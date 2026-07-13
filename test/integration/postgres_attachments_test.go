@@ -56,8 +56,8 @@ func TestPostgres_AttachmentsMigrationsCleanInstallAndUpgrade(t *testing.T) {
 	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM attachments.schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 3 {
-		t.Fatalf("migration count=%d want=3", count)
+	if count != 4 {
+		t.Fatalf("migration count=%d want=4", count)
 	}
 	for _, table := range []string{"secret_sets", "secrets", "service_plans", "service_instances", "service_bindings", "domain_claims", "snapshots", "idempotency", "outbox", "audit"} {
 		var exists bool
