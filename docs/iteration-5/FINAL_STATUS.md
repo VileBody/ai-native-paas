@@ -1,26 +1,32 @@
 # Iteration 5 — Final Status
 
-Generated: `2026-07-12T23:43:52Z`
+Generated: `2026-07-13T20:26:32Z`
 
 ## Verdict
 
 ```text
-Iteration:                  5 — Application Attachments
-Overall status:             RED
-Mandatory TDD parity:       0/0
-Missing mandatory tests:    0
-Attachment top-level tests: 0
-Targeted statement coverage:unknown
-Live PostgreSQL:            NOT RUN
-Live Kubernetes:            NOT RUN
-Live external providers:    NOT RUN
+Iteration:                   5 — Application Attachments
+Code and contract status:    GREEN
+Mandatory TDD parity:        68/68
+Local and CI gates:          PASS
+Live PostgreSQL:             PASS
+Kubernetes database paths:   PASS
+Live external providers:     DEFERRED
 ```
 
-`GREEN` means every locally enforceable gate and live PostgreSQL gate passed. It does **not** claim verification against a real Kubernetes API server, OpenBao, Cozystack, authoritative DNS provider, ACME issuer or cert-manager.
+Iteration 5 is complete for the recovered bounded-context implementation, its
+public contract, PostgreSQL migrations and the two required infrastructure
+classes. User-requested PostgreSQL runs inside the dedicated Kubernetes cluster;
+platform metadata uses private managed PostgreSQL.
+
+`GREEN` does not mean every production provider has been installed. OpenBao,
+Cozystack, DNS, ACME/cert-manager and External Secrets acceptance remain in the
+provider backlog and do not invalidate the completed code/PostgreSQL gate.
 
 ## Frozen output contract
 
-The bounded context exports an immutable attachment snapshot containing references only:
+The bounded context exports an immutable attachment snapshot containing
+references only:
 
 ```go
 type AttachmentSnapshot struct {
@@ -36,32 +42,31 @@ type AttachmentSnapshot struct {
 }
 ```
 
-No plaintext secret, database password, private key or provider credential may cross this contract.
+No plaintext secret, database password, private key or provider credential may
+cross this contract.
 
-## Gate results
+## Verified results
 
-| Gate | Result |
+| Area | Result |
 |---|---|
-| `gofmt` | MISSING |
-| `vet` | MISSING |
-| `default_suite` | MISSING |
-| `attachments_suite` | MISSING |
-| `attachments_race` | MISSING |
-| `attachments_shuffle` | MISSING |
-| `attachments_coverage` | MISSING |
-| `attachments_no_skips` | MISSING |
-| `tdd_parity` | MISSING |
-| `postgres_tag_compile` | MISSING |
-| `no_cross_schema_sql` | MISSING |
-| `no_secret_values_in_contract` | MISSING |
-| `immutable_runtime_reference_scan` | MISSING |
-| `postgres_live` | NOT RUN |
+| TDD matrix | PASS — 68/68 |
+| Unit, acceptance, contract and architecture tests | PASS |
+| Race and shuffled Attachments suites | PASS |
+| Attachments API smoke | PASS |
+| PostgreSQL tagged compilation | PASS |
+| GitHub Actions PostgreSQL gate | PASS, zero skips |
+| User PostgreSQL StatefulSet in Kubernetes | PASS, zero skips |
+| Managed control-plane PostgreSQL over private VPC | PASS, zero skips |
+| Timeweb registry pull and CI push | PASS |
+| Terraform drift check | PASS — no changes |
 
-## Failed or missing gates
+Durable CI evidence:
+[`29281941776`](https://github.com/VileBody/ai-native-paas/actions/runs/29281941776).
+Cloud commands and resource layout are documented in `infra/timeweb/README.md`.
 
-```text
-Missing: gofmt, vet, default_suite, attachments_suite, attachments_race, attachments_shuffle, attachments_coverage, attachments_no_skips, tdd_parity, postgres_tag_compile, no_cross_schema_sql, no_secret_values_in_contract, immutable_runtime_reference_scan
-Failed:  none
-```
+## Remaining acceptance backlog
 
-Full raw logs are in `.verification/final/`.
+Only provider- and production-operations gates remain: real secret broker,
+managed-service operator, DNS/ACME, External Secrets, provider outage/failover,
+backup/restore and production observability. The exact list is maintained in
+`TODO.md` and `KUBERNETES_TODO.md`.

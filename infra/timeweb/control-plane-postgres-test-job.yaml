@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: iteration-5-control-plane-postgres-tests
+  namespace: ai-native-paas-system
+  labels:
+    ai-native-paas.io/owner: verification
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: iteration-5-control-plane-postgres-tests
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: craas-ai-native-paas-registry
+      containers:
+        - name: tests
+          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-tests:iteration-5
+          imagePullPolicy: Always
+          command: ["/bin/bash", "-ec"]
+          args:
+            - >-
+              export TEST_POSTGRES_DSN="host=${PGHOST} port=${PGPORT} user=${PGUSER}
+              password=${PGPASSWORD} dbname=${PGDATABASE} sslmode=${PGSSLMODE}";
+              make test-postgres
+          envFrom:
+            - secretRef:
+                name: control-plane-postgres
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi

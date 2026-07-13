@@ -14,7 +14,8 @@ It provisions:
 
 The cloud test environment also uses a dedicated 5 GiB Container Registry,
 `ai-native-paas-registry` (ID `24867`). It is attached to the
-`ai-native-paas-user-test` and `kube-system` namespaces and provides the
+`ai-native-paas-user-test`, `ai-native-paas-system` and `kube-system`
+namespaces and provides the
 `craas-ai-native-paas-registry` image pull secret. GitHub Actions publishes the
 Iteration 5 test runner to this registry so cluster tests do not depend on
 Docker Hub or GHCR egress.
@@ -50,11 +51,21 @@ registry is created through the Timeweb API and attached to the namespace with:
 
 ```text
 POST /api/v1/k8s/clusters/1099941/container-registry
-{"registry_items":[{"registry_id":24867,"namespace":"ai-native-paas-user-test"},{"registry_id":24867,"namespace":"kube-system"}]}
+{"registry_items":[{"registry_id":24867,"namespace":"ai-native-paas-user-test"},{"registry_id":24867,"namespace":"ai-native-paas-system"},{"registry_id":24867,"namespace":"kube-system"}]}
 ```
 
 Do not commit the registry token. Timeweb owns the generated Kubernetes pull
 secret; CI credentials are stored as GitHub Actions secrets.
+
+Run the complete migration and PostgreSQL integration gate against the managed
+database from inside Kubernetes with the helper below. It refreshes the
+`control-plane-postgres` Secret directly from the sensitive Terraform outputs;
+the password is never written to a manifest or printed.
+
+```shell
+export KUBECONFIG="infra/timeweb/ai-native-paas-test.kubeconfig"
+./scripts/run-iteration-5-managed-postgres-tests.sh
+```
 
 ## Timeweb Cilium Envoy workaround
 
