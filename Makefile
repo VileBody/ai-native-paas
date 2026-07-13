@@ -6,7 +6,7 @@ COVERAGE_HTML ?= coverage.html
 
 .PHONY: fmt fmt-check generate-check vet test race race-build race-kernel-source race-runtime race-commerce \
 	fuzz fuzz-kernel fuzz-source fuzz-build fuzz-runtime fuzz-commerce coverage coverage-html \
-	integration-compile test-postgres test-runtime-postgres test-commerce-postgres build \
+	integration-compile postgres-up postgres-down postgres-reset test-postgres test-postgres-docker test-runtime-postgres test-commerce-postgres build \
 	smoke-runtime-api smoke-commerce-api tdd-iteration4 tdd-iteration6 manifests-iteration4 \
 	verify verify-iteration3 verify-iteration4 verify-iteration6 clean
 
@@ -73,6 +73,18 @@ coverage-html: coverage
 integration-compile:
 	CGO_ENABLED=1 $(GO) test -count=1 -tags=postgres_integration ./test/integration -run='^$$'
 	$(GO) test -count=1 -tags=integration_postgres ./internal/source/postgres -run='^$$'
+
+postgres-up:
+	docker compose -f compose.test.yaml up -d --wait postgres
+
+postgres-down:
+	docker compose -f compose.test.yaml down
+
+postgres-reset:
+	docker compose -f compose.test.yaml down --volumes
+
+test-postgres-docker:
+	./scripts/test-postgres-docker.sh
 
 test-postgres:
 	@test -n "$$TEST_POSTGRES_DSN" || (echo "TEST_POSTGRES_DSN is required" >&2; exit 2)

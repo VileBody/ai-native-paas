@@ -35,3 +35,25 @@ go test ./test/acceptance -run 'TestAcceptance_Agent'
 ```
 
 PostgreSQL-tagged suites require `TEST_POSTGRES_DSN`. Kubernetes/provider acceptance remains an infrastructure gate.
+
+## Local PostgreSQL verification
+
+The Docker harness starts PostgreSQL 17 on `127.0.0.1:55432` and runs every
+surviving live PostgreSQL suite with the Go race detector:
+
+```bash
+make test-postgres-docker
+```
+
+The CGO test driver requires the libpq development files (`brew install libpq
+pkg-config` on macOS, or `apt-get install libpq-dev pkg-config` on Debian and
+Ubuntu). The database remains available after the test run. Manage it with:
+
+```bash
+make postgres-up
+make postgres-down
+make postgres-reset  # also removes the test data volume
+```
+
+Override `POSTGRES_IMAGE` or `PAAS_TEST_POSTGRES_PORT` to test another image or
+host port.
