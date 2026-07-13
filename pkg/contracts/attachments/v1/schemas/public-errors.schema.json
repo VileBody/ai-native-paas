@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://platform.example.com/schemas/attachments/v1/public-errors.schema.json",
+  "title": "AttachmentsPublicError",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["error"],
+  "properties": {
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "INVALID_ARGUMENT",
+            "FORBIDDEN",
+            "ENTITLEMENT_DENIED",
+            "NOT_FOUND",
+            "CONFLICT",
+            "STALE_VERSION",
+            "APPROVAL_REQUIRED",
+            "RETRYABLE",
+            "UNAVAILABLE",
+            "INTERNAL"
+          ]
+        },
+        "message": {"type": "string", "minLength": 1, "maxLength": 512}
+      }
+    }
+  }
+}

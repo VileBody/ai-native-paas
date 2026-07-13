@@ -1,0 +1,82 @@
+name: application-attachments
+
+on:
+  push:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'Makefile'
+      - 'Dockerfile.test'
+      - '.dockerignore'
+      - 'migrations/attachments/**'
+      - 'deploy/iteration5/**'
+      - 'scripts/verify-iteration-5-tdd.py'
+      - '.github/workflows/iteration-5-ci.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - run: sudo apt-get update && sudo apt-get install -y libpq-dev pkg-config
+      - run: make fmt-check vet test tdd-iteration5 build smoke-attachments-api
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: paas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d paas_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      TEST_POSTGRES_DSN: host=127.0.0.1 port=5432 user=postgres password=postgres dbname=paas_test sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - run: sudo apt-get update && sudo apt-get install -y libpq-dev pkg-config
+      - run: make test-postgres
+
+  test-runner-image:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: [verify, postgres]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.test
+          push: true
+          tags: |
+            ghcr.io/vilebody/ai-native-paas-tests:iteration-5
+            ghcr.io/vilebody/ai-native-paas-tests:${{ github.sha }}

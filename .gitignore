@@ -2,11 +2,22 @@
 /coverage.out
 /coverage.html
 *.test
+!Dockerfile.test
 *.prof
 .DS_Store
 __pycache__/
 *.pyc
 /.verification/
+
+# Local Terraform state and cloud access material.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+*.kubeconfig
+crash.log
 
 /coverage-commerce.html
 /coverage-commerce-postgres.html

@@ -1,0 +1,11 @@
+.git
+.terraform
+**/.terraform
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.kubeconfig
+bin
+coverage*.out
+coverage*.html
+.verification

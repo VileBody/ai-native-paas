@@ -1,0 +1,9 @@
+# The API token must have access to this existing project. The cluster itself
+# remains isolated from every other Kubernetes cluster in that project.
+project_id            = 1234567
+location              = "ru-3"
+availability_zone     = "msk-1"
+kubernetes_version    = "v1.35.6+k0s.0"
+master_preset_id      = 1673
+worker_preset_id      = 1683
+postgres_preset_id    = 1175

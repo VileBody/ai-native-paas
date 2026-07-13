@@ -1,0 +1,12 @@
+FROM golang:1.23-bookworm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+COPY . .
+
+RUN CGO_ENABLED=1 go test -count=1 -tags=postgres_integration ./test/integration -run='^$'
+
+CMD ["go", "test", "-count=1", "./..."]

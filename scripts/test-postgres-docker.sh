@@ -8,8 +8,17 @@ compose=(docker compose -f compose.test.yaml)
 
 "${compose[@]}" up -d --wait postgres
 
-if [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
-  libpq_prefix="$(brew --prefix libpq 2>/dev/null || true)"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  libpq_prefix=""
+  for candidate in /opt/homebrew/opt/libpq /usr/local/opt/libpq; do
+    if [[ -d "$candidate/lib/pkgconfig" ]]; then
+      libpq_prefix="$candidate"
+      break
+    fi
+  done
+  if [[ -z "$libpq_prefix" ]] && command -v brew >/dev/null 2>&1; then
+    libpq_prefix="$(brew --prefix libpq 2>/dev/null || true)"
+  fi
   if [[ -n "$libpq_prefix" ]]; then
     export PATH="$libpq_prefix/bin:$PATH"
     export PKG_CONFIG_PATH="$libpq_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"

@@ -6,8 +6,8 @@ COVERAGE_HTML ?= coverage.html
 
 .PHONY: fmt fmt-check generate-check vet test race race-build race-kernel-source race-runtime race-commerce \
 	fuzz fuzz-kernel fuzz-source fuzz-build fuzz-runtime fuzz-commerce coverage coverage-html \
-	integration-compile postgres-up postgres-down postgres-reset test-postgres test-postgres-docker test-runtime-postgres test-commerce-postgres build \
-	smoke-runtime-api smoke-commerce-api tdd-iteration4 tdd-iteration6 manifests-iteration4 \
+	integration-compile postgres-up postgres-down postgres-reset test-postgres test-postgres-docker test-runtime-postgres test-attachments-postgres test-commerce-postgres build \
+	smoke-runtime-api smoke-attachments-api smoke-commerce-api tdd-iteration4 tdd-iteration5 tdd-iteration6 manifests-iteration4 \
 	verify verify-iteration3 verify-iteration4 verify-iteration6 clean
 
 fmt:
@@ -95,6 +95,10 @@ test-runtime-postgres:
 	@test -n "$$TEST_POSTGRES_DSN" || (echo "TEST_POSTGRES_DSN is required" >&2; exit 2)
 	CGO_ENABLED=1 $(GO) test -race -count=1 -tags=postgres_integration ./test/integration -run '^TestPostgres_Runtime' -v
 
+test-attachments-postgres:
+	@test -n "$$TEST_POSTGRES_DSN" || (echo "TEST_POSTGRES_DSN is required" >&2; exit 2)
+	CGO_ENABLED=1 $(GO) test -race -count=1 -tags=postgres_integration ./test/integration -run '^TestPostgres_Attachments' -v
+
 test-commerce-postgres:
 	@test -n "$$TEST_POSTGRES_DSN" || (echo "TEST_POSTGRES_DSN is required" >&2; exit 2)
 	CGO_ENABLED=1 $(GO) test -race -count=1 -tags=postgres_integration ./test/integration -run '^TestPostgres_Commerce' -v
@@ -106,16 +110,23 @@ build:
 	$(GO) build -trimpath -o bin/build-api ./cmd/build-api
 	$(GO) build -trimpath -o bin/runtime-api ./cmd/runtime-api
 	$(GO) build -trimpath -o bin/runtime-operator ./cmd/runtime-operator
+	$(GO) build -trimpath -o bin/attachments-api ./cmd/attachments-api
 	$(GO) build -trimpath -o bin/commerce-api ./cmd/commerce-api
 
 smoke-runtime-api: build
 	./scripts/runtime-api-smoke.sh
+
+smoke-attachments-api: build
+	./scripts/attachments-api-smoke.sh
 
 smoke-commerce-api: build
 	./scripts/commerce-api-smoke.sh
 
 tdd-iteration4:
 	./scripts/verify-iteration-4-tdd.py --matrix docs/iteration-4/TDD_MATRIX.md
+
+tdd-iteration5:
+	./scripts/verify-iteration-5-tdd.py
 
 tdd-iteration6:
 	./scripts/verify-iteration-6-tdd.py

@@ -101,6 +101,21 @@ No log available
 
 See `KUBERNETES_TODO.md`.
 
+## Deferred cloud-lab backlog
+
+The local/DB recovery intentionally defers these live infrastructure gates to
+the shared cloud-lab backlog:
+
+- real OpenBao authentication, tenant policies, lease renewal and HA failover;
+- real Cozystack PostgreSQL/Redis/S3 lifecycle and ambiguous-timeout recovery;
+- authoritative DNS propagation/rebinding tests and ACME staging issuance;
+- External Secrets materialization and rollout behavior;
+- provider callback authentication, outage chaos and regional failure tests;
+- Kubernetes-backed Runtime/Commerce/Agent end-to-end acceptance.
+
+Local fakes and provider contract adapters remain mandatory; only acceptance
+against live provider installations is deferred.
+
 ## Production resilience and operations
 
 - provider webhook/callback authentication against chosen products;

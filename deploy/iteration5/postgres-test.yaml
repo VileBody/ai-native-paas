@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ai-native-paas-user-test
+  labels:
+    ai-native-paas.io/owner: provider-layer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-postgres
+  namespace: ai-native-paas-user-test
+spec:
+  selector:
+    app.kubernetes.io/name: user-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: user-postgres
+  namespace: ai-native-paas-user-test
+  labels:
+    ai-native-paas.io/owner: provider-layer
+spec:
+  serviceName: user-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: user-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: user-postgres
+        ai-native-paas.io/resource-kind: user-database
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_DB
+              value: paas_test
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "paas_test"]
+            initialDelaySeconds: 5
+            periodSeconds: 3
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "paas_test"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          emptyDir: {}
