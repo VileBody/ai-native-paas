@@ -10,9 +10,13 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/build/logs"
 	"github.com/keir-research/ai-native-paas/internal/build/memory"
 	"github.com/keir-research/ai-native-paas/internal/build/support"
+	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 )
 
 func main() {
+	if _, err := platformprofile.Validate(os.Getenv("PLATFORM_PROFILE"), "build-api", platformprofile.Dev("build-memory-store")); err != nil {
+		log.Fatal(err)
+	}
 	service := &application.Service{Store: memory.New(), Logs: logs.New(), Clock: support.Clock{}, IDs: &support.IDs{}, RepositoryBase: os.Getenv("BUILD_REGISTRY_BASE")}
 	handler := httpapi.Handler{Build: service}
 	address := os.Getenv("LISTEN_ADDR")

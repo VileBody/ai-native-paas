@@ -15,11 +15,18 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/agent/httpapi"
 	"github.com/keir-research/ai-native-paas/internal/agent/memory"
 	"github.com/keir-research/ai-native-paas/internal/agent/support"
+	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	agentv1 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v1"
 	commercev1 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1"
 )
 
 func main() {
+	if _, err := platformprofile.Validate(os.Getenv("PLATFORM_PROFILE"), "agent-api",
+		platformprofile.Dev("agent-memory-store"),
+		platformprofile.Dev("source-build-runtime-development-gateways"),
+	); err != nil {
+		log.Fatal(err)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 

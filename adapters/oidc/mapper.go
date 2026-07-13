@@ -23,7 +23,8 @@ type VerifiedClaims struct {
 }
 
 type Mapper struct {
-	Issuer string
+	Issuer        string
+	PrincipalKind kernelv1.PrincipalKind
 }
 
 func (m Mapper) Map(claims VerifiedClaims) (kernelv1.PrincipalContext, error) {
@@ -39,12 +40,14 @@ func (m Mapper) Map(claims VerifiedClaims) (kernelv1.PrincipalContext, error) {
 	if subject == "" {
 		return kernelv1.PrincipalContext{}, kernel.NewError(kernelv1.CodeForbidden, "OIDC subject is required")
 	}
-	kind := kernelv1.PrincipalKind(strings.ToLower(strings.TrimSpace(claims.Kind)))
+	// Principal kind is verifier configuration, not a token-controlled claim.
+	// Human OIDC defaults to user; service/workspace identities use mTLS.
+	kind := m.PrincipalKind
 	if kind == "" {
 		kind = kernelv1.PrincipalKindUser
 	}
 	if !kind.Valid() {
-		return kernelv1.PrincipalContext{}, kernel.NewError(kernelv1.CodeForbidden, fmt.Sprintf("OIDC principal kind %q is invalid", kind))
+		return kernelv1.PrincipalContext{}, kernel.NewError(kernelv1.CodeInvalidArgument, fmt.Sprintf("configured OIDC principal kind %q is invalid", kind))
 	}
 	principal := kernelv1.PrincipalContext{
 		PrincipalID: kernelv1.PrincipalID("oidc:" + subject),

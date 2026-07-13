@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	"github.com/keir-research/ai-native-paas/internal/runtime/application"
 	"github.com/keir-research/ai-native-paas/internal/runtime/kubeapi"
 	"github.com/keir-research/ai-native-paas/internal/runtime/operator"
@@ -37,6 +38,9 @@ func durationEnv(name string, fallback time.Duration) time.Duration {
 }
 
 func main() {
+	if _, err := platformprofile.Validate(os.Getenv("PLATFORM_PROFILE"), "runtime-operator", platformprofile.Prod("kubernetes-api")); err != nil {
+		log.Fatal(err)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 

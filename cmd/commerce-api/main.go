@@ -16,6 +16,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/commerce/application"
 	"github.com/keir-research/ai-native-paas/internal/commerce/httpapi"
 	"github.com/keir-research/ai-native-paas/internal/commerce/memory"
+	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 )
 
 type realClock struct{}
@@ -42,6 +43,9 @@ func env(name, fallback string) string {
 }
 
 func main() {
+	if _, err := platformprofile.Validate(os.Getenv("PLATFORM_PROFILE"), "commerce-api", platformprofile.Dev("commerce-memory-store")); err != nil {
+		log.Fatal(err)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 

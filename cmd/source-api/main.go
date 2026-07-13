@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	"github.com/keir-research/ai-native-paas/internal/source/application"
 	"github.com/keir-research/ai-native-paas/internal/source/gitlab"
 	"github.com/keir-research/ai-native-paas/internal/source/httpapi"
@@ -15,6 +16,9 @@ import (
 )
 
 func main() {
+	if _, err := platformprofile.Validate(os.Getenv("PLATFORM_PROFILE"), "source-api", platformprofile.Dev("source-memory-store")); err != nil {
+		log.Fatal(err)
+	}
 	store := memory.New()
 	clock := support.RealClock{}
 	ids := &support.IDs{}

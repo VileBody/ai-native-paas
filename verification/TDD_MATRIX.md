@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **714**
-- Reused now: **2**
-- New local/contract tests required: **69**
-- Live/provider/system tests required: **86**
+- Discovered Go tests/fuzz targets: **733**
+- Reused now: **17**
+- New local/contract tests required: **56**
+- Live/provider/system tests required: **84**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -14,18 +14,18 @@ A release gate may become green only after every referenced test exists and pass
 
 | ID | Status | Level | Executable evidence target |
 |---|---|---|---|
-| `K1` | NEW | domain + application | `test/pivot/kernel_v2_test.go::TestKernel_ProjectScopedPrincipalCannotCrossProject` |
-| `K2` | NEW | domain | `test/pivot/kernel_v2_test.go::TestKernel_WorkspacePrincipalCannotEscalateToTenantScope` |
-| `K3` | NEW | domain + fake clock | `test/pivot/kernel_v2_test.go::TestKernel_CredentialLeaseExpiresAndCannotBeReused` |
-| `K4` | LIVE_ONLY | application | `test/pivot/kernel_v2_test.go::TestKernel_OperationWaitsForApprovalWithoutRepeatingSideEffect` |
-| `K5` | NEW | application | `test/pivot/kernel_v2_test.go::TestKernel_ParentCancellationPropagatesToCancelableChildren` |
-| `K6` | NEW | application + concurrency | `test/pivot/kernel_v2_test.go::TestKernel_IdempotentCommandReturnsOriginalOperationGraph` |
-| `K7` | NEW | domain | `test/pivot/kernel_v2_test.go::TestKernel_IdempotencyPayloadMismatchCannotReuseApproval` |
+| `K1` | REUSED | domain + application | `internal/kernel/execution/execution_tdd_test.go::TestKernel_ProjectScopedPrincipalCannotCrossProject` |
+| `K2` | REUSED | domain | `internal/kernel/execution/execution_tdd_test.go::TestKernel_WorkspacePrincipalCannotEscalateToTenantScope` |
+| `K3` | REUSED | domain + fake clock | `internal/kernel/execution/execution_tdd_test.go::TestKernel_CredentialLeaseExpiresAndCannotBeReused` |
+| `K4` | REUSED | application | `internal/kernel/execution/execution_tdd_test.go::TestKernel_OperationWaitsForApprovalWithoutRepeatingSideEffect` |
+| `K5` | REUSED | application | `internal/kernel/execution/execution_tdd_test.go::TestKernel_ParentCancellationPropagatesToCancelableChildren` |
+| `K6` | REUSED | application + concurrency | `internal/kernel/execution/execution_tdd_test.go::TestKernel_IdempotentCommandReturnsOriginalOperationGraph` |
+| `K7` | REUSED | domain | `internal/kernel/execution/execution_tdd_test.go::TestKernel_IdempotencyPayloadMismatchCannotReuseApproval` |
 | `K8` | NEW | PostgreSQL + broker integration | `test/pivot/kernel_v2_test.go::TestKernel_OutboxCommitThenCrashPublishesExactlyOnceEffect` |
-| `K9` | NEW | application | `test/pivot/kernel_v2_test.go::TestKernel_AuditRedactsWorkspaceCommandSecrets` |
-| `K10` | NEW | domain | `test/pivot/kernel_v2_test.go::TestKernel_ServicePrincipalCannotApproveHumanAction` |
-| `K11` | NEW | HTTP integration | `test/pivot/kernel_v2_test.go::TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders` |
-| `K12` | LIVE_ONLY | identity provider integration | `test/pivot/kernel_v2_test.go::TestKernel_OIDCAndMTLSIdentityCannotBeConfused` |
+| `K9` | REUSED | application | `internal/security/redact/redact_tdd_test.go::TestKernel_AuditRedactsWorkspaceCommandSecrets` |
+| `K10` | REUSED | domain | `internal/kernel/execution/execution_tdd_test.go::TestKernel_ServicePrincipalCannotApproveHumanAction` |
+| `K11` | REUSED | HTTP integration | `internal/identity/httpauth/middleware_test.go::TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders` |
+| `K12` | REUSED | identity provider integration | `internal/identity/httpauth/middleware_test.go::TestKernel_OIDCAndMTLSIdentityCannotBeConfused` |
 | `K13` | NEW | live PostgreSQL | `test/pivot/kernel_v2_test.go::TestPostgres_ConcurrentMigrationStartupUsesOneOwner` |
 | `K14` | LIVE_ONLY | chaos + PostgreSQL | `test/pivot/kernel_v2_test.go::TestKernel_OperationCheckpointSurvivesDatabaseFailover` |
 | `S1` | LIVE_ONLY | application + GitLab contract | `test/pivot/source_v2_test.go::TestSource_CreateProjectBootstrapsV2RepositoryLayout` |
@@ -129,16 +129,16 @@ A release gate may become green only after every referenced test exists and pass
 | `C16` | NEW | contract/golden | `test/pivot/commerce_v2_test.go::TestCost_ApprovalSummaryIncludesDestructionRiskAndMonthlyDelta` |
 | `C17` | LIVE_ONLY | reconciliation | `test/pivot/commerce_v2_test.go::TestUsage_ReconcilerCorrectsObservedResourceDriftOnce` |
 | `C18` | LIVE_ONLY | application | `test/pivot/commerce_v2_test.go::TestCommercial_CanceledBeforeExecutionCreatesNoUsageCharge` |
-| `G1` | NEW | domain/HTTP | `test/pivot/agent_workspace_test.go::TestAgent_ProjectMCPTokenIsBoundToAgentUserTenantAndProject` |
+| `G1` | REUSED | domain/HTTP | `internal/agent/enrollment/enrollment_tdd_test.go::TestAgent_ProjectMCPTokenIsBoundToAgentUserTenantAndProject` |
 | `G2` | REUSED | contract/golden | `test/contract/mcp_v2_test.go::TestMCPV2_CatalogAndSchemasAreVersionedStableAndClosed` |
 | `G3` | REUSED | application | `test/contract/mcp_v2_test.go::TestMCPV1CompatibilityCannotBypassV2Governance` |
-| `G4` | NEW | fuzz/security | `test/pivot/agent_workspace_test.go::TestAgent_ToolArgumentsCannotOverrideVerifiedScope` |
+| `G4` | REUSED | fuzz/security | `internal/kernel/execution/execution_tdd_test.go::TestAgent_ToolArgumentsCannotOverrideVerifiedScope` |
 | `G5` | LIVE_ONLY | application/provider | `test/pivot/agent_workspace_test.go::TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile` |
 | `G6` | LIVE_ONLY | provider/system | `test/pivot/agent_workspace_test.go::TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials` |
 | `G7` | LIVE_ONLY | architecture/system | `test/pivot/agent_workspace_test.go::TestWorkspace_CommandRunsOnlyInsideWorkspaceNotControlPlaneHost` |
 | `G8` | NEW | policy | `test/pivot/agent_workspace_test.go::TestWorkspace_CommandPolicyRejectsForbiddenExecutableAndFlags` |
 | `G9` | LIVE_ONLY | system/network | `test/pivot/agent_workspace_test.go::TestWorkspace_NetworkProfileAllowsRequiredAndDeniesSensitiveDestinations` |
-| `G10` | NEW | integration/fuzz | `test/pivot/agent_workspace_test.go::TestWorkspace_StdoutStderrStreamingRedactsSecretsAcrossChunkBoundaries` |
+| `G10` | REUSED | integration/fuzz | `internal/security/redact/redact_tdd_test.go::TestWorkspace_StdoutStderrStreamingRedactsSecretsAcrossChunkBoundaries` |
 | `G11` | LIVE_ONLY | system | `test/pivot/agent_workspace_test.go::TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage` |
 | `G12` | LIVE_ONLY | chaos | `test/pivot/agent_workspace_test.go::TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply` |
 | `G13` | NEW | concurrency | `test/pivot/agent_workspace_test.go::TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations` |
@@ -158,7 +158,7 @@ A release gate may become green only after every referenced test exists and pass
 | `G27` | LIVE_ONLY | cross-domain | `test/pivot/agent_workspace_test.go::TestAgent_SuspendedTenantCanInspectButCannotMutate` |
 | `G28` | NEW | acceptance | `test/pivot/agent_workspace_test.go::TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime` |
 | `G29` | LIVE_ONLY | chaos/provider | `test/pivot/agent_workspace_test.go::TestAgent_CancelDuringApplyReconcilesActualExternalState` |
-| `G30` | NEW | HTTP/security | `test/pivot/agent_workspace_test.go::TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction` |
+| `G30` | REUSED | HTTP/security | `internal/identity/httpauth/middleware_test.go::TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction` |
 | `E2E-1` | LIVE_ONLY | full system | `test/system/agentic_devops_e2e_test.go::TestSystem_OneButtonDeploySimpleGoService` |
 | `E2E-2` | LIVE_ONLY | full provider-backed system | `test/system/agentic_devops_e2e_test.go::TestSystem_DeployTemporalPostgresQdrantAndOpenRouter` |
 | `E2E-3` | LIVE_ONLY | system | `test/system/agentic_devops_e2e_test.go::TestSystem_CustomUnknownServiceUsesGenericHelmPath` |

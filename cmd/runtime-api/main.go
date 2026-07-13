@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	"github.com/keir-research/ai-native-paas/internal/runtime/application"
 	"github.com/keir-research/ai-native-paas/internal/runtime/gitops"
 	"github.com/keir-research/ai-native-paas/internal/runtime/httpapi"
@@ -36,6 +37,9 @@ func env(name, fallback string) string {
 }
 
 func main() {
+	if _, err := platformprofile.Validate(os.Getenv("PLATFORM_PROFILE"), "runtime-api", platformprofile.Dev("runtime-memory-store"), platformprofile.Dev("local-gitops-repository")); err != nil {
+		log.Fatal(err)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 

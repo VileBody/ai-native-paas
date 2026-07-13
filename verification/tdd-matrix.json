@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 714,
-  "discovered_unique_test_name_count": 712,
+  "discovered_go_test_count": 733,
+  "discovered_unique_test_name_count": 731,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -8,70 +8,70 @@
       "id": "K1",
       "level": "domain + application",
       "name": "TestKernel_ProjectScopedPrincipalCannotCrossProject",
-      "status": "NEW",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/kernel/execution/execution_tdd_test.go",
       "test_name": "TestKernel_ProjectScopedPrincipalCannotCrossProject",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_ProjectScopedPrincipalCannotCrossProject"
+      "test_ref": "internal/kernel/execution/execution_tdd_test.go::TestKernel_ProjectScopedPrincipalCannotCrossProject"
     },
     {
       "family": "K",
       "id": "K2",
       "level": "domain",
       "name": "TestKernel_WorkspacePrincipalCannotEscalateToTenantScope",
-      "status": "NEW",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/kernel/execution/execution_tdd_test.go",
       "test_name": "TestKernel_WorkspacePrincipalCannotEscalateToTenantScope",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_WorkspacePrincipalCannotEscalateToTenantScope"
+      "test_ref": "internal/kernel/execution/execution_tdd_test.go::TestKernel_WorkspacePrincipalCannotEscalateToTenantScope"
     },
     {
       "family": "K",
       "id": "K3",
       "level": "domain + fake clock",
       "name": "TestKernel_CredentialLeaseExpiresAndCannotBeReused",
-      "status": "NEW",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/kernel/execution/execution_tdd_test.go",
       "test_name": "TestKernel_CredentialLeaseExpiresAndCannotBeReused",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_CredentialLeaseExpiresAndCannotBeReused"
+      "test_ref": "internal/kernel/execution/execution_tdd_test.go::TestKernel_CredentialLeaseExpiresAndCannotBeReused"
     },
     {
       "family": "K",
       "id": "K4",
       "level": "application",
       "name": "TestKernel_OperationWaitsForApprovalWithoutRepeatingSideEffect",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/kernel/execution/execution_tdd_test.go",
       "test_name": "TestKernel_OperationWaitsForApprovalWithoutRepeatingSideEffect",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_OperationWaitsForApprovalWithoutRepeatingSideEffect"
+      "test_ref": "internal/kernel/execution/execution_tdd_test.go::TestKernel_OperationWaitsForApprovalWithoutRepeatingSideEffect"
     },
     {
       "family": "K",
       "id": "K5",
       "level": "application",
       "name": "TestKernel_ParentCancellationPropagatesToCancelableChildren",
-      "status": "NEW",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/kernel/execution/execution_tdd_test.go",
       "test_name": "TestKernel_ParentCancellationPropagatesToCancelableChildren",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_ParentCancellationPropagatesToCancelableChildren"
+      "test_ref": "internal/kernel/execution/execution_tdd_test.go::TestKernel_ParentCancellationPropagatesToCancelableChildren"
     },
     {
       "family": "K",
       "id": "K6",
       "level": "application + concurrency",
       "name": "TestKernel_IdempotentCommandReturnsOriginalOperationGraph",
-      "status": "NEW",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/kernel/execution/execution_tdd_test.go",
       "test_name": "TestKernel_IdempotentCommandReturnsOriginalOperationGraph",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_IdempotentCommandReturnsOriginalOperationGraph"
+      "test_ref": "internal/kernel/execution/execution_tdd_test.go::TestKernel_IdempotentCommandReturnsOriginalOperationGraph"
     },
     {
       "family": "K",
       "id": "K7",
       "level": "domain",
       "name": "TestKernel_IdempotencyPayloadMismatchCannotReuseApproval",
-      "status": "NEW",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/kernel/execution/execution_tdd_test.go",
       "test_name": "TestKernel_IdempotencyPayloadMismatchCannotReuseApproval",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_IdempotencyPayloadMismatchCannotReuseApproval"
+      "test_ref": "internal/kernel/execution/execution_tdd_test.go::TestKernel_IdempotencyPayloadMismatchCannotReuseApproval"
     },
     {
       "family": "K",
@@ -88,40 +88,40 @@
       "id": "K9",
       "level": "application",
       "name": "TestKernel_AuditRedactsWorkspaceCommandSecrets",
-      "status": "NEW",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/security/redact/redact_tdd_test.go",
       "test_name": "TestKernel_AuditRedactsWorkspaceCommandSecrets",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_AuditRedactsWorkspaceCommandSecrets"
+      "test_ref": "internal/security/redact/redact_tdd_test.go::TestKernel_AuditRedactsWorkspaceCommandSecrets"
     },
     {
       "family": "K",
       "id": "K10",
       "level": "domain",
       "name": "TestKernel_ServicePrincipalCannotApproveHumanAction",
-      "status": "NEW",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/kernel/execution/execution_tdd_test.go",
       "test_name": "TestKernel_ServicePrincipalCannotApproveHumanAction",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_ServicePrincipalCannotApproveHumanAction"
+      "test_ref": "internal/kernel/execution/execution_tdd_test.go::TestKernel_ServicePrincipalCannotApproveHumanAction"
     },
     {
       "family": "K",
       "id": "K11",
       "level": "HTTP integration",
       "name": "TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders",
-      "status": "NEW",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/identity/httpauth/middleware_test.go",
       "test_name": "TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders"
+      "test_ref": "internal/identity/httpauth/middleware_test.go::TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders"
     },
     {
       "family": "K",
       "id": "K12",
       "level": "identity provider integration",
       "name": "TestKernel_OIDCAndMTLSIdentityCannotBeConfused",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/identity/httpauth/middleware_test.go",
       "test_name": "TestKernel_OIDCAndMTLSIdentityCannotBeConfused",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_OIDCAndMTLSIdentityCannotBeConfused"
+      "test_ref": "internal/identity/httpauth/middleware_test.go::TestKernel_OIDCAndMTLSIdentityCannotBeConfused"
     },
     {
       "family": "K",
@@ -1158,10 +1158,10 @@
       "id": "G1",
       "level": "domain/HTTP",
       "name": "TestAgent_ProjectMCPTokenIsBoundToAgentUserTenantAndProject",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/agent/enrollment/enrollment_tdd_test.go",
       "test_name": "TestAgent_ProjectMCPTokenIsBoundToAgentUserTenantAndProject",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_ProjectMCPTokenIsBoundToAgentUserTenantAndProject"
+      "test_ref": "internal/agent/enrollment/enrollment_tdd_test.go::TestAgent_ProjectMCPTokenIsBoundToAgentUserTenantAndProject"
     },
     {
       "family": "G",
@@ -1188,10 +1188,10 @@
       "id": "G4",
       "level": "fuzz/security",
       "name": "TestAgent_ToolArgumentsCannotOverrideVerifiedScope",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/kernel/execution/execution_tdd_test.go",
       "test_name": "TestAgent_ToolArgumentsCannotOverrideVerifiedScope",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_ToolArgumentsCannotOverrideVerifiedScope"
+      "test_ref": "internal/kernel/execution/execution_tdd_test.go::TestAgent_ToolArgumentsCannotOverrideVerifiedScope"
     },
     {
       "family": "G",
@@ -1248,10 +1248,10 @@
       "id": "G10",
       "level": "integration/fuzz",
       "name": "TestWorkspace_StdoutStderrStreamingRedactsSecretsAcrossChunkBoundaries",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/security/redact/redact_tdd_test.go",
       "test_name": "TestWorkspace_StdoutStderrStreamingRedactsSecretsAcrossChunkBoundaries",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_StdoutStderrStreamingRedactsSecretsAcrossChunkBoundaries"
+      "test_ref": "internal/security/redact/redact_tdd_test.go::TestWorkspace_StdoutStderrStreamingRedactsSecretsAcrossChunkBoundaries"
     },
     {
       "family": "G",
@@ -1448,10 +1448,10 @@
       "id": "G30",
       "level": "HTTP/security",
       "name": "TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/identity/httpauth/middleware_test.go",
       "test_name": "TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction"
+      "test_ref": "internal/identity/httpauth/middleware_test.go::TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction"
     },
     {
       "family": "E2E",
@@ -1589,9 +1589,9 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 86,
-      "NEW": 69,
-      "REUSED": 2
+      "LIVE_ONLY": 84,
+      "NEW": 56,
+      "REUSED": 17
     },
     "unmapped": 0
   }

@@ -13,10 +13,15 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/kernel"
 	"github.com/keir-research/ai-native-paas/internal/kernel/httpapi"
 	"github.com/keir-research/ai-native-paas/internal/kernel/memory"
+	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	if _, err := platformprofile.Validate(os.Getenv("PLATFORM_PROFILE"), "kernel-api", platformprofile.Dev("kernel-memory-store"), platformprofile.Dev("development-identity-headers")); err != nil {
+		logger.Error("invalid runtime profile", "error", err)
+		os.Exit(1)
+	}
 	ids := kernel.CryptoIDGenerator{}
 	service, err := kernel.NewService(memory.NewStore(), kernel.SystemClock{}, ids)
 	if err != nil {

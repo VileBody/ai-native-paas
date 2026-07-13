@@ -57,9 +57,16 @@ func TestOIDCClaims_DoesNotTrustTenantFromUnsignedInput(t *testing.T) {
 	}
 }
 
-func TestOIDCClaims_RejectsUnknownPrincipalKind(t *testing.T) {
-	_, err := (Mapper{Issuer: "https://identity.example.com"}).Map(VerifiedClaims{Issuer: "https://identity.example.com", Subject: "x", Kind: "root"})
-	if kernel.ErrorCode(err) != kernelv1.CodeForbidden {
+func TestOIDCClaims_IgnoresUntrustedPrincipalKind(t *testing.T) {
+	principal, err := (Mapper{Issuer: "https://identity.example.com"}).Map(VerifiedClaims{Issuer: "https://identity.example.com", Subject: "x", Kind: "root"})
+	if err != nil || principal.Kind != kernelv1.PrincipalKindUser {
+		t.Fatalf("principal = %#v, error = %v", principal, err)
+	}
+}
+
+func TestOIDCClaims_RejectsInvalidConfiguredPrincipalKind(t *testing.T) {
+	_, err := (Mapper{Issuer: "https://identity.example.com", PrincipalKind: "root"}).Map(VerifiedClaims{Issuer: "https://identity.example.com", Subject: "x"})
+	if kernel.ErrorCode(err) != kernelv1.CodeInvalidArgument {
 		t.Fatalf("error = %v", err)
 	}
 }

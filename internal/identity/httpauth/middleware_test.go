@@ -1,0 +1,101 @@
+package httpauth
+
+import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/keir-research/ai-native-paas/internal/platformprofile"
+)
+
+type oidcVerifierFunc func(context.Context, string) (Identity, error)
+
+func (f oidcVerifierFunc) VerifyOIDC(ctx context.Context, token string) (Identity, error) {
+	return f(ctx, token)
+}
+
+type mtlsVerifierFunc func(context.Context, *x509.Certificate) (Identity, error)
+
+func (f mtlsVerifierFunc) VerifyMTLS(ctx context.Context, certificate *x509.Certificate) (Identity, error) {
+	return f(ctx, certificate)
+}
+
+func TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders(t *testing.T) {
+	var invoked bool
+	handler := Middleware{Profile: platformprofile.Production}.Wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { invoked = true }))
+	request := httptest.NewRequest(http.MethodGet, "/v2/operations", nil)
+	request.Header.Set("X-Tenant-ID", "tenant-1")
+	request.Header.Set("X-Principal-ID", "user-1")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized || invoked {
+		t.Fatalf("development headers reached handler: status=%d invoked=%t", response.Code, invoked)
+	}
+}
+
+func TestKernel_OIDCAndMTLSIdentityCannotBeConfused(t *testing.T) {
+	oidc := oidcVerifierFunc(func(_ context.Context, token string) (Identity, error) {
+		return Identity{SubjectID: "user-1", TenantID: "tenant-1", ProjectID: "project-1", KindClaim: "WORKSPACE", Scopes: []string{"project:read"}}, nil
+	})
+	mtls := mtlsVerifierFunc(func(_ context.Context, _ *x509.Certificate) (Identity, error) {
+		return Identity{SubjectID: "workspace-1", TenantID: "tenant-1", ProjectID: "project-1", KindClaim: "USER", Scopes: []string{"workspace:exec"}}, nil
+	})
+	verified := make(chan Identity, 2)
+	handler := Middleware{Profile: platformprofile.Production, OIDC: oidc, MTLS: mtls}.Wrap(http.HandlerFunc(func(_ http.ResponseWriter, request *http.Request) {
+		identity, ok := IdentityFromContext(request.Context())
+		if !ok {
+			t.Error("trusted identity missing from context")
+			return
+		}
+		verified <- identity
+	}))
+
+	oidcRequest := httptest.NewRequest(http.MethodGet, "/v2/operations", nil)
+	oidcRequest.Header.Set("Authorization", "Bearer signed-user-token")
+	oidcResponse := httptest.NewRecorder()
+	handler.ServeHTTP(oidcResponse, oidcRequest)
+	if identity := <-verified; identity.KindClaim != "USER" || identity.Source != "oidc" {
+		t.Fatalf("OIDC claim confused principal kind: %#v", identity)
+	}
+
+	mtlsRequest := httptest.NewRequest(http.MethodGet, "/v2/operations", nil)
+	mtlsRequest.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{{SerialNumber: nil}}}
+	mtlsResponse := httptest.NewRecorder()
+	handler.ServeHTTP(mtlsResponse, mtlsRequest)
+	if identity := <-verified; identity.KindClaim != "SERVICE" || identity.Source != "mtls" {
+		t.Fatalf("mTLS claim confused principal kind: %#v", identity)
+	}
+
+	ambiguous := httptest.NewRequest(http.MethodGet, "/v2/operations", nil)
+	ambiguous.Header.Set("Authorization", "Bearer token")
+	ambiguous.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{{}}}
+	ambiguousResponse := httptest.NewRecorder()
+	handler.ServeHTTP(ambiguousResponse, ambiguous)
+	if ambiguousResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("ambiguous identity accepted: %d", ambiguousResponse.Code)
+	}
+}
+
+func TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction(t *testing.T) {
+	var invoked bool
+	handler := Middleware{Profile: platformprofile.Production}.Wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { invoked = true }))
+	for _, configure := range []func(*http.Request){
+		func(request *http.Request) {},
+		func(request *http.Request) { request.Header.Set("X-Tenant-ID", "tenant-1") },
+		func(request *http.Request) { request.Header.Set("X-Agent-ID", "agent-1") },
+	} {
+		request := httptest.NewRequest(http.MethodPost, "/mcp/v2/invoke", nil)
+		configure(request)
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusUnauthorized {
+			t.Fatalf("unverified request accepted: status=%d", response.Code)
+		}
+	}
+	if invoked {
+		t.Fatal("unverified agent request reached tool dispatch")
+	}
+}

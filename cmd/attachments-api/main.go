@@ -17,6 +17,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/attachments/httpapi"
 	"github.com/keir-research/ai-native-paas/internal/attachments/memory"
 	"github.com/keir-research/ai-native-paas/internal/attachments/openbao"
+	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
 )
 
@@ -34,6 +35,13 @@ func mustPlan(service *application.Service, plan domain.ServicePlan) {
 }
 
 func main() {
+	if _, err := platformprofile.Validate(os.Getenv("PLATFORM_PROFILE"), "attachments-api",
+		platformprofile.Dev("attachments-memory-store"),
+		platformprofile.Dev("openbao-memory-backend"),
+		platformprofile.Dev("managed-provider-development-gateways"),
+	); err != nil {
+		log.Fatal(err)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
