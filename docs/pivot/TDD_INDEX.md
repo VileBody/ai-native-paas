@@ -1,0 +1,290 @@
+# TDD test index
+
+Detailed test specifications: **157**.
+
+- `A5`: 32
+- `B1`: 1
+- `B10`: 1
+- `B11`: 1
+- `B12`: 1
+- `B13`: 1
+- `B14`: 1
+- `B15`: 1
+- `B2`: 1
+- `B3`: 1
+- `B4`: 1
+- `B5`: 1
+- `B6`: 1
+- `B7`: 1
+- `B8`: 1
+- `B9`: 1
+- `C1`: 1
+- `C10`: 1
+- `C11`: 1
+- `C12`: 1
+- `C13`: 1
+- `C14`: 1
+- `C15`: 1
+- `C16`: 1
+- `C17`: 1
+- `C18`: 1
+- `C2`: 1
+- `C3`: 1
+- `C4`: 1
+- `C5`: 1
+- `C6`: 1
+- `C7`: 1
+- `C8`: 1
+- `C9`: 1
+- `E2E-1`: 1
+- `E2E-10`: 1
+- `E2E-11`: 1
+- `E2E-12`: 1
+- `E2E-2`: 1
+- `E2E-3`: 1
+- `E2E-4`: 1
+- `E2E-5`: 1
+- `E2E-6`: 1
+- `E2E-7`: 1
+- `E2E-8`: 1
+- `E2E-9`: 1
+- `G1`: 1
+- `G10`: 1
+- `G11`: 1
+- `G12`: 1
+- `G13`: 1
+- `G14`: 1
+- `G15`: 1
+- `G16`: 1
+- `G17`: 1
+- `G18`: 1
+- `G19`: 1
+- `G2`: 1
+- `G20`: 1
+- `G21`: 1
+- `G22`: 1
+- `G23`: 1
+- `G24`: 1
+- `G25`: 1
+- `G26`: 1
+- `G27`: 1
+- `G28`: 1
+- `G29`: 1
+- `G3`: 1
+- `G30`: 1
+- `G4`: 1
+- `G5`: 1
+- `G6`: 1
+- `G7`: 1
+- `G8`: 1
+- `G9`: 1
+- `K1`: 1
+- `K10`: 1
+- `K11`: 1
+- `K12`: 1
+- `K13`: 1
+- `K14`: 1
+- `K2`: 1
+- `K3`: 1
+- `K4`: 1
+- `K5`: 1
+- `K6`: 1
+- `K7`: 1
+- `K8`: 1
+- `K9`: 1
+- `R1`: 1
+- `R10`: 1
+- `R11`: 1
+- `R12`: 1
+- `R13`: 1
+- `R14`: 1
+- `R15`: 1
+- `R16`: 1
+- `R17`: 1
+- `R18`: 1
+- `R2`: 1
+- `R3`: 1
+- `R4`: 1
+- `R5`: 1
+- `R6`: 1
+- `R7`: 1
+- `R8`: 1
+- `R9`: 1
+- `S1`: 1
+- `S10`: 1
+- `S11`: 1
+- `S12`: 1
+- `S13`: 1
+- `S14`: 1
+- `S15`: 1
+- `S16`: 1
+- `S17`: 1
+- `S18`: 1
+- `S2`: 1
+- `S3`: 1
+- `S4`: 1
+- `S5`: 1
+- `S6`: 1
+- `S7`: 1
+- `S8`: 1
+- `S9`: 1
+
+## Tests
+
+- `K1` `TestKernel_ProjectScopedPrincipalCannotCrossProject` — domain + application
+- `K2` `TestKernel_WorkspacePrincipalCannotEscalateToTenantScope` — domain
+- `K3` `TestKernel_CredentialLeaseExpiresAndCannotBeReused` — domain + fake clock
+- `K4` `TestKernel_OperationWaitsForApprovalWithoutRepeatingSideEffect` — application
+- `K5` `TestKernel_ParentCancellationPropagatesToCancelableChildren` — application
+- `K6` `TestKernel_IdempotentCommandReturnsOriginalOperationGraph` — application + concurrency
+- `K7` `TestKernel_IdempotencyPayloadMismatchCannotReuseApproval` — domain
+- `K8` `TestKernel_OutboxCommitThenCrashPublishesExactlyOnceEffect` — PostgreSQL + broker integration
+- `K9` `TestKernel_AuditRedactsWorkspaceCommandSecrets` — application
+- `K10` `TestKernel_ServicePrincipalCannotApproveHumanAction` — domain
+- `K11` `TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders` — HTTP integration
+- `K12` `TestKernel_OIDCAndMTLSIdentityCannotBeConfused` — identity provider integration
+- `K13` `TestPostgres_ConcurrentMigrationStartupUsesOneOwner` — live PostgreSQL
+- `K14` `TestKernel_OperationCheckpointSurvivesDatabaseFailover` — chaos + PostgreSQL
+- `S1` `TestSource_CreateProjectBootstrapsV2RepositoryLayout` — application + GitLab contract
+- `S2` `TestSource_CheckoutUsesExactCommitNotMutableBranchHead` — real local Git integration
+- `S3` `TestSource_PatchRejectsNonCanonicalAndGitInternalPaths` — fuzz + application
+- `S4` `TestSource_ProductionGitOpsPathRequiresApprovalPolicy` — application
+- `S5` `TestSource_AgentCommitContainsSignedAttestationAndCorrelation` — Git integration
+- `S6` `TestSource_ConcurrentPushUsesExpectedBaseSHA` — Git integration + concurrency
+- `S7` `TestSource_SecretScannerBlocksCredentialBeforeCommit` — application
+- `S8` `TestSource_ProjectTokenCannotReadSiblingRepository` — real GitLab provider
+- `S9` `TestSource_MissedWebhookRecoveredByBranchReconciler` — application + provider fake
+- `S10` `TestSource_OutOfOrderWebhookCannotRegressObservedHead` — application
+- `S11` `TestSource_RenameKeepsNumericProviderIdentity` — real GitLab provider
+- `S12` `TestSource_MergeRequestPublishesPlanSummaryWithoutSecrets` — GitLab contract
+- `S13` `TestSource_DeletedBranchProducesEnvironmentCleanupIntent` — application
+- `S14` `TestSource_SubmoduleAndLFSFollowExplicitPolicy` — integration
+- `S15` `TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency` — provider contract
+- `S16` `TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge` — application + provider
+- `S17` `TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig` — real Git integration
+- `S18` `TestSource_UnknownProviderProjectIsQuarantinedNotAdopted` — reconciliation
+- `B1` `TestBuild_IdentityIncludesCommitAndCanonicalBuildSpec` — domain
+- `B2` `TestBuild_ExplicitBuildSpecOverridesRuntimeDetection` — application
+- `B3` `TestBuild_BuildpacksRemainOptionalFallback` — application
+- `B4` `TestBuild_DockerfileRunsOnlyInDisposableIsolationBackend` — application
+- `B5` `TestBuild_NetworkProfileBlocksMetadataPrivateAndControlPlane` — provider/system security
+- `B6` `TestBuild_ResourceLimitsTerminateForkBombAndOversizedContext` — system
+- `B7` `TestBuild_SecretsNeverEnterLayerLogOrProvenance` — integration
+- `B8` `TestBuild_CacheIsProjectScopedForUntrustedLayers` — integration
+- `B9` `TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery` — registry integration
+- `B10` `TestBuild_TrustChainRequiredBeforeArtifactReleasable` — domain + PostgreSQL
+- `B11` `TestBuild_MutableBaseOrOutputTagCannotDefineProductionArtifact` — policy
+- `B12` `TestBuild_SameIdentityConcurrentRequestsExecuteOnce` — PostgreSQL + concurrency
+- `B13` `TestBuild_CancelStopsExecutionAndRevokesBuildCredentials` — application/system
+- `B14` `TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests` — registry integration
+- `B15` `TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest` — contract/crypto
+- `R1` `TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath` — application
+- `R2` `TestGitOps_HelmRenderIsDeterministicForPinnedInputs` — integration/golden
+- `R3` `TestGitOps_KustomizeRenderIsDeterministicAndPathSafe` — integration/fuzz
+- `R4` `TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit` — policy
+- `R5` `TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource` — policy
+- `R6` `TestArgoProject_AllowsOnlyExpectedRepositoryClusterAndNamespaces` — manifest contract + real Argo
+- `R7` `TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady` — application/system
+- `R8` `TestRuntime_RollbackCreatesAuditableGitRevision` — application + Git
+- `R9` `TestRuntime_DriftIsReportedAndSelfHealFollowsPolicy` — system
+- `R10` `TestRuntime_NamespaceAndServiceAccountIsolation` — Kubernetes system
+- `R11` `TestRuntime_HPAAndGitOpsDoNotFightOverReplicas` — system
+- `R12` `TestRuntime_ProductOperatorCRAllowedOnlyByRecipePolicy` — policy
+- `R13` `TestRuntime_PaaSAppFastPathProducesEquivalentStandardResources` — operator contract
+- `R14` `TestRuntime_PreviewApplicationSetCreatedAndRemovedFromBranchLifecycle` — real Argo/ApplicationSet
+- `R15` `TestRuntime_FailedNewRevisionKeepsPreviousTrafficWhereStrategySupportsIt` — Kubernetes/Gateway system
+- `R16` `TestRuntime_UnknownObservedObjectIsQuarantined` — reconciliation
+- `R17` `TestRuntime_GVisorRequiredForSharedUntrustedTier` — real Kubernetes
+- `R18` `TestRuntime_CiliumDefaultDenyAndExplicitEgressProfiles` — real Kubernetes/network
+- `A5.1` `TestSecret_SetIsWriteOnlyAndReturnsMetadataOnly` — application
+- `A5.2` `TestSecret_ProjectAndEnvironmentScopesAreIsolated` — domain + OpenBao integration
+- `A5.3` `TestSecret_ValueAbsentFromControlPlanePersistenceAndEvents` — PostgreSQL + redaction
+- `A5.4` `TestCredential_LeaseIsShortLivedProjectScopedAndSinglePurpose` — credential broker integration
+- `A5.5` `TestCredential_RotationCutsOverBeforeRevokingOldVersion` — application/system
+- `A5.6` `TestCredential_RevokePrefixFailsClosedWhenBackendCannotGuaranteeIt` — OpenBao adapter
+- `A5.7` `TestSecret_GitWorkspacePlanAndBuildNeverContainValue` — cross-domain acceptance
+- `A5.8` `TestRecipe_ActivatedVersionIsImmutableAndSigned` — domain + PostgreSQL + crypto
+- `A5.9` `TestRecipe_ResolutionPinsExactVersionAndArtifactDigests` — application
+- `A5.10` `TestRecipe_DependencyGraphRejectsCyclesAndVersionConflict` — domain
+- `A5.11` `TestRecipe_PlanIsPureAndCreatesNoExternalResource` — application
+- `A5.12` `TestRecipe_DeclaredPermissionsMatchRenderedResources` — policy integration
+- `A5.13` `TestRecipe_HealthBackupUpgradeAndRemovalProceduresAreComplete` — contract
+- `A5.14` `TestRecipe_CustomAdHocInstallIsAllowedWithinStricterPolicy` — application
+- `A5.15` `TestProviderResource_EntitlementAndReservationPrecedeApply` — cross-domain application
+- `A5.16` `TestProviderResource_LostApplyResponseRecoveredByExternalIdentity` — provider contract
+- `A5.17` `TestProviderResource_ObservedReadyCreatesBindingsAndUsageOnce` — application
+- `A5.18` `TestProviderResource_DeletePolicyRetainDoesNotDestroyData` — application/provider
+- `A5.19` `TestProviderResource_DestroyRequiresMatchingPlanHashApproval` — governance
+- `A5.20` `TestProviderResource_FinalBackupCompletesBeforeApprovedPurge` — provider/system
+- `A5.21` `TestCapability_OpenRouterTokenIsProjectScopedAndMasterKeyHidden` — gateway integration
+- `A5.22` `TestCapability_BudgetExceededStopsRequestBeforeProviderCall` — commerce/gateway
+- `A5.23` `TestCapability_ProviderUsageIsAttributedAndDeduplicated` — integration
+- `A5.24` `TestCapability_ProviderSubstitutionPreservesPlatformContract` — contract
+- `A5.25` `TestCapability_ApifyOrBrightDataCredentialCannotBeUsedOutsideGateway` — security
+- `A5.26` `TestCapability_RateLimitIsPerProjectAndDoesNotLeakCrossTenantState` — concurrency
+- `A5.27` `TestInputsSnapshot_IsImmutableAndContainsReferencesOnly` — domain + PostgreSQL
+- `A5.28` `TestInputsSnapshot_SameImageNewInputsCreatesNewRuntimeRevision` — cross-domain
+- `A5.29` `TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs` — cross-domain
+- `A5.30` `TestDomain_OwnershipProofRequiresIndependentDNSObservations` — DNS provider integration
+- `A5.31` `TestDomain_RouteActivatesOnlyAfterOwnershipAndTLSReady` — provider/runtime integration
+- `A5.32` `TestDomain_ReleaseEntersQuarantineBeforeAnotherTenantCanClaim` — domain + fake clock
+- `C1` `TestCost_TofuPlanProducesDeterministicNormalizedEstimate` — application/golden
+- `C2` `TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement` — domain
+- `C3` `TestCost_HelmResourcesContributeRequestedRuntimeAllocation` — application
+- `C4` `TestCost_ApprovalInvalidatedWhenPlanHashChanges` — domain
+- `C5` `TestQuota_ReservationCommittedBeforeExternalApply` — cross-domain application
+- `C6` `TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget` — PostgreSQL + race
+- `C7` `TestQuota_ExpiredReservationCannotAuthorizeLateApply` — domain/fake clock
+- `C8` `TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder` — application/provider
+- `C9` `TestUsage_ProviderReportReplayDoesNotDoubleCharge` — integration
+- `C10` `TestUsage_OpenRouterTokensAreAttributedToProjectTaskAndModel` — capability gateway integration
+- `C11` `TestUsage_ApifyAndBrightDataMetersRemainProviderSpecificButInvoiceStable` — rating
+- `C12` `TestBudget_WorkspaceCommandStoppedBeforeExceedingHardLimit` — workspace/commerce integration
+- `C13` `TestBudget_RepairLoopConsumesConfiguredNotUnlimitedBudget` — Agent/Commerce
+- `C14` `TestCommercial_SuspendedProjectIsReadOnlyAndRetainsData` — cross-domain
+- `C15` `TestRating_UsesExactArithmeticAcrossMicroUsageAndLargeQuantities` — property/fuzz
+- `C16` `TestCost_ApprovalSummaryIncludesDestructionRiskAndMonthlyDelta` — contract/golden
+- `C17` `TestUsage_ReconcilerCorrectsObservedResourceDriftOnce` — reconciliation
+- `C18` `TestCommercial_CanceledBeforeExecutionCreatesNoUsageCharge` — application
+- `G1` `TestAgent_ProjectMCPTokenIsBoundToAgentUserTenantAndProject` — domain/HTTP
+- `G2` `TestMCPV2_CatalogAndSchemasAreVersionedStableAndClosed` — contract/golden
+- `G3` `TestMCPV1CompatibilityCannotBypassV2Governance` — application
+- `G4` `TestAgent_ToolArgumentsCannotOverrideVerifiedScope` — fuzz/security
+- `G5` `TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile` — application/provider
+- `G6` `TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials` — provider/system
+- `G7` `TestWorkspace_CommandRunsOnlyInsideWorkspaceNotControlPlaneHost` — architecture/system
+- `G8` `TestWorkspace_CommandPolicyRejectsForbiddenExecutableAndFlags` — policy
+- `G9` `TestWorkspace_NetworkProfileAllowsRequiredAndDeniesSensitiveDestinations` — system/network
+- `G10` `TestWorkspace_StdoutStderrStreamingRedactsSecretsAcrossChunkBoundaries` — integration/fuzz
+- `G11` `TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage` — system
+- `G12` `TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply` — chaos
+- `G13` `TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations` — concurrency
+- `G14` `TestAgent_DeployWorkflowStartsFromExactRepositoryRevision` — application
+- `G15` `TestInfraPlan_IsPureIdempotentAndStoresCanonicalPlanHash` — application/OpenTofu integration
+- `G16` `TestInfraApply_RequiresMatchingPlanReservationAndApproval` — cross-domain
+- `G17` `TestInfraState_RemoteLockPreventsConcurrentMutation` — live state backend/concurrency
+- `G18` `TestAgent_GitOpsCommitOccursOnlyAfterInfraDependenciesReady` — orchestration
+- `G19` `TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix` — acceptance
+- `G20` `TestAgent_DestroyWorkflowShowsPlanAndRetainsResourcesByPolicy` — application
+- `G21` `TestAgent_NeverReceivesPlatformOrProviderMasterCredential` — security acceptance
+- `G22` `TestAgent_SecretSetIsWriteOnlyAcrossMCPAndWorkspace` — cross-domain
+- `G23` `TestAgent_CostThresholdPausesBeforeApplyAndNotifiesHuman` — application
+- `G24` `TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan` — PostgreSQL/concurrency
+- `G25` `TestAgent_RepairLoopAndBudgetStopAutonomousSpend` — application
+- `G26` `TestAgent_ProviderCapabilityUsageVisibleWithoutMasterCredential` — gateway acceptance
+- `G27` `TestAgent_SuspendedTenantCanInspectButCannotMutate` — cross-domain
+- `G28` `TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime` — acceptance
+- `G29` `TestAgent_CancelDuringApplyReconcilesActualExternalState` — chaos/provider
+- `G30` `TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction` — HTTP/security
+- `E2E-1` `TestSystem_OneButtonDeploySimpleGoService` — full system
+- `E2E-2` `TestSystem_DeployTemporalPostgresQdrantAndOpenRouter` — full provider-backed system
+- `E2E-3` `TestSystem_CustomUnknownServiceUsesGenericHelmPath` — system
+- `E2E-4` `TestSystem_DestructivePlanCannotReusePreviousApproval` — security/system
+- `E2E-5` `TestSystem_LostGitWebhookProviderResponseAndArgoStatusRecover` — chaos
+- `E2E-6` `TestSystem_WorkspaceCompromiseCannotReachControlPlaneOrOtherTenant` — offensive security
+- `E2E-7` `TestSystem_CostBudgetStopsAutonomousRepairLoop` — system/commerce
+- `E2E-8` `TestSystem_RuntimeDriftReconcilesFromGitNotWorkspaceMemory` — system
+- `E2E-9` `TestSystem_ProjectDeletionRetainsAndPurgesAccordingToExplicitPolicy` — system/provider
+- `E2E-10` `TestSystem_SecretSentinelAbsentAcrossAllSurfaces` — full security regression
+- `E2E-11` `TestSystem_SuspensionStopsMutationButPreservesRecoverability` — system
+- `E2E-12` `TestSystem_BackupRestoreReconstructsControlAndProjectState` — disaster recovery

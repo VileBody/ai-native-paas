@@ -1,21 +1,28 @@
-# Final snapshot provenance and verification
+# Pivot baseline provenance and verification
 
 ## Provenance
 
-The base is the cumulative Iteration 7 checkpoint, itself based on the verified Iteration 6 repository. The latest surviving Iteration 7 PostgreSQL retry patch, MCP/OpenAPI files, API smoke script and lifecycle acceptance test were overlaid. The complete frozen Iteration 5 public contract was restored from the surviving source workspace.
+The implementation baseline is commit `440a195`. It contains the cumulative
+Iterations 1–7 tree plus the fully reconstructed Iteration 5 bounded context.
+The agentic DevOps pivot is additive: the old contracts remain regression
+fixtures while v2 Project MCP, workspace, infrastructure and provider
+contracts are introduced.
 
 ## Verification performed on this exact merged tree
 
-- `gofmt` over all Go sources;
-- Agent Governance domain/application/HTTP tests;
-- Agent and Attachments public contract tests;
-- architecture-boundary tests with the roadmap guard advanced to Iteration 7;
-- Agent lifecycle acceptance tests;
-- compilation of all command packages;
-- ZIP integrity and SHA-256 manifest verification.
+- default Go suite over the exact cumulative tree;
+- 68/68 Iteration 5 requirement parity;
+- race, shuffle, contract, architecture and API smoke gates;
+- live PostgreSQL suites against a Kubernetes user database and private
+  managed platform database;
+- registry push/pull and Terraform no-drift checks;
+- generated pivot matrix containing all 157 requirements and zero unmapped
+  entries.
 
-## Important limitation
+## Current pivot qualification
 
-The final sandbox restart removed the previously restored, complete Iteration 5 working tree before it could be archived. Therefore the directly buildable module contains the frozen Attachments contract rather than the full Attachments implementation. All surviving implementation fragments and evidence are preserved under `recovery/` instead of being represented as a complete package.
-
-Live PostgreSQL and Kubernetes/provider integration suites were not rerun against this final merged snapshot.
+Local and database baselines are green. Generic runtime, disposable workspace,
+OpenBao, Cozystack, GitLab.com, capability-provider, security and disaster
+recovery gates remain explicit pending dimensions in
+`verification/status.yaml`; none is inferred from fake adapters or rendered
+manifests.

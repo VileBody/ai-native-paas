@@ -1,0 +1,22 @@
+schema_version: 1
+baseline_commit: "440a195"
+generated_at: "2026-07-14T00:00:00Z"
+statuses:
+  LOCAL_GREEN:
+    state: GREEN
+    evidence: "go test ./... on the pre-pivot baseline"
+  DB_GREEN:
+    state: GREEN
+    evidence: "Iteration 5 CI plus user and managed PostgreSQL cloud gates"
+  PROVIDER_GREEN:
+    state: PENDING
+    evidence: "OpenBao, Cozystack, GitLab and capability live suites not complete"
+  K8S_GREEN:
+    state: PENDING
+    evidence: "database harness only; generic runtime cell gate not complete"
+  SECURITY_GREEN:
+    state: PENDING
+    evidence: "pivot cross-surface and workspace compromise suites not complete"
+  OPS_GREEN:
+    state: PENDING
+    evidence: "pivot backup/restore and chaos gates not complete"

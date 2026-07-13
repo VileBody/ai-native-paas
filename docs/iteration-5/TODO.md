@@ -20,10 +20,10 @@
 
 ## Cloud account organization
 
-- [ ] Move the isolated cluster, VPC, managed database and registry to a
-  dedicated Timeweb project when the API token has `project:create` permission.
-  The resources do not share a cluster or VPC with `call-analytics-k8s`, but are
-  currently billed under the existing `BALOVSTVO` project.
+- [x] Keep the isolated cluster, VPC, managed database and registry in the
+  existing `BALOVSTVO` project. This is the intentional ownership and billing
+  boundary; the resources do not share a cluster or VPC with
+  `call-analytics-k8s`.
 - [ ] Move local Terraform state, which contains generated database credentials,
   to an encrypted remote backend before adding more operators.
 

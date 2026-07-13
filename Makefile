@@ -8,7 +8,7 @@ COVERAGE_HTML ?= coverage.html
 	fuzz fuzz-kernel fuzz-source fuzz-build fuzz-runtime fuzz-commerce coverage coverage-html \
 	integration-compile postgres-up postgres-down postgres-reset test-postgres test-postgres-docker test-runtime-postgres test-attachments-postgres test-commerce-postgres build \
 	smoke-runtime-api smoke-attachments-api smoke-commerce-api tdd-iteration4 tdd-iteration5 tdd-iteration6 manifests-iteration4 \
-	verify verify-iteration3 verify-iteration4 verify-iteration6 clean
+	pivot-tdd pivot-tdd-check verify verify-iteration3 verify-iteration4 verify-iteration6 clean
 
 fmt:
 	@gofmt -w $$(find . -name '*.go' -type f -not -path './vendor/*' | sort)
@@ -17,8 +17,14 @@ fmt-check:
 	@files="$$(gofmt -l $$(find . -name '*.go' -type f -not -path './vendor/*' | sort))"; \
 	if [[ -n "$$files" ]]; then echo "Unformatted Go files:"; echo "$$files"; exit 1; fi
 
-generate-check:
-	@echo "No generated Go code is committed in iterations 1-4 and 6"
+generate-check: pivot-tdd-check
+	@echo "Generated contract evidence is current"
+
+pivot-tdd:
+	./scripts/generate-pivot-tdd-matrix.py
+
+pivot-tdd-check:
+	./scripts/generate-pivot-tdd-matrix.py --check
 
 vet:
 	$(GO) vet ./...

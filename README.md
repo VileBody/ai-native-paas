@@ -1,6 +1,11 @@
-# AI-native PaaS — final project snapshot
+# AI-native DevOps Platform
 
-Cumulative source snapshot of the seven-iteration architecture:
+This repository is the implementation baseline for an agentic DevOps platform:
+a user creates a project, gives a private Git repository and Project MCP URL to
+an AI agent, and the platform executes the resulting Git/OpenTofu/build/GitOps
+workflow inside governed remote workspaces.
+
+The original seven bounded contexts remain in place:
 
 1. Platform Kernel
 2. Source Control
@@ -10,31 +15,30 @@ Cumulative source snapshot of the seven-iteration architecture:
 6. Commercial Governance
 7. Agent Governance & Public API
 
-## Included directly in the Go module
+## Current baseline
 
-- full cumulative implementation for Iterations 1–4, 6 and 7;
-- the frozen, rich `attachments/v1` public contract used by Agent Governance;
-- MCP/OpenAPI contracts, PostgreSQL migrations, Argo CD manifests, CRD/RBAC, TDD documents and test suites.
+- Iterations 1–7 are present in the cumulative Go module;
+- Iteration 5 is fully restored and verified at 68/68 TDD parity;
+- all live PostgreSQL suites have passed against both user-owned Kubernetes
+  PostgreSQL and private managed control-plane PostgreSQL;
+- MCP v1 stays frozen while additive v2 contracts are introduced;
+- the accepted pivot specification and 157-requirement catalog live under
+  `docs/pivot/`.
 
-## Iteration 5 recovery note
-
-The earlier Iteration 5 delivery artifact omitted most source files. Its full implementation was later restored and tested, but the unarchived working tree was lost during a sandbox restart before final packaging. Every surviving source fragment is preserved in:
-
-```text
-recovery/iteration-5-restored-source-fragments.tgz
-```
-
-The original Iteration 5 documentation artifact is also preserved in `recovery/`. See `docs/FINAL_SNAPSHOT.md` for exact provenance and test status.
+The exact migration decisions are recorded under `docs/adr/`. Generated
+requirement evidence is stored in `verification/`.
 
 ## Quick checks
 
 ```bash
-go test ./internal/agent/... ./pkg/contracts/agent/v1 ./pkg/contracts/attachments/v1
-go test ./test/architecture
-go test ./test/acceptance -run 'TestAcceptance_Agent'
+make fmt-check
+make test
+make pivot-tdd-check
 ```
 
-PostgreSQL-tagged suites require `TEST_POSTGRES_DSN`. Kubernetes/provider acceptance remains an infrastructure gate.
+PostgreSQL-tagged suites require `TEST_POSTGRES_DSN`. Provider, Kubernetes,
+workspace-security and resilience statuses are independent live gates; see
+`verification/status.yaml`.
 
 ## Local PostgreSQL verification
 

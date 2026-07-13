@@ -1,0 +1,38 @@
+name: pivot-evidence
+
+on:
+  push:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'Makefile'
+      - 'docs/pivot/**'
+      - 'docs/adr/**'
+      - 'scripts/generate-pivot-tdd-matrix.py'
+      - 'verification/**'
+      - '.github/workflows/pivot-evidence.yml'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: true
+      - run: make fmt-check pivot-tdd-check
+      - run: go vet ./...
+      - run: go test -count=1 ./...
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pivot-evidence
+          path: |
+            verification/status.yaml
+            verification/tdd-matrix.json
+            verification/TDD_MATRIX.md

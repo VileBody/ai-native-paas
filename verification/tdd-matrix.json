@@ -1,0 +1,1597 @@
+{
+  "discovered_go_test_count": 706,
+  "discovered_unique_test_name_count": 704,
+  "pivot_requirement_count": 157,
+  "requirements": [
+    {
+      "family": "K",
+      "id": "K1",
+      "level": "domain + application",
+      "name": "TestKernel_ProjectScopedPrincipalCannotCrossProject",
+      "status": "NEW",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_ProjectScopedPrincipalCannotCrossProject",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_ProjectScopedPrincipalCannotCrossProject"
+    },
+    {
+      "family": "K",
+      "id": "K2",
+      "level": "domain",
+      "name": "TestKernel_WorkspacePrincipalCannotEscalateToTenantScope",
+      "status": "NEW",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_WorkspacePrincipalCannotEscalateToTenantScope",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_WorkspacePrincipalCannotEscalateToTenantScope"
+    },
+    {
+      "family": "K",
+      "id": "K3",
+      "level": "domain + fake clock",
+      "name": "TestKernel_CredentialLeaseExpiresAndCannotBeReused",
+      "status": "NEW",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_CredentialLeaseExpiresAndCannotBeReused",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_CredentialLeaseExpiresAndCannotBeReused"
+    },
+    {
+      "family": "K",
+      "id": "K4",
+      "level": "application",
+      "name": "TestKernel_OperationWaitsForApprovalWithoutRepeatingSideEffect",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_OperationWaitsForApprovalWithoutRepeatingSideEffect",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_OperationWaitsForApprovalWithoutRepeatingSideEffect"
+    },
+    {
+      "family": "K",
+      "id": "K5",
+      "level": "application",
+      "name": "TestKernel_ParentCancellationPropagatesToCancelableChildren",
+      "status": "NEW",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_ParentCancellationPropagatesToCancelableChildren",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_ParentCancellationPropagatesToCancelableChildren"
+    },
+    {
+      "family": "K",
+      "id": "K6",
+      "level": "application + concurrency",
+      "name": "TestKernel_IdempotentCommandReturnsOriginalOperationGraph",
+      "status": "NEW",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_IdempotentCommandReturnsOriginalOperationGraph",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_IdempotentCommandReturnsOriginalOperationGraph"
+    },
+    {
+      "family": "K",
+      "id": "K7",
+      "level": "domain",
+      "name": "TestKernel_IdempotencyPayloadMismatchCannotReuseApproval",
+      "status": "NEW",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_IdempotencyPayloadMismatchCannotReuseApproval",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_IdempotencyPayloadMismatchCannotReuseApproval"
+    },
+    {
+      "family": "K",
+      "id": "K8",
+      "level": "PostgreSQL + broker integration",
+      "name": "TestKernel_OutboxCommitThenCrashPublishesExactlyOnceEffect",
+      "status": "NEW",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_OutboxCommitThenCrashPublishesExactlyOnceEffect",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_OutboxCommitThenCrashPublishesExactlyOnceEffect"
+    },
+    {
+      "family": "K",
+      "id": "K9",
+      "level": "application",
+      "name": "TestKernel_AuditRedactsWorkspaceCommandSecrets",
+      "status": "NEW",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_AuditRedactsWorkspaceCommandSecrets",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_AuditRedactsWorkspaceCommandSecrets"
+    },
+    {
+      "family": "K",
+      "id": "K10",
+      "level": "domain",
+      "name": "TestKernel_ServicePrincipalCannotApproveHumanAction",
+      "status": "NEW",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_ServicePrincipalCannotApproveHumanAction",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_ServicePrincipalCannotApproveHumanAction"
+    },
+    {
+      "family": "K",
+      "id": "K11",
+      "level": "HTTP integration",
+      "name": "TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders",
+      "status": "NEW",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders"
+    },
+    {
+      "family": "K",
+      "id": "K12",
+      "level": "identity provider integration",
+      "name": "TestKernel_OIDCAndMTLSIdentityCannotBeConfused",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_OIDCAndMTLSIdentityCannotBeConfused",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_OIDCAndMTLSIdentityCannotBeConfused"
+    },
+    {
+      "family": "K",
+      "id": "K13",
+      "level": "live PostgreSQL",
+      "name": "TestPostgres_ConcurrentMigrationStartupUsesOneOwner",
+      "status": "NEW",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestPostgres_ConcurrentMigrationStartupUsesOneOwner",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestPostgres_ConcurrentMigrationStartupUsesOneOwner"
+    },
+    {
+      "family": "K",
+      "id": "K14",
+      "level": "chaos + PostgreSQL",
+      "name": "TestKernel_OperationCheckpointSurvivesDatabaseFailover",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/kernel_v2_test.go",
+      "test_name": "TestKernel_OperationCheckpointSurvivesDatabaseFailover",
+      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_OperationCheckpointSurvivesDatabaseFailover"
+    },
+    {
+      "family": "S",
+      "id": "S1",
+      "level": "application + GitLab contract",
+      "name": "TestSource_CreateProjectBootstrapsV2RepositoryLayout",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_CreateProjectBootstrapsV2RepositoryLayout",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_CreateProjectBootstrapsV2RepositoryLayout"
+    },
+    {
+      "family": "S",
+      "id": "S2",
+      "level": "real local Git integration",
+      "name": "TestSource_CheckoutUsesExactCommitNotMutableBranchHead",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_CheckoutUsesExactCommitNotMutableBranchHead",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_CheckoutUsesExactCommitNotMutableBranchHead"
+    },
+    {
+      "family": "S",
+      "id": "S3",
+      "level": "fuzz + application",
+      "name": "TestSource_PatchRejectsNonCanonicalAndGitInternalPaths",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_PatchRejectsNonCanonicalAndGitInternalPaths",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_PatchRejectsNonCanonicalAndGitInternalPaths"
+    },
+    {
+      "family": "S",
+      "id": "S4",
+      "level": "application",
+      "name": "TestSource_ProductionGitOpsPathRequiresApprovalPolicy",
+      "status": "NEW",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_ProductionGitOpsPathRequiresApprovalPolicy",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_ProductionGitOpsPathRequiresApprovalPolicy"
+    },
+    {
+      "family": "S",
+      "id": "S5",
+      "level": "Git integration",
+      "name": "TestSource_AgentCommitContainsSignedAttestationAndCorrelation",
+      "status": "NEW",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_AgentCommitContainsSignedAttestationAndCorrelation",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_AgentCommitContainsSignedAttestationAndCorrelation"
+    },
+    {
+      "family": "S",
+      "id": "S6",
+      "level": "Git integration + concurrency",
+      "name": "TestSource_ConcurrentPushUsesExpectedBaseSHA",
+      "status": "NEW",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_ConcurrentPushUsesExpectedBaseSHA",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_ConcurrentPushUsesExpectedBaseSHA"
+    },
+    {
+      "family": "S",
+      "id": "S7",
+      "level": "application",
+      "name": "TestSource_SecretScannerBlocksCredentialBeforeCommit",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_SecretScannerBlocksCredentialBeforeCommit",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_SecretScannerBlocksCredentialBeforeCommit"
+    },
+    {
+      "family": "S",
+      "id": "S8",
+      "level": "real GitLab provider",
+      "name": "TestSource_ProjectTokenCannotReadSiblingRepository",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_ProjectTokenCannotReadSiblingRepository",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_ProjectTokenCannotReadSiblingRepository"
+    },
+    {
+      "family": "S",
+      "id": "S9",
+      "level": "application + provider fake",
+      "name": "TestSource_MissedWebhookRecoveredByBranchReconciler",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_MissedWebhookRecoveredByBranchReconciler",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_MissedWebhookRecoveredByBranchReconciler"
+    },
+    {
+      "family": "S",
+      "id": "S10",
+      "level": "application",
+      "name": "TestSource_OutOfOrderWebhookCannotRegressObservedHead",
+      "status": "NEW",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_OutOfOrderWebhookCannotRegressObservedHead",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_OutOfOrderWebhookCannotRegressObservedHead"
+    },
+    {
+      "family": "S",
+      "id": "S11",
+      "level": "real GitLab provider",
+      "name": "TestSource_RenameKeepsNumericProviderIdentity",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_RenameKeepsNumericProviderIdentity",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_RenameKeepsNumericProviderIdentity"
+    },
+    {
+      "family": "S",
+      "id": "S12",
+      "level": "GitLab contract",
+      "name": "TestSource_MergeRequestPublishesPlanSummaryWithoutSecrets",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_MergeRequestPublishesPlanSummaryWithoutSecrets",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_MergeRequestPublishesPlanSummaryWithoutSecrets"
+    },
+    {
+      "family": "S",
+      "id": "S13",
+      "level": "application",
+      "name": "TestSource_DeletedBranchProducesEnvironmentCleanupIntent",
+      "status": "NEW",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_DeletedBranchProducesEnvironmentCleanupIntent",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_DeletedBranchProducesEnvironmentCleanupIntent"
+    },
+    {
+      "family": "S",
+      "id": "S14",
+      "level": "integration",
+      "name": "TestSource_SubmoduleAndLFSFollowExplicitPolicy",
+      "status": "NEW",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_SubmoduleAndLFSFollowExplicitPolicy",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_SubmoduleAndLFSFollowExplicitPolicy"
+    },
+    {
+      "family": "S",
+      "id": "S15",
+      "level": "provider contract",
+      "name": "TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency"
+    },
+    {
+      "family": "S",
+      "id": "S16",
+      "level": "application + provider",
+      "name": "TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge"
+    },
+    {
+      "family": "S",
+      "id": "S17",
+      "level": "real Git integration",
+      "name": "TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig"
+    },
+    {
+      "family": "S",
+      "id": "S18",
+      "level": "reconciliation",
+      "name": "TestSource_UnknownProviderProjectIsQuarantinedNotAdopted",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/source_v2_test.go",
+      "test_name": "TestSource_UnknownProviderProjectIsQuarantinedNotAdopted",
+      "test_ref": "test/pivot/source_v2_test.go::TestSource_UnknownProviderProjectIsQuarantinedNotAdopted"
+    },
+    {
+      "family": "B",
+      "id": "B1",
+      "level": "domain",
+      "name": "TestBuild_IdentityIncludesCommitAndCanonicalBuildSpec",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_IdentityIncludesCommitAndCanonicalBuildSpec",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_IdentityIncludesCommitAndCanonicalBuildSpec"
+    },
+    {
+      "family": "B",
+      "id": "B2",
+      "level": "application",
+      "name": "TestBuild_ExplicitBuildSpecOverridesRuntimeDetection",
+      "status": "NEW",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_ExplicitBuildSpecOverridesRuntimeDetection",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_ExplicitBuildSpecOverridesRuntimeDetection"
+    },
+    {
+      "family": "B",
+      "id": "B3",
+      "level": "application",
+      "name": "TestBuild_BuildpacksRemainOptionalFallback",
+      "status": "NEW",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_BuildpacksRemainOptionalFallback",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_BuildpacksRemainOptionalFallback"
+    },
+    {
+      "family": "B",
+      "id": "B4",
+      "level": "application",
+      "name": "TestBuild_DockerfileRunsOnlyInDisposableIsolationBackend",
+      "status": "NEW",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_DockerfileRunsOnlyInDisposableIsolationBackend",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_DockerfileRunsOnlyInDisposableIsolationBackend"
+    },
+    {
+      "family": "B",
+      "id": "B5",
+      "level": "provider/system security",
+      "name": "TestBuild_NetworkProfileBlocksMetadataPrivateAndControlPlane",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_NetworkProfileBlocksMetadataPrivateAndControlPlane",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_NetworkProfileBlocksMetadataPrivateAndControlPlane"
+    },
+    {
+      "family": "B",
+      "id": "B6",
+      "level": "system",
+      "name": "TestBuild_ResourceLimitsTerminateForkBombAndOversizedContext",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_ResourceLimitsTerminateForkBombAndOversizedContext",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_ResourceLimitsTerminateForkBombAndOversizedContext"
+    },
+    {
+      "family": "B",
+      "id": "B7",
+      "level": "integration",
+      "name": "TestBuild_SecretsNeverEnterLayerLogOrProvenance",
+      "status": "NEW",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_SecretsNeverEnterLayerLogOrProvenance",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_SecretsNeverEnterLayerLogOrProvenance"
+    },
+    {
+      "family": "B",
+      "id": "B8",
+      "level": "integration",
+      "name": "TestBuild_CacheIsProjectScopedForUntrustedLayers",
+      "status": "NEW",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_CacheIsProjectScopedForUntrustedLayers",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_CacheIsProjectScopedForUntrustedLayers"
+    },
+    {
+      "family": "B",
+      "id": "B9",
+      "level": "registry integration",
+      "name": "TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery",
+      "status": "NEW",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery"
+    },
+    {
+      "family": "B",
+      "id": "B10",
+      "level": "domain + PostgreSQL",
+      "name": "TestBuild_TrustChainRequiredBeforeArtifactReleasable",
+      "status": "NEW",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_TrustChainRequiredBeforeArtifactReleasable",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_TrustChainRequiredBeforeArtifactReleasable"
+    },
+    {
+      "family": "B",
+      "id": "B11",
+      "level": "policy",
+      "name": "TestBuild_MutableBaseOrOutputTagCannotDefineProductionArtifact",
+      "status": "NEW",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_MutableBaseOrOutputTagCannotDefineProductionArtifact",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_MutableBaseOrOutputTagCannotDefineProductionArtifact"
+    },
+    {
+      "family": "B",
+      "id": "B12",
+      "level": "PostgreSQL + concurrency",
+      "name": "TestBuild_SameIdentityConcurrentRequestsExecuteOnce",
+      "status": "NEW",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_SameIdentityConcurrentRequestsExecuteOnce",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_SameIdentityConcurrentRequestsExecuteOnce"
+    },
+    {
+      "family": "B",
+      "id": "B13",
+      "level": "application/system",
+      "name": "TestBuild_CancelStopsExecutionAndRevokesBuildCredentials",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_CancelStopsExecutionAndRevokesBuildCredentials",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_CancelStopsExecutionAndRevokesBuildCredentials"
+    },
+    {
+      "family": "B",
+      "id": "B14",
+      "level": "registry integration",
+      "name": "TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests",
+      "status": "NEW",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests"
+    },
+    {
+      "family": "B",
+      "id": "B15",
+      "level": "contract/crypto",
+      "name": "TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest",
+      "status": "NEW",
+      "test_file": "test/pivot/build_v2_test.go",
+      "test_name": "TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest",
+      "test_ref": "test/pivot/build_v2_test.go::TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest"
+    },
+    {
+      "family": "R",
+      "id": "R1",
+      "level": "application",
+      "name": "TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath"
+    },
+    {
+      "family": "R",
+      "id": "R2",
+      "level": "integration/golden",
+      "name": "TestGitOps_HelmRenderIsDeterministicForPinnedInputs",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestGitOps_HelmRenderIsDeterministicForPinnedInputs",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestGitOps_HelmRenderIsDeterministicForPinnedInputs"
+    },
+    {
+      "family": "R",
+      "id": "R3",
+      "level": "integration/fuzz",
+      "name": "TestGitOps_KustomizeRenderIsDeterministicAndPathSafe",
+      "status": "NEW",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestGitOps_KustomizeRenderIsDeterministicAndPathSafe",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestGitOps_KustomizeRenderIsDeterministicAndPathSafe"
+    },
+    {
+      "family": "R",
+      "id": "R4",
+      "level": "policy",
+      "name": "TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit"
+    },
+    {
+      "family": "R",
+      "id": "R5",
+      "level": "policy",
+      "name": "TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource"
+    },
+    {
+      "family": "R",
+      "id": "R6",
+      "level": "manifest contract + real Argo",
+      "name": "TestArgoProject_AllowsOnlyExpectedRepositoryClusterAndNamespaces",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestArgoProject_AllowsOnlyExpectedRepositoryClusterAndNamespaces",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestArgoProject_AllowsOnlyExpectedRepositoryClusterAndNamespaces"
+    },
+    {
+      "family": "R",
+      "id": "R7",
+      "level": "application/system",
+      "name": "TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady"
+    },
+    {
+      "family": "R",
+      "id": "R8",
+      "level": "application + Git",
+      "name": "TestRuntime_RollbackCreatesAuditableGitRevision",
+      "status": "NEW",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestRuntime_RollbackCreatesAuditableGitRevision",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_RollbackCreatesAuditableGitRevision"
+    },
+    {
+      "family": "R",
+      "id": "R9",
+      "level": "system",
+      "name": "TestRuntime_DriftIsReportedAndSelfHealFollowsPolicy",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestRuntime_DriftIsReportedAndSelfHealFollowsPolicy",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_DriftIsReportedAndSelfHealFollowsPolicy"
+    },
+    {
+      "family": "R",
+      "id": "R10",
+      "level": "Kubernetes system",
+      "name": "TestRuntime_NamespaceAndServiceAccountIsolation",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestRuntime_NamespaceAndServiceAccountIsolation",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_NamespaceAndServiceAccountIsolation"
+    },
+    {
+      "family": "R",
+      "id": "R11",
+      "level": "system",
+      "name": "TestRuntime_HPAAndGitOpsDoNotFightOverReplicas",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestRuntime_HPAAndGitOpsDoNotFightOverReplicas",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_HPAAndGitOpsDoNotFightOverReplicas"
+    },
+    {
+      "family": "R",
+      "id": "R12",
+      "level": "policy",
+      "name": "TestRuntime_ProductOperatorCRAllowedOnlyByRecipePolicy",
+      "status": "NEW",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestRuntime_ProductOperatorCRAllowedOnlyByRecipePolicy",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_ProductOperatorCRAllowedOnlyByRecipePolicy"
+    },
+    {
+      "family": "R",
+      "id": "R13",
+      "level": "operator contract",
+      "name": "TestRuntime_PaaSAppFastPathProducesEquivalentStandardResources",
+      "status": "NEW",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestRuntime_PaaSAppFastPathProducesEquivalentStandardResources",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_PaaSAppFastPathProducesEquivalentStandardResources"
+    },
+    {
+      "family": "R",
+      "id": "R14",
+      "level": "real Argo/ApplicationSet",
+      "name": "TestRuntime_PreviewApplicationSetCreatedAndRemovedFromBranchLifecycle",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestRuntime_PreviewApplicationSetCreatedAndRemovedFromBranchLifecycle",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_PreviewApplicationSetCreatedAndRemovedFromBranchLifecycle"
+    },
+    {
+      "family": "R",
+      "id": "R15",
+      "level": "Kubernetes/Gateway system",
+      "name": "TestRuntime_FailedNewRevisionKeepsPreviousTrafficWhereStrategySupportsIt",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestRuntime_FailedNewRevisionKeepsPreviousTrafficWhereStrategySupportsIt",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_FailedNewRevisionKeepsPreviousTrafficWhereStrategySupportsIt"
+    },
+    {
+      "family": "R",
+      "id": "R16",
+      "level": "reconciliation",
+      "name": "TestRuntime_UnknownObservedObjectIsQuarantined",
+      "status": "NEW",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestRuntime_UnknownObservedObjectIsQuarantined",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_UnknownObservedObjectIsQuarantined"
+    },
+    {
+      "family": "R",
+      "id": "R17",
+      "level": "real Kubernetes",
+      "name": "TestRuntime_GVisorRequiredForSharedUntrustedTier",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestRuntime_GVisorRequiredForSharedUntrustedTier",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_GVisorRequiredForSharedUntrustedTier"
+    },
+    {
+      "family": "R",
+      "id": "R18",
+      "level": "real Kubernetes/network",
+      "name": "TestRuntime_CiliumDefaultDenyAndExplicitEgressProfiles",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/runtime_gitops_test.go",
+      "test_name": "TestRuntime_CiliumDefaultDenyAndExplicitEgressProfiles",
+      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_CiliumDefaultDenyAndExplicitEgressProfiles"
+    },
+    {
+      "family": "A5",
+      "id": "A5.1",
+      "level": "application",
+      "name": "TestSecret_SetIsWriteOnlyAndReturnsMetadataOnly",
+      "status": "NEW",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestSecret_SetIsWriteOnlyAndReturnsMetadataOnly",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestSecret_SetIsWriteOnlyAndReturnsMetadataOnly"
+    },
+    {
+      "family": "A5",
+      "id": "A5.2",
+      "level": "domain + OpenBao integration",
+      "name": "TestSecret_ProjectAndEnvironmentScopesAreIsolated",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestSecret_ProjectAndEnvironmentScopesAreIsolated",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestSecret_ProjectAndEnvironmentScopesAreIsolated"
+    },
+    {
+      "family": "A5",
+      "id": "A5.3",
+      "level": "PostgreSQL + redaction",
+      "name": "TestSecret_ValueAbsentFromControlPlanePersistenceAndEvents",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestSecret_ValueAbsentFromControlPlanePersistenceAndEvents",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestSecret_ValueAbsentFromControlPlanePersistenceAndEvents"
+    },
+    {
+      "family": "A5",
+      "id": "A5.4",
+      "level": "credential broker integration",
+      "name": "TestCredential_LeaseIsShortLivedProjectScopedAndSinglePurpose",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestCredential_LeaseIsShortLivedProjectScopedAndSinglePurpose",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestCredential_LeaseIsShortLivedProjectScopedAndSinglePurpose"
+    },
+    {
+      "family": "A5",
+      "id": "A5.5",
+      "level": "application/system",
+      "name": "TestCredential_RotationCutsOverBeforeRevokingOldVersion",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestCredential_RotationCutsOverBeforeRevokingOldVersion",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestCredential_RotationCutsOverBeforeRevokingOldVersion"
+    },
+    {
+      "family": "A5",
+      "id": "A5.6",
+      "level": "OpenBao adapter",
+      "name": "TestCredential_RevokePrefixFailsClosedWhenBackendCannotGuaranteeIt",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestCredential_RevokePrefixFailsClosedWhenBackendCannotGuaranteeIt",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestCredential_RevokePrefixFailsClosedWhenBackendCannotGuaranteeIt"
+    },
+    {
+      "family": "A5",
+      "id": "A5.7",
+      "level": "cross-domain acceptance",
+      "name": "TestSecret_GitWorkspacePlanAndBuildNeverContainValue",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestSecret_GitWorkspacePlanAndBuildNeverContainValue",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestSecret_GitWorkspacePlanAndBuildNeverContainValue"
+    },
+    {
+      "family": "A5",
+      "id": "A5.8",
+      "level": "domain + PostgreSQL + crypto",
+      "name": "TestRecipe_ActivatedVersionIsImmutableAndSigned",
+      "status": "NEW",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestRecipe_ActivatedVersionIsImmutableAndSigned",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_ActivatedVersionIsImmutableAndSigned"
+    },
+    {
+      "family": "A5",
+      "id": "A5.9",
+      "level": "application",
+      "name": "TestRecipe_ResolutionPinsExactVersionAndArtifactDigests",
+      "status": "NEW",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestRecipe_ResolutionPinsExactVersionAndArtifactDigests",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_ResolutionPinsExactVersionAndArtifactDigests"
+    },
+    {
+      "family": "A5",
+      "id": "A5.10",
+      "level": "domain",
+      "name": "TestRecipe_DependencyGraphRejectsCyclesAndVersionConflict",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestRecipe_DependencyGraphRejectsCyclesAndVersionConflict",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_DependencyGraphRejectsCyclesAndVersionConflict"
+    },
+    {
+      "family": "A5",
+      "id": "A5.11",
+      "level": "application",
+      "name": "TestRecipe_PlanIsPureAndCreatesNoExternalResource",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestRecipe_PlanIsPureAndCreatesNoExternalResource",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_PlanIsPureAndCreatesNoExternalResource"
+    },
+    {
+      "family": "A5",
+      "id": "A5.12",
+      "level": "policy integration",
+      "name": "TestRecipe_DeclaredPermissionsMatchRenderedResources",
+      "status": "NEW",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestRecipe_DeclaredPermissionsMatchRenderedResources",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_DeclaredPermissionsMatchRenderedResources"
+    },
+    {
+      "family": "A5",
+      "id": "A5.13",
+      "level": "contract",
+      "name": "TestRecipe_HealthBackupUpgradeAndRemovalProceduresAreComplete",
+      "status": "NEW",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestRecipe_HealthBackupUpgradeAndRemovalProceduresAreComplete",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_HealthBackupUpgradeAndRemovalProceduresAreComplete"
+    },
+    {
+      "family": "A5",
+      "id": "A5.14",
+      "level": "application",
+      "name": "TestRecipe_CustomAdHocInstallIsAllowedWithinStricterPolicy",
+      "status": "NEW",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestRecipe_CustomAdHocInstallIsAllowedWithinStricterPolicy",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_CustomAdHocInstallIsAllowedWithinStricterPolicy"
+    },
+    {
+      "family": "A5",
+      "id": "A5.15",
+      "level": "cross-domain application",
+      "name": "TestProviderResource_EntitlementAndReservationPrecedeApply",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestProviderResource_EntitlementAndReservationPrecedeApply",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestProviderResource_EntitlementAndReservationPrecedeApply"
+    },
+    {
+      "family": "A5",
+      "id": "A5.16",
+      "level": "provider contract",
+      "name": "TestProviderResource_LostApplyResponseRecoveredByExternalIdentity",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestProviderResource_LostApplyResponseRecoveredByExternalIdentity",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestProviderResource_LostApplyResponseRecoveredByExternalIdentity"
+    },
+    {
+      "family": "A5",
+      "id": "A5.17",
+      "level": "application",
+      "name": "TestProviderResource_ObservedReadyCreatesBindingsAndUsageOnce",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestProviderResource_ObservedReadyCreatesBindingsAndUsageOnce",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestProviderResource_ObservedReadyCreatesBindingsAndUsageOnce"
+    },
+    {
+      "family": "A5",
+      "id": "A5.18",
+      "level": "application/provider",
+      "name": "TestProviderResource_DeletePolicyRetainDoesNotDestroyData",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestProviderResource_DeletePolicyRetainDoesNotDestroyData",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestProviderResource_DeletePolicyRetainDoesNotDestroyData"
+    },
+    {
+      "family": "A5",
+      "id": "A5.19",
+      "level": "governance",
+      "name": "TestProviderResource_DestroyRequiresMatchingPlanHashApproval",
+      "status": "NEW",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestProviderResource_DestroyRequiresMatchingPlanHashApproval",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestProviderResource_DestroyRequiresMatchingPlanHashApproval"
+    },
+    {
+      "family": "A5",
+      "id": "A5.20",
+      "level": "provider/system",
+      "name": "TestProviderResource_FinalBackupCompletesBeforeApprovedPurge",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestProviderResource_FinalBackupCompletesBeforeApprovedPurge",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestProviderResource_FinalBackupCompletesBeforeApprovedPurge"
+    },
+    {
+      "family": "A5",
+      "id": "A5.21",
+      "level": "gateway integration",
+      "name": "TestCapability_OpenRouterTokenIsProjectScopedAndMasterKeyHidden",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestCapability_OpenRouterTokenIsProjectScopedAndMasterKeyHidden",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestCapability_OpenRouterTokenIsProjectScopedAndMasterKeyHidden"
+    },
+    {
+      "family": "A5",
+      "id": "A5.22",
+      "level": "commerce/gateway",
+      "name": "TestCapability_BudgetExceededStopsRequestBeforeProviderCall",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestCapability_BudgetExceededStopsRequestBeforeProviderCall",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestCapability_BudgetExceededStopsRequestBeforeProviderCall"
+    },
+    {
+      "family": "A5",
+      "id": "A5.23",
+      "level": "integration",
+      "name": "TestCapability_ProviderUsageIsAttributedAndDeduplicated",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestCapability_ProviderUsageIsAttributedAndDeduplicated",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestCapability_ProviderUsageIsAttributedAndDeduplicated"
+    },
+    {
+      "family": "A5",
+      "id": "A5.24",
+      "level": "contract",
+      "name": "TestCapability_ProviderSubstitutionPreservesPlatformContract",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestCapability_ProviderSubstitutionPreservesPlatformContract",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestCapability_ProviderSubstitutionPreservesPlatformContract"
+    },
+    {
+      "family": "A5",
+      "id": "A5.25",
+      "level": "security",
+      "name": "TestCapability_ApifyOrBrightDataCredentialCannotBeUsedOutsideGateway",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestCapability_ApifyOrBrightDataCredentialCannotBeUsedOutsideGateway",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestCapability_ApifyOrBrightDataCredentialCannotBeUsedOutsideGateway"
+    },
+    {
+      "family": "A5",
+      "id": "A5.26",
+      "level": "concurrency",
+      "name": "TestCapability_RateLimitIsPerProjectAndDoesNotLeakCrossTenantState",
+      "status": "NEW",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestCapability_RateLimitIsPerProjectAndDoesNotLeakCrossTenantState",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestCapability_RateLimitIsPerProjectAndDoesNotLeakCrossTenantState"
+    },
+    {
+      "family": "A5",
+      "id": "A5.27",
+      "level": "domain + PostgreSQL",
+      "name": "TestInputsSnapshot_IsImmutableAndContainsReferencesOnly",
+      "status": "NEW",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestInputsSnapshot_IsImmutableAndContainsReferencesOnly",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestInputsSnapshot_IsImmutableAndContainsReferencesOnly"
+    },
+    {
+      "family": "A5",
+      "id": "A5.28",
+      "level": "cross-domain",
+      "name": "TestInputsSnapshot_SameImageNewInputsCreatesNewRuntimeRevision",
+      "status": "NEW",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestInputsSnapshot_SameImageNewInputsCreatesNewRuntimeRevision",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestInputsSnapshot_SameImageNewInputsCreatesNewRuntimeRevision"
+    },
+    {
+      "family": "A5",
+      "id": "A5.29",
+      "level": "cross-domain",
+      "name": "TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs",
+      "status": "NEW",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs"
+    },
+    {
+      "family": "A5",
+      "id": "A5.30",
+      "level": "DNS provider integration",
+      "name": "TestDomain_OwnershipProofRequiresIndependentDNSObservations",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestDomain_OwnershipProofRequiresIndependentDNSObservations",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestDomain_OwnershipProofRequiresIndependentDNSObservations"
+    },
+    {
+      "family": "A5",
+      "id": "A5.31",
+      "level": "provider/runtime integration",
+      "name": "TestDomain_RouteActivatesOnlyAfterOwnershipAndTLSReady",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestDomain_RouteActivatesOnlyAfterOwnershipAndTLSReady",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestDomain_RouteActivatesOnlyAfterOwnershipAndTLSReady"
+    },
+    {
+      "family": "A5",
+      "id": "A5.32",
+      "level": "domain + fake clock",
+      "name": "TestDomain_ReleaseEntersQuarantineBeforeAnotherTenantCanClaim",
+      "status": "NEW",
+      "test_file": "test/pivot/attachments_v2_test.go",
+      "test_name": "TestDomain_ReleaseEntersQuarantineBeforeAnotherTenantCanClaim",
+      "test_ref": "test/pivot/attachments_v2_test.go::TestDomain_ReleaseEntersQuarantineBeforeAnotherTenantCanClaim"
+    },
+    {
+      "family": "C",
+      "id": "C1",
+      "level": "application/golden",
+      "name": "TestCost_TofuPlanProducesDeterministicNormalizedEstimate",
+      "status": "NEW",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestCost_TofuPlanProducesDeterministicNormalizedEstimate",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestCost_TofuPlanProducesDeterministicNormalizedEstimate"
+    },
+    {
+      "family": "C",
+      "id": "C2",
+      "level": "domain",
+      "name": "TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement"
+    },
+    {
+      "family": "C",
+      "id": "C3",
+      "level": "application",
+      "name": "TestCost_HelmResourcesContributeRequestedRuntimeAllocation",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestCost_HelmResourcesContributeRequestedRuntimeAllocation",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestCost_HelmResourcesContributeRequestedRuntimeAllocation"
+    },
+    {
+      "family": "C",
+      "id": "C4",
+      "level": "domain",
+      "name": "TestCost_ApprovalInvalidatedWhenPlanHashChanges",
+      "status": "NEW",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestCost_ApprovalInvalidatedWhenPlanHashChanges",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestCost_ApprovalInvalidatedWhenPlanHashChanges"
+    },
+    {
+      "family": "C",
+      "id": "C5",
+      "level": "cross-domain application",
+      "name": "TestQuota_ReservationCommittedBeforeExternalApply",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestQuota_ReservationCommittedBeforeExternalApply",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestQuota_ReservationCommittedBeforeExternalApply"
+    },
+    {
+      "family": "C",
+      "id": "C6",
+      "level": "PostgreSQL + race",
+      "name": "TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget",
+      "status": "NEW",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget"
+    },
+    {
+      "family": "C",
+      "id": "C7",
+      "level": "domain/fake clock",
+      "name": "TestQuota_ExpiredReservationCannotAuthorizeLateApply",
+      "status": "NEW",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestQuota_ExpiredReservationCannotAuthorizeLateApply",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestQuota_ExpiredReservationCannotAuthorizeLateApply"
+    },
+    {
+      "family": "C",
+      "id": "C8",
+      "level": "application/provider",
+      "name": "TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder"
+    },
+    {
+      "family": "C",
+      "id": "C9",
+      "level": "integration",
+      "name": "TestUsage_ProviderReportReplayDoesNotDoubleCharge",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestUsage_ProviderReportReplayDoesNotDoubleCharge",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestUsage_ProviderReportReplayDoesNotDoubleCharge"
+    },
+    {
+      "family": "C",
+      "id": "C10",
+      "level": "capability gateway integration",
+      "name": "TestUsage_OpenRouterTokensAreAttributedToProjectTaskAndModel",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestUsage_OpenRouterTokensAreAttributedToProjectTaskAndModel",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestUsage_OpenRouterTokensAreAttributedToProjectTaskAndModel"
+    },
+    {
+      "family": "C",
+      "id": "C11",
+      "level": "rating",
+      "name": "TestUsage_ApifyAndBrightDataMetersRemainProviderSpecificButInvoiceStable",
+      "status": "NEW",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestUsage_ApifyAndBrightDataMetersRemainProviderSpecificButInvoiceStable",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestUsage_ApifyAndBrightDataMetersRemainProviderSpecificButInvoiceStable"
+    },
+    {
+      "family": "C",
+      "id": "C12",
+      "level": "workspace/commerce integration",
+      "name": "TestBudget_WorkspaceCommandStoppedBeforeExceedingHardLimit",
+      "status": "NEW",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestBudget_WorkspaceCommandStoppedBeforeExceedingHardLimit",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestBudget_WorkspaceCommandStoppedBeforeExceedingHardLimit"
+    },
+    {
+      "family": "C",
+      "id": "C13",
+      "level": "Agent/Commerce",
+      "name": "TestBudget_RepairLoopConsumesConfiguredNotUnlimitedBudget",
+      "status": "NEW",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestBudget_RepairLoopConsumesConfiguredNotUnlimitedBudget",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestBudget_RepairLoopConsumesConfiguredNotUnlimitedBudget"
+    },
+    {
+      "family": "C",
+      "id": "C14",
+      "level": "cross-domain",
+      "name": "TestCommercial_SuspendedProjectIsReadOnlyAndRetainsData",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestCommercial_SuspendedProjectIsReadOnlyAndRetainsData",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestCommercial_SuspendedProjectIsReadOnlyAndRetainsData"
+    },
+    {
+      "family": "C",
+      "id": "C15",
+      "level": "property/fuzz",
+      "name": "TestRating_UsesExactArithmeticAcrossMicroUsageAndLargeQuantities",
+      "status": "NEW",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestRating_UsesExactArithmeticAcrossMicroUsageAndLargeQuantities",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestRating_UsesExactArithmeticAcrossMicroUsageAndLargeQuantities"
+    },
+    {
+      "family": "C",
+      "id": "C16",
+      "level": "contract/golden",
+      "name": "TestCost_ApprovalSummaryIncludesDestructionRiskAndMonthlyDelta",
+      "status": "NEW",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestCost_ApprovalSummaryIncludesDestructionRiskAndMonthlyDelta",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestCost_ApprovalSummaryIncludesDestructionRiskAndMonthlyDelta"
+    },
+    {
+      "family": "C",
+      "id": "C17",
+      "level": "reconciliation",
+      "name": "TestUsage_ReconcilerCorrectsObservedResourceDriftOnce",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestUsage_ReconcilerCorrectsObservedResourceDriftOnce",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestUsage_ReconcilerCorrectsObservedResourceDriftOnce"
+    },
+    {
+      "family": "C",
+      "id": "C18",
+      "level": "application",
+      "name": "TestCommercial_CanceledBeforeExecutionCreatesNoUsageCharge",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/commerce_v2_test.go",
+      "test_name": "TestCommercial_CanceledBeforeExecutionCreatesNoUsageCharge",
+      "test_ref": "test/pivot/commerce_v2_test.go::TestCommercial_CanceledBeforeExecutionCreatesNoUsageCharge"
+    },
+    {
+      "family": "G",
+      "id": "G1",
+      "level": "domain/HTTP",
+      "name": "TestAgent_ProjectMCPTokenIsBoundToAgentUserTenantAndProject",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_ProjectMCPTokenIsBoundToAgentUserTenantAndProject",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_ProjectMCPTokenIsBoundToAgentUserTenantAndProject"
+    },
+    {
+      "family": "G",
+      "id": "G2",
+      "level": "contract/golden",
+      "name": "TestMCPV2_CatalogAndSchemasAreVersionedStableAndClosed",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestMCPV2_CatalogAndSchemasAreVersionedStableAndClosed",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestMCPV2_CatalogAndSchemasAreVersionedStableAndClosed"
+    },
+    {
+      "family": "G",
+      "id": "G3",
+      "level": "application",
+      "name": "TestMCPV1CompatibilityCannotBypassV2Governance",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestMCPV1CompatibilityCannotBypassV2Governance",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestMCPV1CompatibilityCannotBypassV2Governance"
+    },
+    {
+      "family": "G",
+      "id": "G4",
+      "level": "fuzz/security",
+      "name": "TestAgent_ToolArgumentsCannotOverrideVerifiedScope",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_ToolArgumentsCannotOverrideVerifiedScope",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_ToolArgumentsCannotOverrideVerifiedScope"
+    },
+    {
+      "family": "G",
+      "id": "G5",
+      "level": "application/provider",
+      "name": "TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile"
+    },
+    {
+      "family": "G",
+      "id": "G6",
+      "level": "provider/system",
+      "name": "TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials"
+    },
+    {
+      "family": "G",
+      "id": "G7",
+      "level": "architecture/system",
+      "name": "TestWorkspace_CommandRunsOnlyInsideWorkspaceNotControlPlaneHost",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestWorkspace_CommandRunsOnlyInsideWorkspaceNotControlPlaneHost",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_CommandRunsOnlyInsideWorkspaceNotControlPlaneHost"
+    },
+    {
+      "family": "G",
+      "id": "G8",
+      "level": "policy",
+      "name": "TestWorkspace_CommandPolicyRejectsForbiddenExecutableAndFlags",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestWorkspace_CommandPolicyRejectsForbiddenExecutableAndFlags",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_CommandPolicyRejectsForbiddenExecutableAndFlags"
+    },
+    {
+      "family": "G",
+      "id": "G9",
+      "level": "system/network",
+      "name": "TestWorkspace_NetworkProfileAllowsRequiredAndDeniesSensitiveDestinations",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestWorkspace_NetworkProfileAllowsRequiredAndDeniesSensitiveDestinations",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_NetworkProfileAllowsRequiredAndDeniesSensitiveDestinations"
+    },
+    {
+      "family": "G",
+      "id": "G10",
+      "level": "integration/fuzz",
+      "name": "TestWorkspace_StdoutStderrStreamingRedactsSecretsAcrossChunkBoundaries",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestWorkspace_StdoutStderrStreamingRedactsSecretsAcrossChunkBoundaries",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_StdoutStderrStreamingRedactsSecretsAcrossChunkBoundaries"
+    },
+    {
+      "family": "G",
+      "id": "G11",
+      "level": "system",
+      "name": "TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage"
+    },
+    {
+      "family": "G",
+      "id": "G12",
+      "level": "chaos",
+      "name": "TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply"
+    },
+    {
+      "family": "G",
+      "id": "G13",
+      "level": "concurrency",
+      "name": "TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations"
+    },
+    {
+      "family": "G",
+      "id": "G14",
+      "level": "application",
+      "name": "TestAgent_DeployWorkflowStartsFromExactRepositoryRevision",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_DeployWorkflowStartsFromExactRepositoryRevision",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_DeployWorkflowStartsFromExactRepositoryRevision"
+    },
+    {
+      "family": "G",
+      "id": "G15",
+      "level": "application/OpenTofu integration",
+      "name": "TestInfraPlan_IsPureIdempotentAndStoresCanonicalPlanHash",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestInfraPlan_IsPureIdempotentAndStoresCanonicalPlanHash",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestInfraPlan_IsPureIdempotentAndStoresCanonicalPlanHash"
+    },
+    {
+      "family": "G",
+      "id": "G16",
+      "level": "cross-domain",
+      "name": "TestInfraApply_RequiresMatchingPlanReservationAndApproval",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestInfraApply_RequiresMatchingPlanReservationAndApproval",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestInfraApply_RequiresMatchingPlanReservationAndApproval"
+    },
+    {
+      "family": "G",
+      "id": "G17",
+      "level": "live state backend/concurrency",
+      "name": "TestInfraState_RemoteLockPreventsConcurrentMutation",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestInfraState_RemoteLockPreventsConcurrentMutation",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestInfraState_RemoteLockPreventsConcurrentMutation"
+    },
+    {
+      "family": "G",
+      "id": "G18",
+      "level": "orchestration",
+      "name": "TestAgent_GitOpsCommitOccursOnlyAfterInfraDependenciesReady",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_GitOpsCommitOccursOnlyAfterInfraDependenciesReady",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_GitOpsCommitOccursOnlyAfterInfraDependenciesReady"
+    },
+    {
+      "family": "G",
+      "id": "G19",
+      "level": "acceptance",
+      "name": "TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix"
+    },
+    {
+      "family": "G",
+      "id": "G20",
+      "level": "application",
+      "name": "TestAgent_DestroyWorkflowShowsPlanAndRetainsResourcesByPolicy",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_DestroyWorkflowShowsPlanAndRetainsResourcesByPolicy",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_DestroyWorkflowShowsPlanAndRetainsResourcesByPolicy"
+    },
+    {
+      "family": "G",
+      "id": "G21",
+      "level": "security acceptance",
+      "name": "TestAgent_NeverReceivesPlatformOrProviderMasterCredential",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_NeverReceivesPlatformOrProviderMasterCredential",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_NeverReceivesPlatformOrProviderMasterCredential"
+    },
+    {
+      "family": "G",
+      "id": "G22",
+      "level": "cross-domain",
+      "name": "TestAgent_SecretSetIsWriteOnlyAcrossMCPAndWorkspace",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_SecretSetIsWriteOnlyAcrossMCPAndWorkspace",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_SecretSetIsWriteOnlyAcrossMCPAndWorkspace"
+    },
+    {
+      "family": "G",
+      "id": "G23",
+      "level": "application",
+      "name": "TestAgent_CostThresholdPausesBeforeApplyAndNotifiesHuman",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_CostThresholdPausesBeforeApplyAndNotifiesHuman",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_CostThresholdPausesBeforeApplyAndNotifiesHuman"
+    },
+    {
+      "family": "G",
+      "id": "G24",
+      "level": "PostgreSQL/concurrency",
+      "name": "TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan"
+    },
+    {
+      "family": "G",
+      "id": "G25",
+      "level": "application",
+      "name": "TestAgent_RepairLoopAndBudgetStopAutonomousSpend",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_RepairLoopAndBudgetStopAutonomousSpend",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_RepairLoopAndBudgetStopAutonomousSpend"
+    },
+    {
+      "family": "G",
+      "id": "G26",
+      "level": "gateway acceptance",
+      "name": "TestAgent_ProviderCapabilityUsageVisibleWithoutMasterCredential",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_ProviderCapabilityUsageVisibleWithoutMasterCredential",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_ProviderCapabilityUsageVisibleWithoutMasterCredential"
+    },
+    {
+      "family": "G",
+      "id": "G27",
+      "level": "cross-domain",
+      "name": "TestAgent_SuspendedTenantCanInspectButCannotMutate",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_SuspendedTenantCanInspectButCannotMutate",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_SuspendedTenantCanInspectButCannotMutate"
+    },
+    {
+      "family": "G",
+      "id": "G28",
+      "level": "acceptance",
+      "name": "TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime"
+    },
+    {
+      "family": "G",
+      "id": "G29",
+      "level": "chaos/provider",
+      "name": "TestAgent_CancelDuringApplyReconcilesActualExternalState",
+      "status": "LIVE_ONLY",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_CancelDuringApplyReconcilesActualExternalState",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_CancelDuringApplyReconcilesActualExternalState"
+    },
+    {
+      "family": "G",
+      "id": "G30",
+      "level": "HTTP/security",
+      "name": "TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction",
+      "status": "NEW",
+      "test_file": "test/pivot/agent_workspace_test.go",
+      "test_name": "TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction",
+      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction"
+    },
+    {
+      "family": "E2E",
+      "id": "E2E-1",
+      "level": "full system",
+      "name": "TestSystem_OneButtonDeploySimpleGoService",
+      "status": "LIVE_ONLY",
+      "test_file": "test/system/agentic_devops_e2e_test.go",
+      "test_name": "TestSystem_OneButtonDeploySimpleGoService",
+      "test_ref": "test/system/agentic_devops_e2e_test.go::TestSystem_OneButtonDeploySimpleGoService"
+    },
+    {
+      "family": "E2E",
+      "id": "E2E-2",
+      "level": "full provider-backed system",
+      "name": "TestSystem_DeployTemporalPostgresQdrantAndOpenRouter",
+      "status": "LIVE_ONLY",
+      "test_file": "test/system/agentic_devops_e2e_test.go",
+      "test_name": "TestSystem_DeployTemporalPostgresQdrantAndOpenRouter",
+      "test_ref": "test/system/agentic_devops_e2e_test.go::TestSystem_DeployTemporalPostgresQdrantAndOpenRouter"
+    },
+    {
+      "family": "E2E",
+      "id": "E2E-3",
+      "level": "system",
+      "name": "TestSystem_CustomUnknownServiceUsesGenericHelmPath",
+      "status": "LIVE_ONLY",
+      "test_file": "test/system/agentic_devops_e2e_test.go",
+      "test_name": "TestSystem_CustomUnknownServiceUsesGenericHelmPath",
+      "test_ref": "test/system/agentic_devops_e2e_test.go::TestSystem_CustomUnknownServiceUsesGenericHelmPath"
+    },
+    {
+      "family": "E2E",
+      "id": "E2E-4",
+      "level": "security/system",
+      "name": "TestSystem_DestructivePlanCannotReusePreviousApproval",
+      "status": "LIVE_ONLY",
+      "test_file": "test/system/agentic_devops_e2e_test.go",
+      "test_name": "TestSystem_DestructivePlanCannotReusePreviousApproval",
+      "test_ref": "test/system/agentic_devops_e2e_test.go::TestSystem_DestructivePlanCannotReusePreviousApproval"
+    },
+    {
+      "family": "E2E",
+      "id": "E2E-5",
+      "level": "chaos",
+      "name": "TestSystem_LostGitWebhookProviderResponseAndArgoStatusRecover",
+      "status": "LIVE_ONLY",
+      "test_file": "test/system/agentic_devops_e2e_test.go",
+      "test_name": "TestSystem_LostGitWebhookProviderResponseAndArgoStatusRecover",
+      "test_ref": "test/system/agentic_devops_e2e_test.go::TestSystem_LostGitWebhookProviderResponseAndArgoStatusRecover"
+    },
+    {
+      "family": "E2E",
+      "id": "E2E-6",
+      "level": "offensive security",
+      "name": "TestSystem_WorkspaceCompromiseCannotReachControlPlaneOrOtherTenant",
+      "status": "LIVE_ONLY",
+      "test_file": "test/system/agentic_devops_e2e_test.go",
+      "test_name": "TestSystem_WorkspaceCompromiseCannotReachControlPlaneOrOtherTenant",
+      "test_ref": "test/system/agentic_devops_e2e_test.go::TestSystem_WorkspaceCompromiseCannotReachControlPlaneOrOtherTenant"
+    },
+    {
+      "family": "E2E",
+      "id": "E2E-7",
+      "level": "system/commerce",
+      "name": "TestSystem_CostBudgetStopsAutonomousRepairLoop",
+      "status": "LIVE_ONLY",
+      "test_file": "test/system/agentic_devops_e2e_test.go",
+      "test_name": "TestSystem_CostBudgetStopsAutonomousRepairLoop",
+      "test_ref": "test/system/agentic_devops_e2e_test.go::TestSystem_CostBudgetStopsAutonomousRepairLoop"
+    },
+    {
+      "family": "E2E",
+      "id": "E2E-8",
+      "level": "system",
+      "name": "TestSystem_RuntimeDriftReconcilesFromGitNotWorkspaceMemory",
+      "status": "LIVE_ONLY",
+      "test_file": "test/system/agentic_devops_e2e_test.go",
+      "test_name": "TestSystem_RuntimeDriftReconcilesFromGitNotWorkspaceMemory",
+      "test_ref": "test/system/agentic_devops_e2e_test.go::TestSystem_RuntimeDriftReconcilesFromGitNotWorkspaceMemory"
+    },
+    {
+      "family": "E2E",
+      "id": "E2E-9",
+      "level": "system/provider",
+      "name": "TestSystem_ProjectDeletionRetainsAndPurgesAccordingToExplicitPolicy",
+      "status": "LIVE_ONLY",
+      "test_file": "test/system/agentic_devops_e2e_test.go",
+      "test_name": "TestSystem_ProjectDeletionRetainsAndPurgesAccordingToExplicitPolicy",
+      "test_ref": "test/system/agentic_devops_e2e_test.go::TestSystem_ProjectDeletionRetainsAndPurgesAccordingToExplicitPolicy"
+    },
+    {
+      "family": "E2E",
+      "id": "E2E-10",
+      "level": "full security regression",
+      "name": "TestSystem_SecretSentinelAbsentAcrossAllSurfaces",
+      "status": "LIVE_ONLY",
+      "test_file": "test/system/agentic_devops_e2e_test.go",
+      "test_name": "TestSystem_SecretSentinelAbsentAcrossAllSurfaces",
+      "test_ref": "test/system/agentic_devops_e2e_test.go::TestSystem_SecretSentinelAbsentAcrossAllSurfaces"
+    },
+    {
+      "family": "E2E",
+      "id": "E2E-11",
+      "level": "system",
+      "name": "TestSystem_SuspensionStopsMutationButPreservesRecoverability",
+      "status": "LIVE_ONLY",
+      "test_file": "test/system/agentic_devops_e2e_test.go",
+      "test_name": "TestSystem_SuspensionStopsMutationButPreservesRecoverability",
+      "test_ref": "test/system/agentic_devops_e2e_test.go::TestSystem_SuspensionStopsMutationButPreservesRecoverability"
+    },
+    {
+      "family": "E2E",
+      "id": "E2E-12",
+      "level": "disaster recovery",
+      "name": "TestSystem_BackupRestoreReconstructsControlAndProjectState",
+      "status": "LIVE_ONLY",
+      "test_file": "test/system/agentic_devops_e2e_test.go",
+      "test_name": "TestSystem_BackupRestoreReconstructsControlAndProjectState",
+      "test_ref": "test/system/agentic_devops_e2e_test.go::TestSystem_BackupRestoreReconstructsControlAndProjectState"
+    }
+  ],
+  "schema_version": 1,
+  "source": "docs/pivot/tdd-catalog.json",
+  "source_sha256": "bdd2bf86003ae0b2d3d864637569ce81c3923841ef219e6cfaee9d3eba8ab337",
+  "summary": {
+    "families": {
+      "A5": 32,
+      "B": 15,
+      "C": 18,
+      "E2E": 12,
+      "G": 30,
+      "K": 14,
+      "R": 18,
+      "S": 18
+    },
+    "statuses": {
+      "LIVE_ONLY": 86,
+      "NEW": 71
+    },
+    "unmapped": 0
+  }
+}
