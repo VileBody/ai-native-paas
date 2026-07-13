@@ -1,0 +1,24 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/repository_push.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "branch": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "commit_sha": {
+      "maxLength": 64,
+      "minLength": 40,
+      "pattern": "^[0-9a-f]{40,64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "branch",
+    "commit_sha"
+  ],
+  "title": "repository_push arguments",
+  "type": "object"
+}

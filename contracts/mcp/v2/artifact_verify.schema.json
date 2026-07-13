@@ -1,0 +1,25 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/artifact_verify.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_digest": {
+      "maxLength": 71,
+      "minLength": 71,
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "policy_version": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "artifact_digest",
+    "policy_version"
+  ],
+  "title": "artifact_verify arguments",
+  "type": "object"
+}

@@ -1,0 +1,23 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/operation_cancel.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "operation_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "reason": {
+      "maxLength": 500,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "operation_id"
+  ],
+  "title": "operation_cancel arguments",
+  "type": "object"
+}

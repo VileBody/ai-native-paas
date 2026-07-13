@@ -1,0 +1,106 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/invocation-request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "api_version": {
+      "const": "agent.platform.example.com/v2"
+    },
+    "approval_grant_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "arguments": {},
+    "correlation_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "idempotency_key": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "semantics_version": {
+      "const": "v2"
+    },
+    "task_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "tool": {
+      "enum": [
+        "approval_get",
+        "approval_request",
+        "argocd_get_status",
+        "argocd_rollback",
+        "argocd_sync",
+        "artifact_get",
+        "artifact_verify",
+        "build_execute",
+        "build_get",
+        "capability_bind",
+        "capability_get_usage",
+        "cost_estimate",
+        "credential_request",
+        "credential_revoke",
+        "deployment_get_events",
+        "deployment_get_logs",
+        "deployment_http_probe",
+        "gitops_commit",
+        "gitops_validate",
+        "infra_apply",
+        "infra_destroy",
+        "infra_get_plan",
+        "infra_import",
+        "infra_init",
+        "infra_plan",
+        "infra_state_list",
+        "infra_validate",
+        "operation_cancel",
+        "operation_get",
+        "operation_wait",
+        "project_create",
+        "project_get",
+        "project_get_policy",
+        "provider_connect",
+        "provider_plan_resource",
+        "recipe_get",
+        "recipe_search",
+        "repository_apply_patch",
+        "repository_commit",
+        "repository_create_branch",
+        "repository_create_merge_request",
+        "repository_diff",
+        "repository_push",
+        "repository_status",
+        "secret_list_metadata",
+        "secret_set",
+        "usage_get",
+        "workspace_cancel_command",
+        "workspace_create",
+        "workspace_destroy",
+        "workspace_exec",
+        "workspace_get",
+        "workspace_upload_artifact"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "api_version",
+    "semantics_version",
+    "task_id",
+    "tool",
+    "arguments",
+    "idempotency_key",
+    "correlation_id"
+  ],
+  "title": "Verified-scope Project MCP invocation",
+  "type": "object"
+}

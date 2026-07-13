@@ -1,0 +1,76 @@
+{
+  "info": {
+    "title": "AI-native DevOps Project MCP API",
+    "version": "2.0.0-beta.1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v2/agent-enrollments/exchange": {
+      "post": {
+        "responses": {
+          "201": {
+            "description": "scoped refresh credential"
+          }
+        }
+      }
+    },
+    "/api/v2/agent-token": {
+      "post": {
+        "responses": {
+          "201": {
+            "description": "15 minute access JWT"
+          }
+        }
+      }
+    },
+    "/api/v2/projects": {
+      "post": {
+        "responses": {
+          "201": {
+            "description": "project, Git URL, MCP URL and one-time enrollment token"
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "healthy"
+          }
+        }
+      }
+    },
+    "/mcp/v2/invoke": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../mcp/v2/invocation-request.schema.json"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "synchronous result"
+          },
+          "202": {
+            "description": "asynchronous operation"
+          }
+        }
+      }
+    },
+    "/mcp/v2/tools": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "closed Project MCP catalog"
+          }
+        }
+      }
+    }
+  }
+}

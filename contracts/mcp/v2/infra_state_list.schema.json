@@ -1,0 +1,13 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/infra_state_list.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "state_generation": {
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "title": "infra_state_list arguments",
+  "type": "object"
+}

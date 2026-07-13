@@ -1,0 +1,430 @@
+{
+  "api_version": "agent.platform.example.com/v2",
+  "semantics_version": "v2",
+  "tools": [
+    {
+      "group": "governance",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/approval_get.schema.json",
+      "name": "approval_get",
+      "read_only": true,
+      "required_scope": "agent.tool:approval_get",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "governance",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/approval_request.schema.json",
+      "name": "approval_request",
+      "read_only": false,
+      "required_scope": "agent.tool:approval_request",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "gitops_runtime",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/argocd_get_status.schema.json",
+      "name": "argocd_get_status",
+      "read_only": true,
+      "required_scope": "agent.tool:argocd_get_status",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "gitops_runtime",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/argocd_rollback.schema.json",
+      "name": "argocd_rollback",
+      "read_only": false,
+      "required_scope": "agent.tool:argocd_rollback",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "gitops_runtime",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/argocd_sync.schema.json",
+      "name": "argocd_sync",
+      "read_only": false,
+      "required_scope": "agent.tool:argocd_sync",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "build",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/artifact_get.schema.json",
+      "name": "artifact_get",
+      "read_only": true,
+      "required_scope": "agent.tool:artifact_get",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "build",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/artifact_verify.schema.json",
+      "name": "artifact_verify",
+      "read_only": true,
+      "required_scope": "agent.tool:artifact_verify",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "build",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/build_execute.schema.json",
+      "name": "build_execute",
+      "read_only": false,
+      "required_scope": "agent.tool:build_execute",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "build",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/build_get.schema.json",
+      "name": "build_get",
+      "read_only": true,
+      "required_scope": "agent.tool:build_get",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "provider_capability",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/capability_bind.schema.json",
+      "name": "capability_bind",
+      "read_only": false,
+      "required_scope": "agent.tool:capability_bind",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "provider_capability",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/capability_get_usage.schema.json",
+      "name": "capability_get_usage",
+      "read_only": true,
+      "required_scope": "agent.tool:capability_get_usage",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "governance",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/cost_estimate.schema.json",
+      "name": "cost_estimate",
+      "read_only": true,
+      "required_scope": "agent.tool:cost_estimate",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "provider_capability",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/credential_request.schema.json",
+      "name": "credential_request",
+      "read_only": false,
+      "required_scope": "agent.tool:credential_request",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "provider_capability",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/credential_revoke.schema.json",
+      "name": "credential_revoke",
+      "read_only": false,
+      "required_scope": "agent.tool:credential_revoke",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "gitops_runtime",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/deployment_get_events.schema.json",
+      "name": "deployment_get_events",
+      "read_only": true,
+      "required_scope": "agent.tool:deployment_get_events",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "gitops_runtime",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/deployment_get_logs.schema.json",
+      "name": "deployment_get_logs",
+      "read_only": true,
+      "required_scope": "agent.tool:deployment_get_logs",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "gitops_runtime",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/deployment_http_probe.schema.json",
+      "name": "deployment_http_probe",
+      "read_only": true,
+      "required_scope": "agent.tool:deployment_http_probe",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "gitops_runtime",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/gitops_commit.schema.json",
+      "name": "gitops_commit",
+      "read_only": false,
+      "required_scope": "agent.tool:gitops_commit",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "gitops_runtime",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/gitops_validate.schema.json",
+      "name": "gitops_validate",
+      "read_only": false,
+      "required_scope": "agent.tool:gitops_validate",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "infrastructure",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/infra_apply.schema.json",
+      "name": "infra_apply",
+      "read_only": false,
+      "required_scope": "agent.tool:infra_apply",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "infrastructure",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/infra_destroy.schema.json",
+      "name": "infra_destroy",
+      "read_only": false,
+      "required_scope": "agent.tool:infra_destroy",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "infrastructure",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/infra_get_plan.schema.json",
+      "name": "infra_get_plan",
+      "read_only": true,
+      "required_scope": "agent.tool:infra_get_plan",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "infrastructure",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/infra_import.schema.json",
+      "name": "infra_import",
+      "read_only": false,
+      "required_scope": "agent.tool:infra_import",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "infrastructure",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/infra_init.schema.json",
+      "name": "infra_init",
+      "read_only": false,
+      "required_scope": "agent.tool:infra_init",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "infrastructure",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/infra_plan.schema.json",
+      "name": "infra_plan",
+      "read_only": false,
+      "required_scope": "agent.tool:infra_plan",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "infrastructure",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/infra_state_list.schema.json",
+      "name": "infra_state_list",
+      "read_only": true,
+      "required_scope": "agent.tool:infra_state_list",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "infrastructure",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/infra_validate.schema.json",
+      "name": "infra_validate",
+      "read_only": false,
+      "required_scope": "agent.tool:infra_validate",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "governance",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/operation_cancel.schema.json",
+      "name": "operation_cancel",
+      "read_only": false,
+      "required_scope": "agent.tool:operation_cancel",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "governance",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/operation_get.schema.json",
+      "name": "operation_get",
+      "read_only": true,
+      "required_scope": "agent.tool:operation_get",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "governance",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/operation_wait.schema.json",
+      "name": "operation_wait",
+      "read_only": true,
+      "required_scope": "agent.tool:operation_wait",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "project_repository",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/project_create.schema.json",
+      "name": "project_create",
+      "read_only": false,
+      "required_scope": "agent.tool:project_create",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "project_repository",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/project_get.schema.json",
+      "name": "project_get",
+      "read_only": true,
+      "required_scope": "agent.tool:project_get",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "project_repository",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/project_get_policy.schema.json",
+      "name": "project_get_policy",
+      "read_only": true,
+      "required_scope": "agent.tool:project_get_policy",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "provider_capability",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/provider_connect.schema.json",
+      "name": "provider_connect",
+      "read_only": false,
+      "required_scope": "agent.tool:provider_connect",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "provider_capability",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/provider_plan_resource.schema.json",
+      "name": "provider_plan_resource",
+      "read_only": false,
+      "required_scope": "agent.tool:provider_plan_resource",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "provider_capability",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/recipe_get.schema.json",
+      "name": "recipe_get",
+      "read_only": true,
+      "required_scope": "agent.tool:recipe_get",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "provider_capability",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/recipe_search.schema.json",
+      "name": "recipe_search",
+      "read_only": true,
+      "required_scope": "agent.tool:recipe_search",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "project_repository",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/repository_apply_patch.schema.json",
+      "name": "repository_apply_patch",
+      "read_only": false,
+      "required_scope": "agent.tool:repository_apply_patch",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "project_repository",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/repository_commit.schema.json",
+      "name": "repository_commit",
+      "read_only": false,
+      "required_scope": "agent.tool:repository_commit",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "project_repository",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/repository_create_branch.schema.json",
+      "name": "repository_create_branch",
+      "read_only": false,
+      "required_scope": "agent.tool:repository_create_branch",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "project_repository",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/repository_create_merge_request.schema.json",
+      "name": "repository_create_merge_request",
+      "read_only": false,
+      "required_scope": "agent.tool:repository_create_merge_request",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "project_repository",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/repository_diff.schema.json",
+      "name": "repository_diff",
+      "read_only": true,
+      "required_scope": "agent.tool:repository_diff",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "project_repository",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/repository_push.schema.json",
+      "name": "repository_push",
+      "read_only": false,
+      "required_scope": "agent.tool:repository_push",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "project_repository",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/repository_status.schema.json",
+      "name": "repository_status",
+      "read_only": true,
+      "required_scope": "agent.tool:repository_status",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "provider_capability",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/secret_list_metadata.schema.json",
+      "name": "secret_list_metadata",
+      "read_only": true,
+      "required_scope": "agent.tool:secret_list_metadata",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "provider_capability",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/secret_set.schema.json",
+      "name": "secret_set",
+      "read_only": false,
+      "required_scope": "agent.tool:secret_set",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "governance",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/usage_get.schema.json",
+      "name": "usage_get",
+      "read_only": true,
+      "required_scope": "agent.tool:usage_get",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "workspace",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/workspace_cancel_command.schema.json",
+      "name": "workspace_cancel_command",
+      "read_only": false,
+      "required_scope": "agent.tool:workspace_cancel_command",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "workspace",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/workspace_create.schema.json",
+      "name": "workspace_create",
+      "read_only": false,
+      "required_scope": "agent.tool:workspace_create",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "workspace",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/workspace_destroy.schema.json",
+      "name": "workspace_destroy",
+      "read_only": false,
+      "required_scope": "agent.tool:workspace_destroy",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "workspace",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/workspace_exec.schema.json",
+      "name": "workspace_exec",
+      "read_only": false,
+      "required_scope": "agent.tool:workspace_exec",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "workspace",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/workspace_get.schema.json",
+      "name": "workspace_get",
+      "read_only": true,
+      "required_scope": "agent.tool:workspace_get",
+      "semanticsVersion": "v2"
+    },
+    {
+      "group": "workspace",
+      "inputSchema": "https://platform.example.com/contracts/mcp/v2/workspace_upload_artifact.schema.json",
+      "name": "workspace_upload_artifact",
+      "read_only": false,
+      "required_scope": "agent.tool:workspace_upload_artifact",
+      "semanticsVersion": "v2"
+    }
+  ]
+}

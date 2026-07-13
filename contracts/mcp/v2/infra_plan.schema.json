@@ -1,0 +1,44 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/infra_plan.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "destroy": {
+      "type": "boolean"
+    },
+    "root": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    },
+    "source_sha": {
+      "maxLength": 64,
+      "minLength": 40,
+      "pattern": "^[0-9a-f]{40,64}$",
+      "type": "string"
+    },
+    "variables": {
+      "additionalProperties": {
+        "maxLength": 4096,
+        "minLength": 0,
+        "type": "string"
+      },
+      "maxProperties": 128,
+      "type": "object"
+    },
+    "workspace_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workspace_id",
+    "root",
+    "source_sha"
+  ],
+  "title": "infra_plan arguments",
+  "type": "object"
+}

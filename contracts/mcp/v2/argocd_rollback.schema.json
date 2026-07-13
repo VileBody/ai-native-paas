@@ -1,0 +1,38 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/argocd_rollback.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "application_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "approval_grant_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "base_sha": {
+      "maxLength": 64,
+      "minLength": 40,
+      "pattern": "^[0-9a-f]{40,64}$",
+      "type": "string"
+    },
+    "target_revision": {
+      "maxLength": 64,
+      "minLength": 40,
+      "pattern": "^[0-9a-f]{40,64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "application_id",
+    "base_sha",
+    "target_revision"
+  ],
+  "title": "argocd_rollback arguments",
+  "type": "object"
+}

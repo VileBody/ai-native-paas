@@ -1,0 +1,42 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/repository_commit.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_sha": {
+      "maxLength": 64,
+      "minLength": 40,
+      "pattern": "^[0-9a-f]{40,64}$",
+      "type": "string"
+    },
+    "branch": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "message": {
+      "maxLength": 500,
+      "minLength": 1,
+      "type": "string"
+    },
+    "paths": {
+      "items": {
+        "maxLength": 4096,
+        "minLength": 1,
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+        "type": "string"
+      },
+      "maxItems": 1000,
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "branch",
+    "base_sha",
+    "message",
+    "paths"
+  ],
+  "title": "repository_commit arguments",
+  "type": "object"
+}

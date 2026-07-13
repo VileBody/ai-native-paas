@@ -1,0 +1,18 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/usage_get.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "period": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "period"
+  ],
+  "title": "usage_get arguments",
+  "type": "object"
+}

@@ -1,0 +1,37 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/approval_request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "estimate_version": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "plan_hash": {
+      "maxLength": 71,
+      "minLength": 71,
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "reason": {
+      "maxLength": 1000,
+      "minLength": 1,
+      "type": "string"
+    },
+    "target": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "plan_hash",
+    "estimate_version",
+    "target",
+    "reason"
+  ],
+  "title": "approval_request arguments",
+  "type": "object"
+}

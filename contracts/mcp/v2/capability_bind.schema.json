@@ -1,0 +1,36 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/capability_bind.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "budget_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "llm.openrouter-compatible",
+        "parser.apify",
+        "parser.bright-data"
+      ],
+      "maxLength": 4096,
+      "minLength": 1,
+      "type": "string"
+    },
+    "rate_limit_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "budget_id",
+    "rate_limit_id"
+  ],
+  "title": "capability_bind arguments",
+  "type": "object"
+}

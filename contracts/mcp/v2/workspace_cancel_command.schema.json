@@ -1,0 +1,25 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/workspace_cancel_command.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "command_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "workspace_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workspace_id",
+    "command_id"
+  ],
+  "title": "workspace_cancel_command arguments",
+  "type": "object"
+}

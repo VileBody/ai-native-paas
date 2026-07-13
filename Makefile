@@ -4,7 +4,7 @@ FUZZTIME ?= 5s
 COVERAGE_PROFILE ?= coverage.out
 COVERAGE_HTML ?= coverage.html
 
-.PHONY: fmt fmt-check generate-check vet test race race-build race-kernel-source race-runtime race-commerce \
+.PHONY: fmt fmt-check generate-check mcp-v2 mcp-v2-check vet test race race-build race-kernel-source race-runtime race-commerce \
 	fuzz fuzz-kernel fuzz-source fuzz-build fuzz-runtime fuzz-commerce coverage coverage-html \
 	integration-compile postgres-up postgres-down postgres-reset test-postgres test-postgres-docker test-runtime-postgres test-attachments-postgres test-commerce-postgres build \
 	smoke-runtime-api smoke-attachments-api smoke-commerce-api tdd-iteration4 tdd-iteration5 tdd-iteration6 manifests-iteration4 \
@@ -17,8 +17,14 @@ fmt-check:
 	@files="$$(gofmt -l $$(find . -name '*.go' -type f -not -path './vendor/*' | sort))"; \
 	if [[ -n "$$files" ]]; then echo "Unformatted Go files:"; echo "$$files"; exit 1; fi
 
-generate-check: pivot-tdd-check
+generate-check: mcp-v2-check pivot-tdd-check
 	@echo "Generated contract evidence is current"
+
+mcp-v2:
+	./scripts/generate-agent-mcp-v2-schemas.py
+
+mcp-v2-check:
+	./scripts/generate-agent-mcp-v2-schemas.py --check
 
 pivot-tdd:
 	./scripts/generate-pivot-tdd-matrix.py

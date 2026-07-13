@@ -1,0 +1,21 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/repository_diff.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_sha": {
+      "maxLength": 64,
+      "minLength": 40,
+      "pattern": "^[0-9a-f]{40,64}$",
+      "type": "string"
+    },
+    "target_sha": {
+      "maxLength": 64,
+      "minLength": 40,
+      "pattern": "^[0-9a-f]{40,64}$",
+      "type": "string"
+    }
+  },
+  "title": "repository_diff arguments",
+  "type": "object"
+}

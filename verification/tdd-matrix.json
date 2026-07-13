@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 706,
-  "discovered_unique_test_name_count": 704,
+  "discovered_go_test_count": 714,
+  "discovered_unique_test_name_count": 712,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1168,20 +1168,20 @@
       "id": "G2",
       "level": "contract/golden",
       "name": "TestMCPV2_CatalogAndSchemasAreVersionedStableAndClosed",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "test/contract/mcp_v2_test.go",
       "test_name": "TestMCPV2_CatalogAndSchemasAreVersionedStableAndClosed",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestMCPV2_CatalogAndSchemasAreVersionedStableAndClosed"
+      "test_ref": "test/contract/mcp_v2_test.go::TestMCPV2_CatalogAndSchemasAreVersionedStableAndClosed"
     },
     {
       "family": "G",
       "id": "G3",
       "level": "application",
       "name": "TestMCPV1CompatibilityCannotBypassV2Governance",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "test/contract/mcp_v2_test.go",
       "test_name": "TestMCPV1CompatibilityCannotBypassV2Governance",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestMCPV1CompatibilityCannotBypassV2Governance"
+      "test_ref": "test/contract/mcp_v2_test.go::TestMCPV1CompatibilityCannotBypassV2Governance"
     },
     {
       "family": "G",
@@ -1590,7 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 86,
-      "NEW": 71
+      "NEW": 69,
+      "REUSED": 2
     },
     "unmapped": 0
   }

@@ -1,0 +1,29 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/deployment_http_probe.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "expected_status": {
+      "maximum": 599,
+      "minimum": 100,
+      "type": "integer"
+    },
+    "timeout_seconds": {
+      "maximum": 60,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "url": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "pattern": "^https://",
+      "type": "string"
+    }
+  },
+  "required": [
+    "url",
+    "expected_status"
+  ],
+  "title": "deployment_http_probe arguments",
+  "type": "object"
+}

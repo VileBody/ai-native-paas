@@ -1,0 +1,82 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/build_execute.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "spec": {
+      "additionalProperties": false,
+      "properties": {
+        "definition_path": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+          "type": "string"
+        },
+        "driver": {
+          "enum": [
+            "dockerfile",
+            "buildpacks",
+            "nix",
+            "custom-approved"
+          ],
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "platforms": {
+          "items": {
+            "enum": [
+              "linux/amd64",
+              "linux/arm64"
+            ],
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "type": "array"
+        },
+        "secret_refs": {
+          "items": {
+            "maxLength": 63,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+            "type": "string"
+          },
+          "maxItems": 128,
+          "type": "array"
+        },
+        "source_sha": {
+          "maxLength": 64,
+          "minLength": 40,
+          "pattern": "^[0-9a-f]{40,64}$",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source_sha",
+        "driver",
+        "platforms",
+        "timeout_seconds"
+      ],
+      "type": "object"
+    },
+    "workspace_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workspace_id",
+    "spec"
+  ],
+  "title": "build_execute arguments",
+  "type": "object"
+}

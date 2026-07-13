@@ -21,7 +21,8 @@ The original seven bounded contexts remain in place:
 - Iteration 5 is fully restored and verified at 68/68 TDD parity;
 - all live PostgreSQL suites have passed against both user-owned Kubernetes
   PostgreSQL and private managed control-plane PostgreSQL;
-- MCP v1 stays frozen while additive v2 contracts are introduced;
+- MCP v1 stays frozen behind governed compatibility routes; the additive v2
+  contracts and closed 53-tool Project MCP catalog are executable;
 - the accepted pivot specification and 157-requirement catalog live under
   `docs/pivot/`.
 
@@ -33,8 +34,16 @@ requirement evidence is stored in `verification/`.
 ```bash
 make fmt-check
 make test
-make pivot-tdd-check
+make generate-check
 ```
+
+## Pivot contracts
+
+- `templates/project-v2/platform.yaml` is the strict project template;
+- `contracts/project/v2/platform.schema.json` is its editor-facing schema;
+- `contracts/mcp/v2/catalog.json` is the canonical Project MCP tool catalog;
+- `contracts/mcp/v2/compatibility-v1.json` documents how every MCP v1 tool is
+  forced through v2 scope, policy, idempotency and approval gates.
 
 PostgreSQL-tagged suites require `TEST_POSTGRES_DSN`. Provider, Kubernetes,
 workspace-security and resilience statuses are independent live gates; see

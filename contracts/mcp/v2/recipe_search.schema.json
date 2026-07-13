@@ -1,0 +1,19 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/recipe_search.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "query": {
+      "maxLength": 500,
+      "minLength": 0,
+      "type": "string"
+    }
+  },
+  "title": "recipe_search arguments",
+  "type": "object"
+}

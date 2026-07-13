@@ -1,0 +1,104 @@
+// Package v2 defines beta estimates, reservations, immutable rate cards and usage ledgers.
+package v2
+
+import (
+	"errors"
+	"regexp"
+	"strings"
+	"time"
+)
+
+const APIVersion = "commerce.platform.example.com/v2"
+
+var digest = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+
+type Money struct {
+	Currency  string `json:"currency"`
+	MinorUnit int64  `json:"minor_unit"`
+}
+
+func (m Money) Validate() error {
+	if !regexp.MustCompile(`^[A-Z]{3}$`).MatchString(m.Currency) || m.MinorUnit < 0 {
+		return errors.New("invalid money")
+	}
+	return nil
+}
+
+type PriceSnapshot struct {
+	SnapshotID string    `json:"snapshot_id"`
+	Provider   string    `json:"provider"`
+	Version    string    `json:"version"`
+	Digest     string    `json:"digest"`
+	ObservedAt time.Time `json:"observed_at"`
+}
+
+type RateCard struct {
+	RateCardID        string `json:"rate_card_id"`
+	Version           string `json:"version"`
+	MarkupBasisPoints int64  `json:"markup_basis_points"`
+	Currency          string `json:"currency"`
+	PriceSnapshotID   string `json:"price_snapshot_id"`
+}
+
+func (r RateCard) Validate() error {
+	if r.RateCardID == "" || r.Version == "" || r.PriceSnapshotID == "" || r.MarkupBasisPoints < 1000 || r.MarkupBasisPoints > 5000 || !regexp.MustCompile(`^[A-Z]{3}$`).MatchString(r.Currency) {
+		return errors.New("invalid beta rate card")
+	}
+	return nil
+}
+
+type EstimateLine struct {
+	Meter        string `json:"meter"`
+	Quantity     int64  `json:"quantity"`
+	Unit         string `json:"unit"`
+	ProviderCost Money  `json:"provider_cost"`
+	CustomerCost Money  `json:"customer_cost"`
+	PriceKnown   bool   `json:"price_known"`
+}
+
+type CostEstimate struct {
+	EstimateID       string         `json:"estimate_id"`
+	Version          string         `json:"version"`
+	PlanHash         string         `json:"plan_hash"`
+	RateCardID       string         `json:"rate_card_id"`
+	Lines            []EstimateLine `json:"lines"`
+	Minimum          Money          `json:"minimum"`
+	Maximum          Money          `json:"maximum"`
+	ApprovalRequired bool           `json:"approval_required"`
+	ExpiresAt        time.Time      `json:"expires_at"`
+}
+
+func (e CostEstimate) Validate(now time.Time) error {
+	if e.EstimateID == "" || e.Version == "" || !digest.MatchString(e.PlanHash) || e.RateCardID == "" || len(e.Lines) == 0 || !e.ExpiresAt.After(now) || e.Minimum.Validate() != nil || e.Maximum.Validate() != nil || e.Minimum.Currency != e.Maximum.Currency || e.Minimum.MinorUnit > e.Maximum.MinorUnit {
+		return errors.New("invalid cost estimate")
+	}
+	for _, line := range e.Lines {
+		if strings.TrimSpace(line.Meter) == "" || line.Quantity < 0 || line.ProviderCost.Validate() != nil || line.CustomerCost.Validate() != nil {
+			return errors.New("invalid estimate line")
+		}
+		if !line.PriceKnown && !e.ApprovalRequired {
+			return errors.New("unknown price requires approval")
+		}
+	}
+	return nil
+}
+
+type ExecutionReservation struct {
+	ReservationID   string    `json:"reservation_id"`
+	ProjectID       string    `json:"project_id"`
+	EstimateID      string    `json:"estimate_id"`
+	EstimateVersion string    `json:"estimate_version"`
+	PlanHash        string    `json:"plan_hash"`
+	Maximum         Money     `json:"maximum"`
+	ExpiresAt       time.Time `json:"expires_at"`
+}
+
+type UsageFact struct {
+	UsageID          string    `json:"usage_id"`
+	ProjectID        string    `json:"project_id"`
+	OperationID      string    `json:"operation_id"`
+	Meter            string    `json:"meter"`
+	Quantity         int64     `json:"quantity"`
+	DeduplicationKey string    `json:"deduplication_key"`
+	OccurredAt       time.Time `json:"occurred_at"`
+}

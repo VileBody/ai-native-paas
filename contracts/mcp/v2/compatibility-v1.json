@@ -1,0 +1,171 @@
+{
+  "api_version": "agent.platform.example.com/v2",
+  "routes": [
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_add_domain",
+      "v2_targets": [
+        "provider_plan_resource",
+        "infra_plan",
+        "infra_apply"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_apply_repository_patch",
+      "v2_targets": [
+        "repository_apply_patch"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_bind_service",
+      "v2_targets": [
+        "provider_connect"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_cancel_operation",
+      "v2_targets": [
+        "operation_cancel"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_create_branch",
+      "v2_targets": [
+        "repository_create_branch"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_create_merge_request",
+      "v2_targets": [
+        "repository_create_merge_request"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_create_project",
+      "v2_targets": [
+        "project_create"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_deploy",
+      "v2_targets": [
+        "gitops_validate",
+        "gitops_commit",
+        "argocd_sync"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_get_build",
+      "v2_targets": [
+        "build_get"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_get_deployment",
+      "v2_targets": [
+        "argocd_get_status"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_get_logs",
+      "v2_targets": [
+        "deployment_get_logs"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_get_operation",
+      "v2_targets": [
+        "operation_get"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_get_project",
+      "v2_targets": [
+        "project_get"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_get_usage",
+      "v2_targets": [
+        "usage_get"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_list_secret_metadata",
+      "v2_targets": [
+        "secret_list_metadata"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_provision_service",
+      "v2_targets": [
+        "provider_plan_resource",
+        "infra_plan",
+        "infra_apply"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_request_approval",
+      "v2_targets": [
+        "approval_request"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_request_build",
+      "v2_targets": [
+        "build_execute"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_rollback",
+      "v2_targets": [
+        "argocd_rollback"
+      ]
+    },
+    {
+      "deprecation": "MCP v1 compatibility fa\u00e7ade; migrate to Project MCP v2",
+      "governance_required": true,
+      "v1_tool": "platform_set_secret",
+      "v2_targets": [
+        "secret_set"
+      ]
+    }
+  ]
+}

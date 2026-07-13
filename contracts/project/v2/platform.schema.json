@@ -1,0 +1,201 @@
+{
+  "$id": "https://platform.example.com/contracts/project/v2/platform.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "platform.example.com/v2"
+    },
+    "build": {
+      "additionalProperties": false,
+      "properties": {
+        "defaultDriver": {
+          "enum": [
+            "dockerfile",
+            "buildpacks",
+            "nix",
+            "custom-approved"
+          ]
+        },
+        "supplyChainPolicy": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "defaultDriver",
+        "supplyChainPolicy"
+      ],
+      "type": "object"
+    },
+    "environments": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "approvalPolicy": {
+            "enum": [
+              "automatic",
+              "required"
+            ]
+          },
+          "name": {
+            "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$",
+            "type": "string"
+          },
+          "production": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "production",
+          "approvalPolicy"
+        ],
+        "type": "object"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "type": "array"
+    },
+    "gitops": {
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "const": "argocd"
+        },
+        "root": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "engine",
+        "root"
+      ],
+      "type": "object"
+    },
+    "infrastructure": {
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "const": "opentofu"
+        },
+        "root": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "stateBackend": {
+          "const": "platform"
+        }
+      },
+      "required": [
+        "engine",
+        "root",
+        "stateBackend"
+      ],
+      "type": "object"
+    },
+    "kind": {
+      "const": "Project"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "policy": {
+      "additionalProperties": false,
+      "properties": {
+        "destructiveApplyRequiresApproval": {
+          "const": true
+        },
+        "forbidClusterScopedResources": {
+          "const": true
+        },
+        "monthlyCostApprovalThresholdMinorUnit": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "productionRequiresApproval": {
+          "const": true
+        }
+      },
+      "required": [
+        "forbidClusterScopedResources",
+        "productionRequiresApproval",
+        "destructiveApplyRequiresApproval",
+        "monthlyCostApprovalThresholdMinorUnit"
+      ],
+      "type": "object"
+    },
+    "workspace": {
+      "additionalProperties": false,
+      "properties": {
+        "cpuMillis": {
+          "maximum": 64000,
+          "minimum": 250,
+          "type": "integer"
+        },
+        "egressPolicy": {
+          "enum": [
+            "governed",
+            "deny-all"
+          ]
+        },
+        "imageDigest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "maxArtifactMiB": {
+          "maximum": 10240,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "memoryMiB": {
+          "maximum": 262144,
+          "minimum": 256,
+          "type": "integer"
+        },
+        "networkProfile": {
+          "const": "isolated"
+        },
+        "timeoutSeconds": {
+          "maximum": 86400,
+          "minimum": 60,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "imageDigest",
+        "cpuMillis",
+        "memoryMiB",
+        "timeoutSeconds",
+        "networkProfile",
+        "egressPolicy",
+        "maxArtifactMiB"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "environments",
+    "workspace",
+    "infrastructure",
+    "build",
+    "gitops",
+    "policy"
+  ],
+  "title": "AI-native DevOps platform.yaml/v2",
+  "type": "object"
+}

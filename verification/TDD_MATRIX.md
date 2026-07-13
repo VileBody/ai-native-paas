@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **706**
-- Reused now: **0**
-- New local/contract tests required: **71**
+- Discovered Go tests/fuzz targets: **714**
+- Reused now: **2**
+- New local/contract tests required: **69**
 - Live/provider/system tests required: **86**
 - Unmapped: **0**
 
@@ -130,8 +130,8 @@ A release gate may become green only after every referenced test exists and pass
 | `C17` | LIVE_ONLY | reconciliation | `test/pivot/commerce_v2_test.go::TestUsage_ReconcilerCorrectsObservedResourceDriftOnce` |
 | `C18` | LIVE_ONLY | application | `test/pivot/commerce_v2_test.go::TestCommercial_CanceledBeforeExecutionCreatesNoUsageCharge` |
 | `G1` | NEW | domain/HTTP | `test/pivot/agent_workspace_test.go::TestAgent_ProjectMCPTokenIsBoundToAgentUserTenantAndProject` |
-| `G2` | NEW | contract/golden | `test/pivot/agent_workspace_test.go::TestMCPV2_CatalogAndSchemasAreVersionedStableAndClosed` |
-| `G3` | NEW | application | `test/pivot/agent_workspace_test.go::TestMCPV1CompatibilityCannotBypassV2Governance` |
+| `G2` | REUSED | contract/golden | `test/contract/mcp_v2_test.go::TestMCPV2_CatalogAndSchemasAreVersionedStableAndClosed` |
+| `G3` | REUSED | application | `test/contract/mcp_v2_test.go::TestMCPV1CompatibilityCannotBypassV2Governance` |
 | `G4` | NEW | fuzz/security | `test/pivot/agent_workspace_test.go::TestAgent_ToolArgumentsCannotOverrideVerifiedScope` |
 | `G5` | LIVE_ONLY | application/provider | `test/pivot/agent_workspace_test.go::TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile` |
 | `G6` | LIVE_ONLY | provider/system | `test/pivot/agent_workspace_test.go::TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials` |

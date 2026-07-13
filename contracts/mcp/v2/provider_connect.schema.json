@@ -1,0 +1,25 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/provider_connect.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "credential_binding_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "provider": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider",
+    "credential_binding_id"
+  ],
+  "title": "provider_connect arguments",
+  "type": "object"
+}

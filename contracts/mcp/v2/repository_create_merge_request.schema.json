@@ -1,0 +1,29 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/repository_create_merge_request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "source_branch": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "target_branch": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 500,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "source_branch",
+    "target_branch",
+    "title"
+  ],
+  "title": "repository_create_merge_request arguments",
+  "type": "object"
+}

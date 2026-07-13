@@ -1,0 +1,25 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/argocd_sync.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "application_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "revision_sha": {
+      "maxLength": 64,
+      "minLength": 40,
+      "pattern": "^[0-9a-f]{40,64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "application_id",
+    "revision_sha"
+  ],
+  "title": "argocd_sync arguments",
+  "type": "object"
+}

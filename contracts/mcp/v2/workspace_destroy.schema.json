@@ -1,0 +1,23 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/workspace_destroy.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "reason": {
+      "maxLength": 500,
+      "minLength": 1,
+      "type": "string"
+    },
+    "workspace_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workspace_id"
+  ],
+  "title": "workspace_destroy arguments",
+  "type": "object"
+}

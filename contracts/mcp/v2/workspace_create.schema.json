@@ -1,0 +1,37 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/workspace_create.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cpu_millis": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "image_digest": {
+      "maxLength": 71,
+      "minLength": 71,
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "memory_mib": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "task_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "ttl_seconds": {
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "task_id",
+    "image_digest"
+  ],
+  "title": "workspace_create arguments",
+  "type": "object"
+}

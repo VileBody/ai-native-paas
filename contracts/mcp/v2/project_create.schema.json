@@ -1,0 +1,22 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/project_create.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "platform_contract": {
+      "maxLength": 1048576,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "project_create arguments",
+  "type": "object"
+}

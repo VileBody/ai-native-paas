@@ -1,0 +1,8 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/repository_status.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {},
+  "title": "repository_status arguments",
+  "type": "object"
+}

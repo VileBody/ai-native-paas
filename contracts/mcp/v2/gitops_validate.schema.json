@@ -1,0 +1,36 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/gitops_validate.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "path": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    },
+    "renderer": {
+      "enum": [
+        "helm",
+        "kustomize",
+        "plain"
+      ],
+      "maxLength": 4096,
+      "minLength": 1,
+      "type": "string"
+    },
+    "revision_sha": {
+      "maxLength": 64,
+      "minLength": 40,
+      "pattern": "^[0-9a-f]{40,64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "revision_sha",
+    "path",
+    "renderer"
+  ],
+  "title": "gitops_validate arguments",
+  "type": "object"
+}

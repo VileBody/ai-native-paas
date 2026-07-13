@@ -1,0 +1,24 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v2/repository_apply_patch.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_sha": {
+      "maxLength": 64,
+      "minLength": 40,
+      "pattern": "^[0-9a-f]{40,64}$",
+      "type": "string"
+    },
+    "patch": {
+      "maxLength": 1048576,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "base_sha",
+    "patch"
+  ],
+  "title": "repository_apply_patch arguments",
+  "type": "object"
+}
