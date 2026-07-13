@@ -4,7 +4,6 @@ set -Eeuo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 : "${KUBECONFIG:?KUBECONFIG must point to the dedicated test cluster}"
-: "${GH_TOKEN:?GH_TOKEN with read:packages is required}"
 
 namespace="ai-native-paas-user-test"
 password="${POSTGRES_PASSWORD:-$(openssl rand -hex 16)}"
@@ -12,9 +11,7 @@ password="${POSTGRES_PASSWORD:-$(openssl rand -hex 16)}"
 kubectl create namespace "$namespace" --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n "$namespace" create secret generic postgres-credentials \
   --from-literal=password="$password" --dry-run=client -o yaml | kubectl apply -f -
-kubectl -n "$namespace" create secret docker-registry ghcr-pull \
-  --docker-server=ghcr.io --docker-username=VileBody --docker-password="$GH_TOKEN" \
-  --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n "$namespace" get secret craas-ai-native-paas-registry >/dev/null
 
 kubectl apply -f deploy/iteration5/postgres-test.yaml
 kubectl -n "$namespace" rollout restart statefulset/user-postgres

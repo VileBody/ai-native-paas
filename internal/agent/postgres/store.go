@@ -26,11 +26,17 @@ type Store struct {
 	MaxSerializableRetries int
 }
 
+const defaultSerializableRetries = 32
+
 func NewStore(db *sql.DB) (*Store, error) {
 	if db == nil {
 		return nil, errors.New("postgres db is nil")
 	}
-	return &Store{DB: db, MaxSerializableRetries: 8}, nil
+	// A single agent task is an intentional contention point: budget reservations
+	// and approval consumption must serialize on the task aggregate. Keep enough
+	// retry headroom for a burst of concurrent tool calls so valid reservations do
+	// not fail merely because they lost several serialization races in a row.
+	return &Store{DB: db, MaxSerializableRetries: defaultSerializableRetries}, nil
 }
 
 func (s *Store) Migrate(ctx context.Context) error {
@@ -93,7 +99,7 @@ func (s *Store) Transact(ctx context.Context, fn func(application.Tx) error) err
 	}
 	attempts := s.MaxSerializableRetries
 	if attempts <= 0 {
-		attempts = 8
+		attempts = defaultSerializableRetries
 	}
 	var last error
 	for attempt := 0; attempt < attempts; attempt++ {

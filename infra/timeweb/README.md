@@ -12,11 +12,24 @@ It provisions:
 - one private VPC shared by Kubernetes and the control-plane database;
 - one managed PostgreSQL 17 cluster for platform metadata.
 
+The cloud test environment also uses a dedicated 5 GiB Container Registry,
+`ai-native-paas-registry` (ID `24867`). It is attached only to the
+`ai-native-paas-user-test` namespace and provides the
+`craas-ai-native-paas-registry` image pull secret. GitHub Actions publishes the
+Iteration 5 test runner to this registry so cluster tests do not depend on
+Docker Hub or GHCR egress.
+
 The managed database is private-only. Run migrations and application traffic
 from Kubernetes; do not expose PostgreSQL to the public internet.
 
 User-requested databases are intentionally not part of this stack. The provider
 layer creates those workloads inside Kubernetes and accounts for their usage.
+
+The current test resource split is therefore:
+
+- platform/control-plane state: private Timeweb managed PostgreSQL;
+- user-requested services: namespace-scoped Kubernetes workloads;
+- build and test images: the dedicated Timeweb Container Registry.
 
 The API token is read from `TWC_TOKEN`; never put it in a tfvars file:
 
@@ -29,6 +42,19 @@ terraform -chdir=infra/timeweb apply -var='project_id=1234567'
 
 Terraform state contains generated database credentials and must stay local or
 be moved to an encrypted remote backend before other operators use this stack.
+
+## Timeweb registry integration
+
+Container Registry is not supported by the current Terraform provider. The
+registry is created through the Timeweb API and attached to the namespace with:
+
+```text
+POST /api/v1/k8s/clusters/1099941/container-registry
+{"registry_items":[{"registry_id":24867,"namespace":"ai-native-paas-user-test"}]}
+```
+
+Do not commit the registry token. Timeweb owns the generated Kubernetes pull
+secret; CI credentials are stored as GitHub Actions secrets.
 
 ## Timeweb Cilium Envoy workaround
 

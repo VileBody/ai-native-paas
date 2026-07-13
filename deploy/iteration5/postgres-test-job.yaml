@@ -15,10 +15,10 @@ spec:
     spec:
       restartPolicy: Never
       imagePullSecrets:
-        - name: ghcr-pull
+        - name: craas-ai-native-paas-registry
       containers:
         - name: tests
-          image: ghcr.io/vilebody/ai-native-paas-tests:iteration-5
+          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-tests:iteration-5
           imagePullPolicy: Always
           command: ["/bin/bash", "-ec"]
           args:
