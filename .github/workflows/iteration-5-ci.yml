@@ -27,7 +27,7 @@ jobs:
         with:
           go-version: '1.23.x'
           cache: false
-      - run: sudo apt-get update && sudo apt-get install -y libpq-dev pkg-config
+      - run: sudo apt-get update && sudo apt-get install -y libpq-dev pkg-config postgresql-client
       - run: make fmt-check vet test tdd-iteration5 build smoke-attachments-api
 
   postgres:
@@ -54,7 +54,7 @@ jobs:
         with:
           go-version: '1.23.x'
           cache: false
-      - run: sudo apt-get update && sudo apt-get install -y libpq-dev pkg-config
+      - run: sudo apt-get update && sudo apt-get install -y libpq-dev pkg-config postgresql-client
       - run: make test-postgres
 
   test-runner-image:

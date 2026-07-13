@@ -88,6 +88,7 @@ test-postgres-docker:
 
 test-postgres:
 	@test -n "$$TEST_POSTGRES_DSN" || (echo "TEST_POSTGRES_DSN is required" >&2; exit 2)
+	@command -v psql >/dev/null || (echo "psql is required for the complete PostgreSQL gate" >&2; exit 2)
 	CGO_ENABLED=1 $(GO) test -race -count=1 -tags=postgres_integration ./test/integration -v
 	$(GO) test -race -count=1 -tags=integration_postgres ./internal/source/postgres -v
 

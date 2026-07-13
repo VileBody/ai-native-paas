@@ -13,8 +13,8 @@ It provisions:
 - one managed PostgreSQL 17 cluster for platform metadata.
 
 The cloud test environment also uses a dedicated 5 GiB Container Registry,
-`ai-native-paas-registry` (ID `24867`). It is attached only to the
-`ai-native-paas-user-test` namespace and provides the
+`ai-native-paas-registry` (ID `24867`). It is attached to the
+`ai-native-paas-user-test` and `kube-system` namespaces and provides the
 `craas-ai-native-paas-registry` image pull secret. GitHub Actions publishes the
 Iteration 5 test runner to this registry so cluster tests do not depend on
 Docker Hub or GHCR egress.
@@ -50,7 +50,7 @@ registry is created through the Timeweb API and attached to the namespace with:
 
 ```text
 POST /api/v1/k8s/clusters/1099941/container-registry
-{"registry_items":[{"registry_id":24867,"namespace":"ai-native-paas-user-test"}]}
+{"registry_items":[{"registry_id":24867,"namespace":"ai-native-paas-user-test"},{"registry_id":24867,"namespace":"kube-system"}]}
 ```
 
 Do not commit the registry token. Timeweb owns the generated Kubernetes pull
@@ -60,12 +60,12 @@ secret; CI credentials are stored as GitHub Actions secrets.
 
 The initial `v1.35.6+k0s.0` installation could not pull Cilium Envoy from
 `quay.io` because the worker repeatedly hit a TLS handshake timeout. The exact
-upstream multi-architecture image was mirrored to private GHCR without changing
-its digest. Reapply the namespaced pull secret and DaemonSet override with:
+upstream multi-architecture image was mirrored to the dedicated Timeweb
+Container Registry without changing its digest. Reapply the namespaced pull
+secret and DaemonSet override with:
 
 ```shell
 export KUBECONFIG="infra/timeweb/ai-native-paas-test.kubeconfig"
-export GH_TOKEN="..."
 ./scripts/fix-timeweb-cilium-envoy.sh
 ```
 
