@@ -101,10 +101,21 @@ No log available
 
 See `KUBERNETES_TODO.md`.
 
+## Cloud-lab foundation — 2026-07-13
+
+- [x] dedicated Timeweb Kubernetes cluster in Moscow with one worker;
+- [x] isolated VPC shared by Kubernetes and the control-plane database;
+- [x] private managed PostgreSQL 17 for platform metadata;
+- [x] in-cluster PostgreSQL harness representing user-owned infrastructure;
+- [x] GitHub Actions test-runner build and private GHCR delivery path;
+- [ ] move the resources to a dedicated Timeweb project when the API token has
+  `project:create` permission (the current cluster is isolated but owned by the
+  existing `BALOVSTVO` project).
+
 ## Deferred cloud-lab backlog
 
-The local/DB recovery intentionally defers these live infrastructure gates to
-the shared cloud-lab backlog:
+The cloud-lab foundation exists; these product/provider gates remain in the
+backlog until the corresponding components are installed:
 
 - real OpenBao authentication, tenant policies, lease renewal and HA failover;
 - real Cozystack PostgreSQL/Redis/S3 lifecycle and ambiguous-timeout recovery;

@@ -175,7 +175,12 @@ func TestPostgres_AttachmentsOptimisticLockPreventsLostUpdate(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
 	instance := domain.ServiceInstance{ID: "svc-lock", TenantID: "tenant-a", Name: "primary", PlanID: "pg-small", PlanVersion: 1, Type: attachmentsv1.ServicePostgreSQL, State: attachmentsv1.ServiceRequested, ProviderOperationKey: "op-lock", Version: 1, CreatedAt: now, UpdatedAt: now}
-	if err := store.Transact(ctx, func(tx application.Tx) error { return tx.PutInstance(instance, 0) }); err != nil {
+	if err := store.Transact(ctx, func(tx application.Tx) error {
+		if err := tx.PutPlan(pgAttachmentPlan(t, instance.PlanID)); err != nil {
+			return err
+		}
+		return tx.PutInstance(instance, 0)
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -216,7 +221,12 @@ func TestPostgres_AttachmentsProviderIdentityIsImmutable(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
 	instance := domain.ServiceInstance{ID: "svc-provider", TenantID: "tenant-a", Name: "primary", PlanID: "pg", PlanVersion: 1, Type: attachmentsv1.ServicePostgreSQL, State: attachmentsv1.ServiceReady, ProviderOperationKey: "op-provider", ProviderID: "provider-a", Version: 1, CreatedAt: now, UpdatedAt: now}
-	if err := store.Transact(ctx, func(tx application.Tx) error { return tx.PutInstance(instance, 0) }); err != nil {
+	if err := store.Transact(ctx, func(tx application.Tx) error {
+		if err := tx.PutPlan(pgAttachmentPlan(t, instance.PlanID)); err != nil {
+			return err
+		}
+		return tx.PutInstance(instance, 0)
+	}); err != nil {
 		t.Fatal(err)
 	}
 	_, err := db.ExecContext(ctx, `UPDATE attachments.service_instances SET provider_id='provider-b' WHERE id='svc-provider'`)

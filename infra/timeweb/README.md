@@ -29,3 +29,19 @@ terraform -chdir=infra/timeweb apply -var='project_id=1234567'
 
 Terraform state contains generated database credentials and must stay local or
 be moved to an encrypted remote backend before other operators use this stack.
+
+## Timeweb Cilium Envoy workaround
+
+The initial `v1.35.6+k0s.0` installation could not pull Cilium Envoy from
+`quay.io` because the worker repeatedly hit a TLS handshake timeout. The exact
+upstream multi-architecture image was mirrored to private GHCR without changing
+its digest. Reapply the namespaced pull secret and DaemonSet override with:
+
+```shell
+export KUBECONFIG="infra/timeweb/ai-native-paas-test.kubeconfig"
+export GH_TOKEN="..."
+./scripts/fix-timeweb-cilium-envoy.sh
+```
+
+Remove this override after Timeweb ships the Envoy image in its internal
+registry or fixes worker access to `quay.io`.
