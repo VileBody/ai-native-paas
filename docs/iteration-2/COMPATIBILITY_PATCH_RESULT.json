@@ -1,0 +1,11 @@
+{
+  "iteration": 2,
+  "scope": "compatibility-patch-discovered-during-iteration-3",
+  "verdict": "PASS",
+  "default_tests": "PASS",
+  "race_tests": "PASS",
+  "live_postgres": "PASS",
+  "postgres_version": "18.4",
+  "generated_at": "2026-07-12T18:41:13Z",
+  "note": "The original Iteration 2 failed verdict is preserved under docs/iteration-2/archive."
+}

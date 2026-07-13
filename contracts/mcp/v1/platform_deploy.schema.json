@@ -1,0 +1,182 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v1/platform_deploy.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "application_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "build_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "configuration": {
+      "additionalProperties": false,
+      "properties": {
+        "attachment_snapshot_ref": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+          "type": "string"
+        },
+        "egress_profile": {
+          "enum": [
+            "",
+            "public-default",
+            "deny-all"
+          ],
+          "maxLength": 64,
+          "minLength": 0,
+          "type": "string"
+        },
+        "generated_hostname": {
+          "maxLength": 253,
+          "minLength": 3,
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$",
+          "type": "string"
+        },
+        "isolation": {
+          "enum": [
+            "sandboxed",
+            "dedicated"
+          ],
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "migration": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "items": {
+                "maxLength": 4096,
+                "minLength": 0,
+                "type": "string"
+              },
+              "maxItems": 128,
+              "type": "array"
+            },
+            "timeoutSeconds": {
+              "maximum": 86400,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "processes": {
+          "additionalProperties": {
+            "additionalProperties": false,
+            "properties": {
+              "command": {
+                "items": {
+                  "maxLength": 4096,
+                  "minLength": 0,
+                  "type": "string"
+                },
+                "maxItems": 128,
+                "type": "array"
+              },
+              "healthPath": {
+                "maxLength": 4096,
+                "minLength": 0,
+                "type": "string"
+              },
+              "maxReplicas": {
+                "maximum": 1000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "minReplicas": {
+                "maximum": 1000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "port": {
+                "maximum": 65535,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "readinessTimeoutSeconds": {
+                "maximum": 86400,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "startupTimeoutSeconds": {
+                "maximum": 86400,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "minReplicas",
+              "maxReplicas"
+            ],
+            "type": "object"
+          },
+          "maxProperties": 32,
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$"
+          },
+          "type": "object"
+        },
+        "region": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+          "type": "string"
+        },
+        "rollout_timeout_seconds": {
+          "maximum": 86400,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unit": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "region",
+        "isolation",
+        "unit",
+        "processes"
+      ],
+      "type": "object"
+    },
+    "environment_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "environment_name": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "expected_environment_revision": {
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "build_id",
+    "application_id",
+    "environment_id",
+    "environment_name",
+    "expected_environment_revision",
+    "configuration"
+  ],
+  "title": "platform_deploy arguments",
+  "type": "object"
+}

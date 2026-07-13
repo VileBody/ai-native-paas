@@ -1,0 +1,733 @@
+=== RUN   TestPostgres_BuildMigrationsCleanInstallAndUpgrade
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  schema "build" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildMigrationsCleanInstallAndUpgrade (0.11s)
+=== RUN   TestPostgres_BuildAndOutboxAreAtomic
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildAndOutboxAreAtomic (0.10s)
+=== RUN   TestPostgres_ConcurrentBuildIdentityUsesSingleWinner
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_ConcurrentBuildIdentityUsesSingleWinner (0.51s)
+=== RUN   TestPostgres_BuildOptimisticLockPreventsLostUpdate
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildOptimisticLockPreventsLostUpdate (0.17s)
+=== RUN   TestPostgres_ArtifactIdentityIsImmutable
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_ArtifactIdentityIsImmutable (0.12s)
+=== RUN   TestPostgres_BuildAuditRejectsMutation
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildAuditRejectsMutation (0.13s)
+=== RUN   TestPostgres_BuildPipelinePersistsReleasableTrustChain
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildPipelinePersistsReleasableTrustChain (0.16s)
+=== RUN   TestPostgres_DockerfileExecutionSelectionAndIdentityRemainImmutable
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_DockerfileExecutionSelectionAndIdentityRemainImmutable (0.12s)
+=== RUN   TestPostgres_Migrations_CleanInstallAndUpgrade
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  schema "kernel" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_Migrations_CleanInstallAndUpgrade (0.07s)
+=== RUN   TestPostgres_CreateOrganizationAndOutboxAreAtomic
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+--- PASS: TestPostgres_CreateOrganizationAndOutboxAreAtomic (0.10s)
+=== RUN   TestPostgres_ConcurrentIdempotencyUsesSingleWinner
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+--- PASS: TestPostgres_ConcurrentIdempotencyUsesSingleWinner (0.52s)
+=== RUN   TestPostgres_OperationOptimisticLockPreventsLostUpdate
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+--- PASS: TestPostgres_OperationOptimisticLockPreventsLostUpdate (0.09s)
+=== RUN   TestPostgres_AuditTableRejectsUpdateAndDelete
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+--- PASS: TestPostgres_AuditTableRejectsUpdateAndDelete (0.09s)
+=== RUN   TestPostgres_RuntimeMigrationsCleanInstallAndUpgrade
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+NOTICE:  schema "runtime" does not exist, skipping
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_RuntimeMigrationsCleanInstallAndUpgrade (0.12s)
+=== RUN   TestPostgres_RuntimeApplicationReleaseDeploymentAndOutboxAreAtomic
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeApplicationReleaseDeploymentAndOutboxAreAtomic (0.15s)
+=== RUN   TestPostgres_RuntimeConcurrentReleaseIdentityUsesSingleWinner
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeConcurrentReleaseIdentityUsesSingleWinner (0.66s)
+=== RUN   TestPostgres_RuntimeOptimisticLockPreventsLostUpdate
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeOptimisticLockPreventsLostUpdate (0.10s)
+=== RUN   TestPostgres_RuntimeReleaseArtifactAndConfigAreImmutable
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeReleaseArtifactAndConfigAreImmutable (0.11s)
+=== RUN   TestPostgres_RuntimeGitOpsCommitIsImmutable
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeGitOpsCommitIsImmutable (0.11s)
+=== RUN   TestPostgres_RuntimeAuditRejectsMutation
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeAuditRejectsMutation (0.10s)
+=== RUN   TestPostgres_RuntimePayloadConsistencyRejectsColumnDrift
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimePayloadConsistencyRejectsColumnDrift (0.13s)
+=== RUN   TestPostgres_RuntimeOnlyOneActiveReleasePerEnvironment
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeOnlyOneActiveReleasePerEnvironment (0.23s)
+PASS
+ok  	github.com/keir-research/ai-native-paas/test/integration	5.064s

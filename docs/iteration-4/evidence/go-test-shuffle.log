@@ -1,0 +1,13 @@
+$ go test -shuffle=on -count=25 ./internal/runtime/application ./internal/runtime/domain ./internal/runtime/httpapi ./internal/runtime/kubeapi ./internal/runtime/operator ./pkg/contracts/runtime/v1 ./test/contract ./test/architecture
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/application	14.393s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/domain	0.022s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/httpapi	0.109s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/kubeapi	2.280s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/operator	0.110s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/runtime/v1	0.025s
+ok  	github.com/keir-research/ai-native-paas/test/contract	0.131s
+ok  	github.com/keir-research/ai-native-paas/test/architecture	1.223s
+$ go test -shuffle=on -count=5 ./internal/runtime/gitops
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/gitops	2.372s
+$ go test -shuffle=on -count=10 ./test/acceptance -run ^TestRuntimeDelivery_
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	0.056s

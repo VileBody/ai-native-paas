@@ -1,0 +1,59 @@
+name: build-and-artifact
+
+on:
+  push:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'Makefile'
+      - 'migrations/**'
+      - 'scripts/verify-iteration-3.sh'
+      - '.github/workflows/iteration-3-ci.yml'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: true
+      - run: make fmt-check vet test race integration-compile build
+      - run: make fuzz FUZZTIME=10s
+      - run: make coverage-html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iteration-3-coverage
+          path: coverage.html
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: paas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d paas_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_POSTGRES_DSN: host=127.0.0.1 port=5432 user=postgres password=postgres dbname=paas_test sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: true
+      - run: sudo apt-get update && sudo apt-get install -y libpq-dev pkg-config
+      - run: make test-postgres

@@ -1,0 +1,16 @@
+$ go test -race ./internal/runtime/... ./pkg/contracts/runtime/v1 ./test/contract ./test/architecture -count=1
+?   	github.com/keir-research/ai-native-paas/internal/runtime/kube	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/postgres	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/testkit	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/application	2.454s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/domain	1.097s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/gitops	2.004s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/httpapi	1.067s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/kubeapi	1.220s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/operator	1.120s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/runtime/v1	1.103s
+ok  	github.com/keir-research/ai-native-paas/test/contract	1.109s
+ok  	github.com/keir-research/ai-native-paas/test/architecture	1.308s
+$ go test -race ./test/acceptance -run ^TestRuntimeDelivery_ -count=1
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	1.071s

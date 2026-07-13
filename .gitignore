@@ -1,0 +1,14 @@
+/bin/
+/coverage.out
+/coverage.html
+*.test
+*.prof
+.DS_Store
+__pycache__/
+*.pyc
+/.verification/
+
+/coverage-commerce.html
+/coverage-commerce-postgres.html
+/coverage-commerce.out
+/coverage-commerce-postgres.out

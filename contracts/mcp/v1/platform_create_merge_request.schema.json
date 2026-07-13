@@ -1,0 +1,40 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v1/platform_create_merge_request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "project_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "source_branch": {
+      "description": "A second server-side validator enforces the full safe Git ref subset.",
+      "maxLength": 255,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$",
+      "type": "string"
+    },
+    "target_branch": {
+      "description": "A second server-side validator enforces the full safe Git ref subset.",
+      "maxLength": 255,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 500,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "project_id",
+    "source_branch",
+    "target_branch",
+    "title"
+  ],
+  "title": "platform_create_merge_request arguments",
+  "type": "object"
+}

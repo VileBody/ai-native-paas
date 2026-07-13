@@ -1,0 +1,32 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v1/platform_bind_service.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "application_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "environment_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "service_instance_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service_instance_id",
+    "application_id",
+    "environment_id"
+  ],
+  "title": "platform_bind_service arguments",
+  "type": "object"
+}

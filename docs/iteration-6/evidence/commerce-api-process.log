@@ -1,0 +1,2 @@
+2026/07/13 11:22:04 WARNING: COMMERCE_DEV_ALLOW_ALL_OWNERSHIP is enabled; use only for local smoke tests
+2026/07/13 11:22:04 commerce-api listening on 127.0.0.1:49637

@@ -1,0 +1,59 @@
+{
+  "bounded_context_status": "GREEN",
+  "clean_package_validation": "PASS",
+  "coverage": {
+    "postgres_tagged_statement_percent": 46.8,
+    "untagged_statement_percent": 59.4
+  },
+  "cumulative_source_status": "GREEN_FOR_ITERATIONS_1_4_AND_6",
+  "domain": "commercial-governance",
+  "fuzz": {
+    "rating_executions": 61502,
+    "result": "PASS",
+    "runtime_usage_executions": 54971,
+    "targets": 2,
+    "total_executions": 116473
+  },
+  "iteration": 6,
+  "live_kubernetes": "NOT_APPLICABLE",
+  "live_postgres": {
+    "race_detector": true,
+    "status": "PASS",
+    "version": "18.4"
+  },
+  "process_smoke": "PASS",
+  "race": {
+    "cumulative": "PASS",
+    "postgres": "PASS",
+    "targeted": "PASS"
+  },
+  "source_baseline": {
+    "full_iteration_5_merge_gate": "NOT_RUN",
+    "included": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "iteration_5": "frozen-contract-only; full source unavailable in active artifact"
+  },
+  "static_boundaries": {
+    "cross_domain_internal_imports": "ABSENT",
+    "cross_domain_sql": "ABSENT",
+    "floating_point_money": "ABSENT"
+  },
+  "tests": {
+    "commerce_postgres_passed": 10,
+    "commerce_top_level_tests": 88,
+    "cumulative_postgres_passed": 32,
+    "failures": 0,
+    "mandatory_tdd_present": 52,
+    "mandatory_tdd_required": 52,
+    "repository_top_level_test_functions": 508,
+    "skips": 0
+  },
+  "verdict": "PASS",
+  "verification_finished_at": "2026-07-13T11:22:40Z",
+  "verification_started_at": "2026-07-13T11:19:00Z"
+}

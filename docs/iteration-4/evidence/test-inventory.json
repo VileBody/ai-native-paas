@@ -1,0 +1,19 @@
+{
+  "cumulative_unique_tests": 419,
+  "cumulative_test_occurrences": 420,
+  "iteration4_related_unique_tests": 103,
+  "iteration4_live_postgres_tests": 9,
+  "cumulative_fuzz_targets": 6,
+  "iteration4_fuzz_targets": 3,
+  "iteration4_postgres_names": [
+    "TestPostgres_RuntimeApplicationReleaseDeploymentAndOutboxAreAtomic",
+    "TestPostgres_RuntimeAuditRejectsMutation",
+    "TestPostgres_RuntimeConcurrentReleaseIdentityUsesSingleWinner",
+    "TestPostgres_RuntimeGitOpsCommitIsImmutable",
+    "TestPostgres_RuntimeMigrationsCleanInstallAndUpgrade",
+    "TestPostgres_RuntimeOnlyOneActiveReleasePerEnvironment",
+    "TestPostgres_RuntimeOptimisticLockPreventsLostUpdate",
+    "TestPostgres_RuntimePayloadConsistencyRejectsColumnDrift",
+    "TestPostgres_RuntimeReleaseArtifactAndConfigAreImmutable"
+  ]
+}

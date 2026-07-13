@@ -1,0 +1,57 @@
+# Iteration 5 Verification Log
+
+{
+  "iteration": 5,
+  "domain": "Application Attachments",
+  "status": "RED",
+  "generated_at": "2026-07-12T23:43:52Z",
+  "non_live_missing_gates": [
+    "gofmt",
+    "vet",
+    "default_suite",
+    "attachments_suite",
+    "attachments_race",
+    "attachments_shuffle",
+    "attachments_coverage",
+    "attachments_no_skips",
+    "tdd_parity",
+    "postgres_tag_compile",
+    "no_cross_schema_sql",
+    "no_secret_values_in_contract",
+    "immutable_runtime_reference_scan"
+  ],
+  "non_live_failed_gates": [],
+  "postgres_live_exit_code": null,
+  "tdd": {
+    "required": 0,
+    "present": 0,
+    "missing": 0
+  },
+  "attachment_test_count": 0,
+  "attachment_packages": [],
+  "fuzz_target_count": 0,
+  "binaries": [],
+  "statement_coverage": "unknown",
+  "kubernetes_live_gate": "NOT_RUN",
+  "external_provider_live_gate": "NOT_RUN",
+  "results": []
+}
+
+## Gate table
+
+| Gate | Result |
+|---|---|
+| `gofmt` | MISSING |
+| `vet` | MISSING |
+| `default_suite` | MISSING |
+| `attachments_suite` | MISSING |
+| `attachments_race` | MISSING |
+| `attachments_shuffle` | MISSING |
+| `attachments_coverage` | MISSING |
+| `attachments_no_skips` | MISSING |
+| `tdd_parity` | MISSING |
+| `postgres_tag_compile` | MISSING |
+| `no_cross_schema_sql` | MISSING |
+| `no_secret_values_in_contract` | MISSING |
+| `immutable_runtime_reference_scan` | MISSING |
+| `postgres_live` | NOT RUN |

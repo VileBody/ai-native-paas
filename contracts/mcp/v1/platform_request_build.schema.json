@@ -1,0 +1,59 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v1/platform_request_build.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "estimated_minutes": {
+      "maximum": 1440,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "revision": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "description": "A second server-side validator enforces the full safe Git ref subset.",
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$",
+          "type": "string"
+        },
+        "commit_sha": {
+          "maxLength": 64,
+          "minLength": 7,
+          "pattern": "^[0-9a-fA-F]{7,64}$",
+          "type": "string"
+        },
+        "project_id": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+          "type": "string"
+        },
+        "repository_id": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+          "type": "string"
+        },
+        "source_root": {
+          "maxLength": 4096,
+          "minLength": 0,
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "repository_id",
+        "branch",
+        "commit_sha"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "revision"
+  ],
+  "title": "platform_request_build arguments",
+  "type": "object"
+}

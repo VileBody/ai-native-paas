@@ -1,0 +1,28 @@
+$ go test -race ./... -count=1
+ok  	github.com/keir-research/ai-native-paas/adapters/oidc	1.604s
+ok  	github.com/keir-research/ai-native-paas/adapters/postgres/kernel	1.289s
+?   	github.com/keir-research/ai-native-paas/cmd/build-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/kernel-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/runtime-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/runtime-operator	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/source-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/contracts/kernel/v1	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/build/application	1.391s
+ok  	github.com/keir-research/ai-native-paas/internal/build/cache	1.198s
+ok  	github.com/keir-research/ai-native-paas/internal/build/detect	1.288s
+ok  	github.com/keir-research/ai-native-paas/internal/build/dockerfilevm	1.197s
+ok  	github.com/keir-research/ai-native-paas/internal/build/domain	1.286s
+?   	github.com/keir-research/ai-native-paas/internal/build/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/build/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/kube	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/build/httpapi	1.315s
+ok  	github.com/keir-research/ai-native-paas/internal/build/kpack	1.304s
+?   	github.com/keir-research/ai-native-paas/internal/runtime/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/postgres	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/testkit	[no test files]
+
+RESULT: INCOMPLETE
+The cumulative race run was terminated by the 20-minute execution limit while processing prior-iteration heavy OCI/Git packages. No race failure was emitted before termination. Iteration-4-specific race suites are executed separately and are the authoritative gate.

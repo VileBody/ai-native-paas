@@ -1,0 +1,23 @@
+== agent and contracts ==
+?   	github.com/keir-research/ai-native-paas/internal/agent/devadapter	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/agent/domain	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/agent/application	0.029s
+?   	github.com/keir-research/ai-native-paas/internal/agent/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/agent/postgres	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/agent/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/pkg/contracts/agent/v1	[no test files]
+?   	github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/agent/httpapi	0.031s
+ok  	github.com/keir-research/ai-native-paas/internal/agent/support	0.019s
+== architecture ==
+ok  	github.com/keir-research/ai-native-paas/test/architecture	0.052s
+== agent acceptance ==
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	0.025s
+== command compilation ==
+?   	github.com/keir-research/ai-native-paas/cmd/agent-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/build-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/commerce-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/kernel-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/runtime-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/runtime-operator	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/source-api	[no test files]

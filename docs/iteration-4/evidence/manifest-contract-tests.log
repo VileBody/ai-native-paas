@@ -1,0 +1,20 @@
+=== RUN   TestArgo_DoesNotManageGeneratedDeploymentReplicas
+--- PASS: TestArgo_DoesNotManageGeneratedDeploymentReplicas (0.00s)
+=== RUN   TestDelete_ArgoApplicationSetPreservesResourcesOnControllerRemoval
+--- PASS: TestDelete_ArgoApplicationSetPreservesResourcesOnControllerRemoval (0.00s)
+=== RUN   TestArgoApplication_UsesRestrictedAppProject
+--- PASS: TestArgoApplication_UsesRestrictedAppProject (0.00s)
+=== RUN   TestArgoApplication_AutoSyncPruneSelfHealEnabled
+--- PASS: TestArgoApplication_AutoSyncPruneSelfHealEnabled (0.00s)
+=== RUN   TestArgoApplication_SourceIsOnlyCellGitOpsRepository
+--- PASS: TestArgoApplication_SourceIsOnlyCellGitOpsRepository (0.00s)
+=== RUN   TestArgoApplication_DestinationIsOnlyOwnedNamespace
+--- PASS: TestArgoApplication_DestinationIsOnlyOwnedNamespace (0.00s)
+=== RUN   TestArgoAppProject_DeniesClusterScopedResources
+--- PASS: TestArgoAppProject_DeniesClusterScopedResources (0.00s)
+=== RUN   TestPaaSAppCRD_IsNamespacedAndHasStatusSubresource
+--- PASS: TestPaaSAppCRD_IsNamespacedAndHasStatusSubresource (0.00s)
+=== RUN   TestRuntimeOperatorRBAC_HasNoSecretsOrNamespaceMutation
+--- PASS: TestRuntimeOperatorRBAC_HasNoSecretsOrNamespaceMutation (0.00s)
+PASS
+ok  	github.com/keir-research/ai-native-paas/test/contract	0.012s

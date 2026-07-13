@@ -1,0 +1,643 @@
+Iteration 3 composite release verification
+Execution mode: independent gate invocations because the single long-running shell was terminated by the host command-duration limit during race-build.
+Verdict: PASS when all evidence sections below are considered.
+
+
+===== default-final.log =====
+## gofmt
+PASS gofmt
+## go vet
+PASS vet
+## default tests
+?   	github.com/keir-research/ai-native-paas/cmd/build-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/kernel-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/source-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/contracts/kernel/v1	[no test files]
+ok  	github.com/keir-research/ai-native-paas/adapters/oidc	0.195s
+ok  	github.com/keir-research/ai-native-paas/adapters/postgres/kernel	0.204s
+ok  	github.com/keir-research/ai-native-paas/internal/build/application	0.401s
+ok  	github.com/keir-research/ai-native-paas/internal/build/cache	0.202s
+ok  	github.com/keir-research/ai-native-paas/internal/build/detect	0.292s
+ok  	github.com/keir-research/ai-native-paas/internal/build/dockerfilevm	0.202s
+ok  	github.com/keir-research/ai-native-paas/internal/build/domain	0.206s
+?   	github.com/keir-research/ai-native-paas/internal/build/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/build/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/testkit	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/build/httpapi	0.211s
+ok  	github.com/keir-research/ai-native-paas/internal/build/kpack	0.117s
+ok  	github.com/keir-research/ai-native-paas/internal/build/localoci	15.433s
+ok  	github.com/keir-research/ai-native-paas/internal/build/logs	0.119s
+ok  	github.com/keir-research/ai-native-paas/internal/build/memory	0.097s
+ok  	github.com/keir-research/ai-native-paas/internal/build/postgres	0.212s
+ok  	github.com/keir-research/ai-native-paas/internal/build/registry	13.219s
+ok  	github.com/keir-research/ai-native-paas/internal/build/sbom	0.204s
+ok  	github.com/keir-research/ai-native-paas/internal/build/scanner	0.116s
+ok  	github.com/keir-research/ai-native-paas/internal/build/signer	0.121s
+ok  	github.com/keir-research/ai-native-paas/internal/build/source	16.183s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel	0.223s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/httpapi	0.308s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/memory	0.117s
+ok  	github.com/keir-research/ai-native-paas/internal/source/application	0.121s
+ok  	github.com/keir-research/ai-native-paas/internal/source/domain	0.115s
+ok  	github.com/keir-research/ai-native-paas/internal/source/gitlab	0.295s
+ok  	github.com/keir-research/ai-native-paas/internal/source/httpapi	0.206s
+ok  	github.com/keir-research/ai-native-paas/internal/source/postgres	0.107s
+ok  	github.com/keir-research/ai-native-paas/internal/source/webhook	0.109s
+ok  	github.com/keir-research/ai-native-paas/internal/source/workspace	13.683s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/build/v1	0.105s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/source/v1	0.104s
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	13.837s
+ok  	github.com/keir-research/ai-native-paas/test/architecture	0.697s
+ok  	github.com/keir-research/ai-native-paas/test/contract	0.306s
+PASS default tests
+
+
+===== tagged-vet-compile-final.log =====
+## tagged vet/compile
+ok  	github.com/keir-research/ai-native-paas/test/integration	0.062s [no tests to run]
+ok  	github.com/keir-research/ai-native-paas/internal/source/postgres	0.017s [no tests to run]
+PASS tagged vet/compile
+
+
+===== race-build-final.log =====
+## race build group
+?   	github.com/keir-research/ai-native-paas/internal/build/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/build/testkit	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/build/application	1.387s
+ok  	github.com/keir-research/ai-native-paas/internal/build/cache	1.294s
+ok  	github.com/keir-research/ai-native-paas/internal/build/detect	1.288s
+ok  	github.com/keir-research/ai-native-paas/internal/build/dockerfilevm	1.292s
+ok  	github.com/keir-research/ai-native-paas/internal/build/domain	1.194s
+ok  	github.com/keir-research/ai-native-paas/internal/build/httpapi	1.200s
+ok  	github.com/keir-research/ai-native-paas/internal/build/kpack	1.192s
+ok  	github.com/keir-research/ai-native-paas/internal/build/localoci	10.909s
+ok  	github.com/keir-research/ai-native-paas/internal/build/logs	1.184s
+ok  	github.com/keir-research/ai-native-paas/internal/build/memory	1.196s
+ok  	github.com/keir-research/ai-native-paas/internal/build/postgres	1.194s
+ok  	github.com/keir-research/ai-native-paas/internal/build/registry	10.117s
+ok  	github.com/keir-research/ai-native-paas/internal/build/sbom	1.207s
+ok  	github.com/keir-research/ai-native-paas/internal/build/scanner	1.188s
+ok  	github.com/keir-research/ai-native-paas/internal/build/signer	1.195s
+ok  	github.com/keir-research/ai-native-paas/internal/build/source	10.805s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/build/v1	1.190s
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	9.740s
+ok  	github.com/keir-research/ai-native-paas/test/architecture	1.770s
+PASS race build group
+
+
+===== race-kernel-source-final.log =====
+## race kernel/source group
+?   	github.com/keir-research/ai-native-paas/contracts/kernel/v1	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/testkit	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/kernel	1.494s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/httpapi	1.403s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/memory	1.137s
+ok  	github.com/keir-research/ai-native-paas/adapters/oidc	1.218s
+ok  	github.com/keir-research/ai-native-paas/adapters/postgres/kernel	1.218s
+ok  	github.com/keir-research/ai-native-paas/internal/source/application	1.303s
+ok  	github.com/keir-research/ai-native-paas/internal/source/domain	1.299s
+ok  	github.com/keir-research/ai-native-paas/internal/source/gitlab	1.372s
+ok  	github.com/keir-research/ai-native-paas/internal/source/httpapi	1.288s
+ok  	github.com/keir-research/ai-native-paas/internal/source/postgres	1.289s
+ok  	github.com/keir-research/ai-native-paas/internal/source/webhook	1.285s
+ok  	github.com/keir-research/ai-native-paas/internal/source/workspace	5.979s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/source/v1	1.271s
+ok  	github.com/keir-research/ai-native-paas/test/contract	1.287s
+PASS race kernel/source group
+
+
+===== shuffle-fast-final.log =====
+## shuffle fast x20
+ok  	github.com/keir-research/ai-native-paas/internal/build/application	0.667s
+ok  	github.com/keir-research/ai-native-paas/internal/build/cache	0.020s
+ok  	github.com/keir-research/ai-native-paas/internal/build/detect	0.283s
+ok  	github.com/keir-research/ai-native-paas/internal/build/dockerfilevm	0.019s
+ok  	github.com/keir-research/ai-native-paas/internal/build/domain	0.111s
+ok  	github.com/keir-research/ai-native-paas/internal/build/httpapi	0.145s
+ok  	github.com/keir-research/ai-native-paas/internal/build/kpack	0.145s
+ok  	github.com/keir-research/ai-native-paas/internal/build/logs	0.048s
+ok  	github.com/keir-research/ai-native-paas/internal/build/memory	0.053s
+ok  	github.com/keir-research/ai-native-paas/internal/build/postgres	0.241s
+ok  	github.com/keir-research/ai-native-paas/internal/build/sbom	0.235s
+ok  	github.com/keir-research/ai-native-paas/internal/build/scanner	0.050s
+ok  	github.com/keir-research/ai-native-paas/internal/build/signer	0.118s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/build/v1	0.049s
+ok  	github.com/keir-research/ai-native-paas/test/architecture	0.615s
+PASS shuffle fast x20
+
+
+===== shuffle-real-final.log =====
+## shuffle real fixtures x3
+ok  	github.com/keir-research/ai-native-paas/internal/build/localoci	29.919s
+ok  	github.com/keir-research/ai-native-paas/internal/build/registry	26.274s
+ok  	github.com/keir-research/ai-native-paas/internal/build/source	30.294s
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	27.046s
+PASS shuffle real fixtures x3
+
+
+===== fuzz-kernel-final.log =====
+## fuzz kernel 10s
+fuzz: elapsed: 0s, gathering baseline coverage: 0/9 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 9/9 completed, now fuzzing with 56 workers
+fuzz: elapsed: 3s, execs: 124282 (40954/sec), new interesting: 0 (total: 9)
+fuzz: elapsed: 6s, execs: 296240 (57281/sec), new interesting: 0 (total: 9)
+fuzz: elapsed: 9s, execs: 465832 (56556/sec), new interesting: 0 (total: 9)
+fuzz: elapsed: 10s, execs: 521528 (45904/sec), new interesting: 0 (total: 9)
+PASS
+ok  	github.com/keir-research/ai-native-paas/internal/kernel	10.269s
+PASS fuzz kernel
+
+
+===== fuzz-source-final.log =====
+## fuzz source 10s
+fuzz: elapsed: 0s, gathering baseline coverage: 0/6 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 6/6 completed, now fuzzing with 56 workers
+fuzz: elapsed: 3s, execs: 488 (160/sec), new interesting: 2 (total: 8)
+fuzz: elapsed: 6s, execs: 2535 (682/sec), new interesting: 7 (total: 13)
+fuzz: elapsed: 9s, execs: 3791 (419/sec), new interesting: 9 (total: 15)
+fuzz: elapsed: 11s, execs: 4195 (173/sec), new interesting: 11 (total: 17)
+PASS
+ok  	github.com/keir-research/ai-native-paas/internal/source/workspace	11.482s
+PASS fuzz source
+
+
+===== fuzz-build-final.log =====
+## fuzz build 10s
+fuzz: elapsed: 0s, gathering baseline coverage: 0/105 completed
+fuzz: elapsed: 1s, gathering baseline coverage: 105/105 completed, now fuzzing with 56 workers
+fuzz: elapsed: 3s, execs: 118362 (38645/sec), new interesting: 2 (total: 107)
+fuzz: elapsed: 6s, execs: 317404 (66268/sec), new interesting: 9 (total: 114)
+fuzz: elapsed: 9s, execs: 500570 (60881/sec), new interesting: 11 (total: 116)
+fuzz: elapsed: 11s, execs: 574787 (54749/sec), new interesting: 14 (total: 119)
+PASS
+ok  	github.com/keir-research/ai-native-paas/internal/build/domain	10.538s
+PASS fuzz build
+
+
+===== static-gates-final.log =====
+## TDD name parity
+expected=62 present=62 missing=0
+## production secret literal scan
+PASS TDD parity and secret scan
+
+
+===== coverage-final.log =====
+## package-local atomic coverage
+ok  	github.com/keir-research/ai-native-paas/adapters/oidc	0.196s	coverage: 92.6% of statements
+	github.com/keir-research/ai-native-paas/cmd/source-api		coverage: 0.0% of statements
+	github.com/keir-research/ai-native-paas/contracts/kernel/v1		coverage: 0.0% of statements
+	github.com/keir-research/ai-native-paas/cmd/build-api		coverage: 0.0% of statements
+	github.com/keir-research/ai-native-paas/cmd/kernel-api		coverage: 0.0% of statements
+ok  	github.com/keir-research/ai-native-paas/adapters/postgres/kernel	0.183s	coverage: 8.5% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/application	0.284s	coverage: 75.1% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/cache	0.173s	coverage: 89.6% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/detect	0.182s	coverage: 66.2% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/dockerfilevm	0.088s	coverage: 66.7% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/domain	0.184s	coverage: 80.0% of statements
+	github.com/keir-research/ai-native-paas/internal/build/support		coverage: 0.0% of statements
+	github.com/keir-research/ai-native-paas/internal/build/testkit		coverage: 0.0% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/httpapi	0.215s	coverage: 67.3% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/kpack	0.109s	coverage: 71.9% of statements
+	github.com/keir-research/ai-native-paas/internal/source/testkit		coverage: 0.0% of statements
+	github.com/keir-research/ai-native-paas/internal/source/support		coverage: 0.0% of statements
+	github.com/keir-research/ai-native-paas/internal/source/memory		coverage: 0.0% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/localoci	10.981s	coverage: 73.0% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/logs	0.109s	coverage: 88.5% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/memory	0.194s	coverage: 46.0% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/postgres	0.199s	coverage: 0.0% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/registry	10.197s	coverage: 75.8% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/sbom	0.188s	coverage: 75.0% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/scanner	0.108s	coverage: 79.4% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/signer	0.109s	coverage: 72.4% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/build/source	11.247s	coverage: 74.2% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/kernel	0.386s	coverage: 67.6% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/httpapi	0.393s	coverage: 22.9% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/memory	0.203s	coverage: 55.1% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/source/application	0.294s	coverage: 72.6% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/source/domain	0.206s	coverage: 76.3% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/source/gitlab	0.417s	coverage: 81.4% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/source/httpapi	0.301s	coverage: 71.3% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/source/postgres	0.197s	coverage: 0.0% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/source/webhook	0.193s	coverage: 83.5% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/source/workspace	9.013s	coverage: 76.2% of statements
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/build/v1	0.181s	coverage: 88.9% of statements
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/source/v1	0.200s	coverage: 84.6% of statements
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	9.591s	coverage: [no statements]
+ok  	github.com/keir-research/ai-native-paas/test/architecture	0.491s	coverage: [no statements]
+ok  	github.com/keir-research/ai-native-paas/test/contract	0.194s	coverage: [no statements]
+total:												(statements)			57.0%
+PASS coverage
+
+
+===== build-smoke-final.log =====
+## binaries
+mkdir -p bin
+go build -trimpath -o bin/kernel-api ./cmd/kernel-api
+go build -trimpath -o bin/source-api ./cmd/source-api
+go build -trimpath -o bin/build-api ./cmd/build-api
+bin/kernel-api: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, Go BuildID=37qI2XuJq79yBmyRCprF/ZIe6x3NYjgJIechBfAly/xzbS4H7df1g7RNyCY0P1/3ebm_ENk8qgPEUuQyD1f, with debug_info, not stripped
+bin/source-api: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, Go BuildID=rfvKy78J1boAnQKsbkTt/IV5qQIca3JplSi8PyqQ1/aGwonBGnZ5-To-CRJ7F-/GXxEc2zce1EVJsbgBWhx, with debug_info, not stripped
+bin/build-api:  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, Go BuildID=eD1coJOCeQnZYG8TJy4w/P8MEJ5WZnM-zzTFgcsI6/DAjkqz0sZkPuajWv80yj/1CIXKQd1dZYhoijuZ0EK, with debug_info, not stripped
+## build-api health smoke
+{"status":"ok"}
+PASS binaries and smoke
+
+
+===== postgres-kernel-build-release.log =====
+## PostgreSQL version
+PostgreSQL 18.4 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit
+## Iteration 1 kernel + Iteration 3 build live PostgreSQL tests
+=== RUN   TestPostgres_BuildMigrationsCleanInstallAndUpgrade
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 12 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.build_log_refs
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.reject_artifact_identity_mutation()
+drop cascades to function build.enforce_artifact_trust_state()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildMigrationsCleanInstallAndUpgrade (0.25s)
+=== RUN   TestPostgres_BuildAndOutboxAreAtomic
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildAndOutboxAreAtomic (0.24s)
+=== RUN   TestPostgres_ConcurrentBuildIdentityUsesSingleWinner
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_ConcurrentBuildIdentityUsesSingleWinner (0.80s)
+=== RUN   TestPostgres_BuildOptimisticLockPreventsLostUpdate
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildOptimisticLockPreventsLostUpdate (0.26s)
+=== RUN   TestPostgres_ArtifactIdentityIsImmutable
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_ArtifactIdentityIsImmutable (0.26s)
+=== RUN   TestPostgres_BuildAuditRejectsMutation
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildAuditRejectsMutation (0.16s)
+=== RUN   TestPostgres_BuildPipelinePersistsReleasableTrustChain
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildPipelinePersistsReleasableTrustChain (0.26s)
+=== RUN   TestPostgres_DockerfileExecutionSelectionAndIdentityRemainImmutable
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_DockerfileExecutionSelectionAndIdentityRemainImmutable (0.20s)
+=== RUN   TestPostgres_Migrations_CleanInstallAndUpgrade
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  schema "kernel" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_Migrations_CleanInstallAndUpgrade (0.18s)
+=== RUN   TestPostgres_CreateOrganizationAndOutboxAreAtomic
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+--- PASS: TestPostgres_CreateOrganizationAndOutboxAreAtomic (0.19s)
+=== RUN   TestPostgres_ConcurrentIdempotencyUsesSingleWinner
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+--- PASS: TestPostgres_ConcurrentIdempotencyUsesSingleWinner (0.78s)
+=== RUN   TestPostgres_OperationOptimisticLockPreventsLostUpdate
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+--- PASS: TestPostgres_OperationOptimisticLockPreventsLostUpdate (0.19s)
+=== RUN   TestPostgres_AuditTableRejectsUpdateAndDelete
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+--- PASS: TestPostgres_AuditTableRejectsUpdateAndDelete (0.20s)
+PASS
+ok  	github.com/keir-research/ai-native-paas/test/integration	5.077s
+PASS kernel/build live PostgreSQL
+
+
+===== postgres-source-release.log =====
+## Iteration 2 source live PostgreSQL tests
+=== RUN   TestMigrations_SourceSchemaOwnsItsTables
+--- PASS: TestMigrations_SourceSchemaOwnsItsTables (0.00s)
+=== RUN   TestMigrations_NoCrossDomainForeignKeys
+--- PASS: TestMigrations_NoCrossDomainForeignKeys (0.00s)
+=== RUN   TestMigrations_AuditHasMutationGuard
+--- PASS: TestMigrations_AuditHasMutationGuard (0.00s)
+=== RUN   TestMigrations_WebhookAndIdempotencyHaveCompositePrimaryKeys
+--- PASS: TestMigrations_WebhookAndIdempotencyHaveCompositePrimaryKeys (0.00s)
+=== RUN   TestPostgres_SourceMigrationsCleanInstallAndUpgrade
+--- PASS: TestPostgres_SourceMigrationsCleanInstallAndUpgrade (1.12s)
+=== RUN   TestPostgres_ProjectRepositoryOutboxAtomic
+--- PASS: TestPostgres_ProjectRepositoryOutboxAtomic (0.65s)
+=== RUN   TestPostgres_ConcurrentIdempotencySingleWinner
+--- PASS: TestPostgres_ConcurrentIdempotencySingleWinner (1.41s)
+=== RUN   TestPostgres_BranchHeadOptimisticLockRejectsStaleUpdate
+--- PASS: TestPostgres_BranchHeadOptimisticLockRejectsStaleUpdate (0.77s)
+=== RUN   TestPostgres_WebhookInboxDeduplicatesConcurrentDelivery
+--- PASS: TestPostgres_WebhookInboxDeduplicatesConcurrentDelivery (1.57s)
+=== RUN   TestPostgres_WebhookIDCannotBeReusedForDifferentBody
+--- PASS: TestPostgres_WebhookIDCannotBeReusedForDifferentBody (0.77s)
+=== RUN   TestPostgres_OutOfOrderBranchWriteCannotWinOptimisticRace
+--- PASS: TestPostgres_OutOfOrderBranchWriteCannotWinOptimisticRace (0.67s)
+=== RUN   TestPostgres_AuditRejectsUpdateAndDelete
+--- PASS: TestPostgres_AuditRejectsUpdateAndDelete (0.73s)
+=== RUN   TestPostgres_RepositoryProviderIdentityRemainsStable
+--- PASS: TestPostgres_RepositoryProviderIdentityRemainsStable (4.60s)
+=== RUN   TestPostgres_SerializableSkipLockedRequiresBoundedRetry
+--- PASS: TestPostgres_SerializableSkipLockedRequiresBoundedRetry (1.19s)
+PASS
+ok  	github.com/keir-research/ai-native-paas/internal/source/postgres	14.549s
+PASS source live PostgreSQL
+
+
+===== FINAL =====
+PASS

@@ -1,0 +1,106 @@
+{
+  "api_version": "agent.platform.example.com/v1",
+  "semantics_version": "v1",
+  "tools": [
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_add_domain.schema.json",
+      "name": "platform_add_domain",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_apply_repository_patch.schema.json",
+      "name": "platform_apply_repository_patch",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_bind_service.schema.json",
+      "name": "platform_bind_service",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_cancel_operation.schema.json",
+      "name": "platform_cancel_operation",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_create_branch.schema.json",
+      "name": "platform_create_branch",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_create_merge_request.schema.json",
+      "name": "platform_create_merge_request",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_create_project.schema.json",
+      "name": "platform_create_project",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_deploy.schema.json",
+      "name": "platform_deploy",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_get_build.schema.json",
+      "name": "platform_get_build",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_get_deployment.schema.json",
+      "name": "platform_get_deployment",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_get_logs.schema.json",
+      "name": "platform_get_logs",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_get_operation.schema.json",
+      "name": "platform_get_operation",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_get_project.schema.json",
+      "name": "platform_get_project",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_get_usage.schema.json",
+      "name": "platform_get_usage",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_list_secret_metadata.schema.json",
+      "name": "platform_list_secret_metadata",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_provision_service.schema.json",
+      "name": "platform_provision_service",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_request_approval.schema.json",
+      "name": "platform_request_approval",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_request_build.schema.json",
+      "name": "platform_request_build",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_rollback.schema.json",
+      "name": "platform_rollback",
+      "semanticsVersion": "v1"
+    },
+    {
+      "inputSchema": "https://platform.example.com/contracts/mcp/v1/platform_set_secret.schema.json",
+      "name": "platform_set_secret",
+      "semanticsVersion": "v1"
+    }
+  ]
+}

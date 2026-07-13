@@ -1,0 +1,9 @@
+health: PASS
+tenant-derived: PASS
+gitops-committed: PASS
+status-readable: PASS
+cross-tenant-denied: PASS
+RESULT: PASS
+application_id=app-1
+environment_id=env-2
+deployment_id=dep-8

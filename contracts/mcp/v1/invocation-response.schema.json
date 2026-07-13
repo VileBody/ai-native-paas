@@ -1,0 +1,147 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v1/invocation-response.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "not": {
+        "required": [
+          "result"
+        ]
+      },
+      "required": [
+        "operation"
+      ]
+    },
+    {
+      "not": {
+        "required": [
+          "operation"
+        ]
+      },
+      "required": [
+        "result"
+      ]
+    }
+  ],
+  "properties": {
+    "api_version": {
+      "const": "agent.platform.example.com/v1"
+    },
+    "error": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "details": {
+          "type": "object"
+        },
+        "message": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string"
+        },
+        "operation_id": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "invocation_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "operation": {
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "PENDING",
+            "RUNNING",
+            "WAITING_EXTERNAL",
+            "SUCCEEDED",
+            "FAILED",
+            "CANCELED"
+          ],
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "tenant_id": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "state"
+      ],
+      "type": "object"
+    },
+    "replayed": {
+      "type": "boolean"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {},
+        "id": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+          "type": "string"
+        },
+        "state": {
+          "maxLength": 128,
+          "type": "string"
+        },
+        "type": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+          "type": "string"
+        },
+        "url": {
+          "maxLength": 4096,
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "api_version",
+    "invocation_id",
+    "replayed"
+  ],
+  "title": "Agent invocation response",
+  "type": "object"
+}

@@ -1,0 +1,80 @@
+# file: namespace.yaml
+{
+  "apiVersion": "v1",
+  "kind": "Namespace",
+  "metadata": {
+    "name": "app-app-1-production-6fcb3936e9",
+    "labels": {
+      "platform.example.com/application-id": "app-1",
+      "platform.example.com/environment-id": "env-1",
+      "platform.example.com/managed-by": "paas-control-plane",
+      "platform.example.com/tenant-id": "tenant-1"
+    }
+  }
+}
+# file: paasapp.yaml
+{
+  "apiVersion": "platform.example.com/v1alpha1",
+  "kind": "PaaSApp",
+  "metadata": {
+    "name": "paas-app-1-production-6fcb3936e9",
+    "namespace": "app-app-1-production-6fcb3936e9",
+    "labels": {
+      "platform.example.com/application-id": "app-1",
+      "platform.example.com/environment-id": "env-1",
+      "platform.example.com/managed-by": "paas-control-plane",
+      "platform.example.com/tenant-id": "tenant-1"
+    },
+    "annotations": {
+      "platform.example.com/release-id": "rel-1"
+    }
+  },
+  "spec": {
+    "identity": {
+      "tenantID": "tenant-1",
+      "projectID": "project-1",
+      "applicationID": "app-1",
+      "environmentID": "env-1",
+      "environment": "production",
+      "releaseID": "rel-1"
+    },
+    "image": {
+      "repository": "registry.test/tenants/tenant-1/apps/app-1",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json"
+    },
+    "runtime": {
+      "isolation": "sandboxed",
+      "unit": "u1"
+    },
+    "processes": {
+      "web": {
+        "port": 8080,
+        "minReplicas": 1,
+        "maxReplicas": 3,
+        "healthPath": "/health",
+        "startupTimeoutSeconds": 60,
+        "readinessTimeoutSeconds": 30
+      }
+    },
+    "release": {
+      "strategy": "Rolling",
+      "migration": {},
+      "rolloutTimeoutSeconds": 300
+    },
+    "route": {
+      "generatedHostname": "app-1-production.apps.eu1.test",
+      "process": "web"
+    },
+    "attachmentSnapshotRef": "secset-app-1-production-v3",
+    "network": {
+      "egressProfile": "public-default"
+    },
+    "lifecycle": {
+      "state": "Active"
+    }
+  },
+  "status": {
+    "startedAt": "0001-01-01T00:00:00Z"
+  }
+}

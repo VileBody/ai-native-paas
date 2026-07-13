@@ -1,0 +1,32 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v1/platform_add_domain.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "application_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "environment_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "hostname": {
+      "maxLength": 253,
+      "minLength": 3,
+      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "application_id",
+    "environment_id",
+    "hostname"
+  ],
+  "title": "platform_add_domain arguments",
+  "type": "object"
+}

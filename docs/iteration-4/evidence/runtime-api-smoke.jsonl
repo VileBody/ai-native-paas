@@ -1,0 +1,5 @@
+{"step":"health","response":{"status":"ok"}}
+{"step":"create_application","response":{"application":{"ID":"app-1","TenantID":"tenant-smoke","ProjectID":"project-smoke","Name":"booking","Lifecycle":"Active","Version":1,"CreatedAt":"2026-07-12T21:22:45.50943921Z","UpdatedAt":"2026-07-12T21:22:45.50943921Z"},"default_environment":{"ID":"env-2","TenantID":"tenant-smoke","ApplicationID":"app-1","Name":"production","Namespace":"app-app-1-production-6fcb3936e9","Default":true,"ActiveReleaseID":"","PlacementID":"","Version":1,"CreatedAt":"2026-07-12T21:22:45.50943921Z","UpdatedAt":"2026-07-12T21:22:45.50943921Z"}}}
+{"step":"deploy","response":{"deployment_id":"dep-8","release_id":"rel-6","phase":"GIT_COMMITTED"}}
+{"step":"status","response":{"deployment_id":"dep-8","phase":"GIT_COMMITTED","active_release":"","url":"","ready_replicas":0}}
+{"step":"cross_tenant","http_status":403,"response":{"error":{"code":"FORBIDDEN","message":"tenant path does not match principal"}}}

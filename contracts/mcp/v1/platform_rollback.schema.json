@@ -1,0 +1,30 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v1/platform_rollback.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "deployment_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "expected_environment_revision": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "target_release_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "deployment_id",
+    "target_release_id",
+    "expected_environment_revision"
+  ],
+  "title": "platform_rollback arguments",
+  "type": "object"
+}

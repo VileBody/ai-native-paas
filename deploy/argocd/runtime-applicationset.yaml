@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: runtime-cell-applications
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: paas-runtime-delivery
+spec:
+  # Deleting or accidentally replacing the ApplicationSet must not cascade
+  # into customer runtime deletion. The control plane owns the two-phase
+  # lifecycle and removes a PaaSApp only after retention policy is satisfied.
+  preserveResourcesOnDeletion: true
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - git:
+        repoURL: https://git.example.invalid/platform/runtime-cell-a.git
+        revision: main
+        files:
+          - path: cells/cell-a/tenants/*/apps/*/*/paasapp.yaml
+  template:
+    metadata:
+      name: '{{.metadata.name}}'
+      namespace: argocd
+      labels:
+        platform.example.com/tenant-id: '{{.spec.identity.tenantID}}'
+        platform.example.com/application-id: '{{.spec.identity.applicationID}}'
+        platform.example.com/environment-id: '{{.spec.identity.environmentID}}'
+    spec:
+      project: runtime-cell-a
+      source:
+        repoURL: https://git.example.invalid/platform/runtime-cell-a.git
+        targetRevision: main
+        path: '{{.path.path}}'
+        directory:
+          recurse: false
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{.metadata.namespace}}'
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+          - CreateNamespace=false
+          - RespectIgnoreDifferences=true
+      ignoreDifferences:
+        - group: platform.example.com
+          kind: PaaSApp
+          jsonPointers:
+            - /status

@@ -1,0 +1,1519 @@
+Iteration 6 verification started at 2026-07-13T11:19:00Z
+Go: go version go1.23.2 linux/amd64
+
+===== format =====
+
+===== vet =====
+
+===== default-tests =====
+?   	github.com/keir-research/ai-native-paas/cmd/build-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/commerce-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/kernel-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/runtime-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/runtime-operator	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/source-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/contracts/kernel/v1	[no test files]
+ok  	github.com/keir-research/ai-native-paas/adapters/oidc	0.590s
+ok  	github.com/keir-research/ai-native-paas/adapters/postgres/kernel	0.690s
+ok  	github.com/keir-research/ai-native-paas/internal/build/application	1.097s
+ok  	github.com/keir-research/ai-native-paas/internal/build/cache	0.589s
+ok  	github.com/keir-research/ai-native-paas/internal/build/detect	0.695s
+ok  	github.com/keir-research/ai-native-paas/internal/build/dockerfilevm	0.303s
+ok  	github.com/keir-research/ai-native-paas/internal/build/domain	0.397s
+?   	github.com/keir-research/ai-native-paas/internal/build/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/build/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/commerce/domain	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/build/httpapi	0.389s
+ok  	github.com/keir-research/ai-native-paas/internal/build/kpack	0.277s
+?   	github.com/keir-research/ai-native-paas/internal/commerce/postgres	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/commerce/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/kube	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/postgres	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/build/localoci	24.856s
+ok  	github.com/keir-research/ai-native-paas/internal/build/logs	0.192s
+ok  	github.com/keir-research/ai-native-paas/internal/build/memory	0.378s
+ok  	github.com/keir-research/ai-native-paas/internal/build/postgres	0.282s
+ok  	github.com/keir-research/ai-native-paas/internal/build/registry	23.942s
+ok  	github.com/keir-research/ai-native-paas/internal/build/sbom	0.388s
+ok  	github.com/keir-research/ai-native-paas/internal/build/scanner	0.192s
+ok  	github.com/keir-research/ai-native-paas/internal/build/signer	0.192s
+ok  	github.com/keir-research/ai-native-paas/internal/build/source	24.777s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/application	0.392s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/httpapi	0.296s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/memory	0.111s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel	0.306s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/httpapi	0.384s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/memory	0.186s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/application	11.186s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/domain	0.107s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/gitops	9.287s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/httpapi	1.201s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/kubeapi	0.593s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/operator	0.284s
+ok  	github.com/keir-research/ai-native-paas/internal/source/application	0.206s
+ok  	github.com/keir-research/ai-native-paas/internal/source/domain	0.197s
+ok  	github.com/keir-research/ai-native-paas/internal/source/gitlab	0.416s
+ok  	github.com/keir-research/ai-native-paas/internal/source/httpapi	0.307s
+ok  	github.com/keir-research/ai-native-paas/internal/source/postgres	0.196s
+ok  	github.com/keir-research/ai-native-paas/internal/source/webhook	0.203s
+ok  	github.com/keir-research/ai-native-paas/internal/source/workspace	17.925s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/build/v1	0.195s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/runtime/v1	0.196s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/source/v1	0.199s
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	19.829s
+ok  	github.com/keir-research/ai-native-paas/test/architecture	0.805s
+ok  	github.com/keir-research/ai-native-paas/test/contract	0.109s
+
+===== commerce-race =====
+?   	github.com/keir-research/ai-native-paas/internal/commerce/domain	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/commerce/postgres	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/commerce/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/application	1.206s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/httpapi	1.102s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/memory	1.075s
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	7.460s
+ok  	github.com/keir-research/ai-native-paas/test/architecture	1.482s
+ok  	github.com/keir-research/ai-native-paas/test/contract	1.111s
+
+===== cumulative-race =====
+?   	github.com/keir-research/ai-native-paas/cmd/build-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/commerce-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/runtime-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/runtime-operator	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/source-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/contracts/kernel/v1	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/kernel-api	[no test files]
+ok  	github.com/keir-research/ai-native-paas/adapters/oidc	1.803s
+ok  	github.com/keir-research/ai-native-paas/adapters/postgres/kernel	1.893s
+ok  	github.com/keir-research/ai-native-paas/internal/build/application	2.399s
+ok  	github.com/keir-research/ai-native-paas/internal/build/cache	1.807s
+ok  	github.com/keir-research/ai-native-paas/internal/build/detect	2.102s
+ok  	github.com/keir-research/ai-native-paas/internal/build/dockerfilevm	1.907s
+ok  	github.com/keir-research/ai-native-paas/internal/build/domain	2.095s
+?   	github.com/keir-research/ai-native-paas/internal/build/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/build/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/commerce/domain	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/commerce/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/commerce/postgres	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/build/httpapi	1.899s
+ok  	github.com/keir-research/ai-native-paas/internal/build/kpack	1.705s
+?   	github.com/keir-research/ai-native-paas/internal/runtime/kube	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/postgres	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/build/localoci	29.532s
+ok  	github.com/keir-research/ai-native-paas/internal/build/logs	1.705s
+ok  	github.com/keir-research/ai-native-paas/internal/build/memory	1.798s
+ok  	github.com/keir-research/ai-native-paas/internal/build/postgres	1.898s
+ok  	github.com/keir-research/ai-native-paas/internal/build/registry	28.559s
+ok  	github.com/keir-research/ai-native-paas/internal/build/sbom	1.807s
+ok  	github.com/keir-research/ai-native-paas/internal/build/scanner	1.801s
+ok  	github.com/keir-research/ai-native-paas/internal/build/signer	1.897s
+ok  	github.com/keir-research/ai-native-paas/internal/build/source	29.071s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/application	2.587s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/httpapi	2.093s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/memory	1.793s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel	2.680s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/httpapi	2.605s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/memory	1.710s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/application	15.003s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/domain	1.705s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/gitops	11.601s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/httpapi	1.723s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/kubeapi	1.898s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/operator	1.511s
+ok  	github.com/keir-research/ai-native-paas/internal/source/application	1.513s
+ok  	github.com/keir-research/ai-native-paas/internal/source/domain	1.319s
+ok  	github.com/keir-research/ai-native-paas/internal/source/gitlab	1.783s
+ok  	github.com/keir-research/ai-native-paas/internal/source/httpapi	1.595s
+ok  	github.com/keir-research/ai-native-paas/internal/source/postgres	1.501s
+ok  	github.com/keir-research/ai-native-paas/internal/source/webhook	1.576s
+ok  	github.com/keir-research/ai-native-paas/internal/source/workspace	20.590s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/build/v1	1.494s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/runtime/v1	1.587s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/source/v1	1.487s
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	22.757s
+ok  	github.com/keir-research/ai-native-paas/test/architecture	2.605s
+ok  	github.com/keir-research/ai-native-paas/test/contract	1.312s
+
+===== shuffle =====
+?   	github.com/keir-research/ai-native-paas/internal/commerce/domain	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/application	0.478s
+?   	github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/httpapi	0.163s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/memory	0.030s
+ok  	github.com/keir-research/ai-native-paas/test/contract	0.202s
+ok  	github.com/keir-research/ai-native-paas/test/architecture	1.681s
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	0.081s
+
+===== tdd-parity =====
+{
+  "missing": [],
+  "present": 52,
+  "required": 52
+}
+
+===== static-boundaries =====
+
+===== fuzz =====
+fuzz: elapsed: 0s, gathering baseline coverage: 0/2 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 2/2 completed, now fuzzing with 56 workers
+fuzz: elapsed: 3s, execs: 24294 (7900/sec), new interesting: 0 (total: 2)
+fuzz: elapsed: 5s, execs: 54971 (13318/sec), new interesting: 0 (total: 2)
+PASS
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/application	5.420s
+fuzz: elapsed: 0s, gathering baseline coverage: 0/10 completed
+fuzz: elapsed: 1s, gathering baseline coverage: 10/10 completed, now fuzzing with 56 workers
+fuzz: elapsed: 3s, execs: 29671 (9707/sec), new interesting: 0 (total: 10)
+fuzz: elapsed: 5s, execs: 61502 (14349/sec), new interesting: 0 (total: 10)
+PASS
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/application	5.343s
+
+===== coverage =====
+	github.com/keir-research/ai-native-paas/internal/commerce/domain		coverage: 0.0% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/application	0.212s	coverage: 50.4% of statements in ./internal/commerce/..., ./pkg/contracts/commerce/v1
+	github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1		coverage: 0.0% of statements
+	github.com/keir-research/ai-native-paas/internal/commerce/postgres		coverage: 0.0% of statements
+	github.com/keir-research/ai-native-paas/internal/commerce/testkit		coverage: 0.0% of statements
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/httpapi	0.233s	coverage: 42.7% of statements in ./internal/commerce/..., ./pkg/contracts/commerce/v1
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/memory	0.189s	coverage: 5.8% of statements in ./internal/commerce/..., ./pkg/contracts/commerce/v1
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	5.586s	coverage: 35.4% of statements in ./internal/commerce/..., ./pkg/contracts/commerce/v1
+ok  	github.com/keir-research/ai-native-paas/test/contract	0.078s	coverage: 0.7% of statements in ./internal/commerce/..., ./pkg/contracts/commerce/v1
+github.com/keir-research/ai-native-paas/internal/commerce/application/ports.go:18:	Owns				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/ports.go:24:	Owns				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/ports.go:94:	now				66.7%
+github.com/keir-research/ai-native-paas/internal/commerce/application/ports.go:100:	newID				66.7%
+github.com/keir-research/ai-native-paas/internal/commerce/application/ports.go:106:	ownership			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/ports.go:112:	require				66.7%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:48:	CreatePlanDefinition		70.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:64:	CreatePlanVersion		73.3%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:88:	ActivatePlanVersion		100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:91:	DisablePlanVersion		100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:94:	transitionPlan			78.9%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:122:	ReplacePlanSpec			60.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:144:	StartSubscription		67.9%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:186:	CheckAs				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:192:	Check				75.6%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:252:	Reserve				68.9%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:315:	activeQuota			85.7%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:327:	Commit				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:330:	Release				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:333:	transitionQuota			85.7%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:366:	Append				85.7%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:376:	normalizeUsage			78.3%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:409:	appendUsageTx			82.8%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:449:	findPeriod			75.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:458:	RecordBuildUsage		71.4%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:504:	PreviewInvoice			82.8%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:595:	RateQuantity			86.7%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:617:	CalculateRuntimeUnitSeconds	89.4%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:687:	SetGrace			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:690:	Suspend				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:693:	Resume				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:696:	transitionCommercial		82.8%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:741:	ReconcileUsage			78.4%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:794:	record				71.4%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:805:	fingerprint			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:810:	cloneStringMap			33.3%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:820:	min64				66.7%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:826:	max64				66.7%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:832:	safeAdd				60.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:841:	safeSub				40.0%
+github.com/keir-research/ai-native-paas/internal/commerce/application/service.go:850:	abs64				60.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/errors.go:28:		Error				0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/errors.go:37:		Unwrap				0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/errors.go:43:		NewError			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/errors.go:44:		Wrap				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/errors.go:47:		HasCode				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:18:		NewPlanDefinition		80.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:48:		ClonePlanSpec			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:56:		cloneBoolMap			83.3%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:66:		cloneIntMap			83.3%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:76:		clonePriceMap			83.3%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:86:		cloneMeterIntMap		100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:97:		NewPlanVersion			85.7%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:108:		Activate			75.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:120:		Disable				75.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:132:		ReplaceSpec			25.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:166:		NewSubscription			63.6%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:185:		AllowsAllocation		75.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:218:		NewBillingPeriod		80.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:226:		Contains			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:230:		AcceptsUsage			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:242:		NewCommercialAccount		66.7%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:258:		Transition			88.9%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:301:		NewQuotaReservation		80.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:309:		Commit				90.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:324:		Release				75.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:336:		CountsAgainstLimit		100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/domain/model.go:342:		Contract			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:24:	command				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:37:	command				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:55:	command				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:73:	command				0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:86:	ServeHTTP			82.6%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:118:	serveAdmin			52.8%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:172:	serveTenant			57.6%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:270:	decodeOrWrite			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:277:	limit				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:284:	authorizeAdmin			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:290:	authorizeTenant			85.7%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:301:	decode				70.6%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:326:	splitPath			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:344:	writeError			71.4%
+github.com/keir-research/ai-native-paas/internal/commerce/httpapi/handler.go:368:	writeJSON			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:27:		newData				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:30:		clone				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:63:		cloneOutbox			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:71:		cloneAudit			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:79:		cloneMetadata			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:95:		New				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:96:		Transact			90.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:113:		GetPlanDefinition		100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:117:		InsertPlanDefinition		75.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:124:		UpdatePlanDefinition		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:135:		GetPlanVersion			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:140:		ListPlanVersions		87.5%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:151:		InsertPlanVersion		80.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:159:		UpdatePlanVersion		70.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:174:		GetSubscription			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:178:		FindSubscriptionByTenant	100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:189:		InsertSubscription		75.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:196:		UpdateSubscription		71.4%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:207:		GetBillingPeriod		100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:211:		ListBillingPeriods		85.7%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:221:		InsertBillingPeriod		57.1%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:233:		UpdateBillingPeriod		71.4%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:244:		GetCommercialAccount		100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:248:		InsertCommercialAccount		75.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:255:		UpdateCommercialAccount		71.4%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:266:		GetQuotaReservation		100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:270:		FindQuotaReservation		75.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:278:		ListQuotaReservations		100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:287:		InsertQuotaReservation		66.7%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:297:		UpdateQuotaReservation		71.4%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:308:		usageKey			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:309:		FindUsageByKey			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:314:		ListUsage			90.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:330:		InsertUsage			83.3%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:339:		idemKey				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:340:		GetIdempotency			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:344:		InsertIdempotency		80.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:352:		AppendOutbox			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:357:		AppendAudit			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:362:		AppendAlert			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:366:		ListAlerts			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:376:		SnapshotCounts			100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:381:		Usage				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:387:		Outbox				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/memory/store.go:392:		Alerts				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:30:		NewStore			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:36:		Migrate				0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:89:		Transact			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:129:	retryableDB			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:139:	capture				0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:144:	marshal				0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:145:	decode				0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:146:	scanPayload			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:154:	mapDB				0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:170:	affected			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:183:	hashSpec			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:192:	GetPlanDefinition		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:200:	InsertPlanDefinition		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:208:	UpdatePlanDefinition		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:217:	GetPlanVersion			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:225:	ListPlanVersions		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:244:	InsertPlanVersion		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:256:	UpdatePlanVersion		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:269:	GetSubscription			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:277:	FindSubscriptionByTenant	0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:285:	InsertSubscription		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:297:	UpdateSubscription		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:310:	GetBillingPeriod		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:318:	ListBillingPeriods		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:337:	InsertBillingPeriod		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:356:	UpdateBillingPeriod		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:365:	GetCommercialAccount		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:373:	InsertCommercialAccount		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:381:	UpdateCommercialAccount		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:390:	GetQuotaReservation		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:398:	FindQuotaReservation		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:406:	ListQuotaReservations		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:438:	InsertQuotaReservation		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:446:	UpdateQuotaReservation		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:455:	FindUsageByKey			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:463:	ListUsage			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:489:	InsertUsage			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:502:	GetIdempotency			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:511:	InsertIdempotency		0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:515:	AppendOutbox			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:519:	AppendAudit			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:523:	AppendAlert			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/postgres/store.go:527:	ListAlerts			0.0%
+github.com/keir-research/ai-native-paas/internal/commerce/testkit/testkit.go:15:	Now				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/testkit/testkit.go:16:	Set				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/testkit/testkit.go:17:	Advance				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/testkit/testkit.go:24:	NewID				100.0%
+github.com/keir-research/ai-native-paas/internal/commerce/testkit/testkit.go:37:	Owns				100.0%
+github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1/contracts.go:36:	MeterCatalog			100.0%
+github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1/contracts.go:37:	ValidMeter			100.0%
+github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1/contracts.go:59:	Validate			66.7%
+github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1/contracts.go:75:	Validate			66.7%
+github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1/contracts.go:183:	Normalize			77.8%
+total:											(statements)			59.4%
+
+===== build =====
+
+===== commerce-api-smoke =====
+commerce-api process smoke: PASS
+
+===== postgres =====
+=== RUN   TestPostgres_BuildMigrationsCleanInstallAndUpgrade
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  schema "build" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildMigrationsCleanInstallAndUpgrade (0.33s)
+=== RUN   TestPostgres_BuildAndOutboxAreAtomic
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildAndOutboxAreAtomic (0.41s)
+=== RUN   TestPostgres_ConcurrentBuildIdentityUsesSingleWinner
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_ConcurrentBuildIdentityUsesSingleWinner (1.59s)
+=== RUN   TestPostgres_BuildOptimisticLockPreventsLostUpdate
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildOptimisticLockPreventsLostUpdate (0.37s)
+=== RUN   TestPostgres_ArtifactIdentityIsImmutable
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_ArtifactIdentityIsImmutable (0.32s)
+=== RUN   TestPostgres_BuildAuditRejectsMutation
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildAuditRejectsMutation (0.25s)
+=== RUN   TestPostgres_BuildPipelinePersistsReleasableTrustChain
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_BuildPipelinePersistsReleasableTrustChain (0.39s)
+=== RUN   TestPostgres_DockerfileExecutionSelectionAndIdentityRemainImmutable
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 15 other objects
+DETAIL:  drop cascades to table build.schema_migrations
+drop cascades to table build.builds
+drop cascades to table build.artifacts
+drop cascades to table build.scan_results
+drop cascades to table build.signature_records
+drop cascades to table build.log_refs
+drop cascades to table build.idempotency
+drop cascades to table build.outbox
+drop cascades to table build.audit
+drop cascades to function build.reject_audit_mutation()
+drop cascades to function build.enforce_artifact_identity()
+drop cascades to function build.enforce_signature_digest()
+drop cascades to function build.enforce_build_identity_and_state()
+drop cascades to function build.reject_trust_record_mutation()
+drop cascades to function build.enforce_artifact_state_and_trust()
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_audit_no_update" for relation "build.audit" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_artifact_identity_immutable" for relation "build.artifacts" does not exist, skipping
+NOTICE:  trigger "build_signature_digest_matches_artifact" for relation "build.signature_records" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+NOTICE:  trigger "build_identity_and_state_guard" for relation "build.builds" does not exist, skipping
+NOTICE:  trigger "build_scan_result_immutable" for relation "build.scan_results" does not exist, skipping
+NOTICE:  trigger "build_signature_record_immutable" for relation "build.signature_records" does not exist, skipping
+NOTICE:  trigger "build_artifact_state_and_trust" for relation "build.artifacts" does not exist, skipping
+NOTICE:  schema "build" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_DockerfileExecutionSelectionAndIdentityRemainImmutable (0.35s)
+=== RUN   TestPostgres_CommerceMigrationsCleanInstallAndUpgrade
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  schema "commerce" does not exist, skipping
+NOTICE:  schema "commerce" already exists, skipping
+NOTICE:  trigger "commerce_usage_append_only" for relation "commerce.usage_events" does not exist, skipping
+NOTICE:  trigger "commerce_idempotency_append_only" for relation "commerce.idempotency" does not exist, skipping
+NOTICE:  trigger "commerce_audit_append_only" for relation "commerce.audit" does not exist, skipping
+NOTICE:  trigger "commerce_alerts_append_only" for relation "commerce.reconciliation_alerts" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definition_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_version_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscription_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_period_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_account_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definitions_payload_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_versions_payload_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscriptions_payload_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_periods_payload_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_accounts_payload_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_payload_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_usage_payload_guard" for relation "commerce.usage_events" does not exist, skipping
+NOTICE:  schema "commerce" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_CommerceMigrationsCleanInstallAndUpgrade (0.27s)
+=== RUN   TestPostgres_CommerceSubscriptionPeriodAccountAndOutboxAreAtomic
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 20 other objects
+DETAIL:  drop cascades to table commerce.schema_migrations
+drop cascades to table commerce.plan_definitions
+drop cascades to table commerce.plan_versions
+drop cascades to table commerce.subscriptions
+drop cascades to table commerce.billing_periods
+drop cascades to table commerce.commercial_accounts
+drop cascades to table commerce.quota_reservations
+drop cascades to table commerce.usage_events
+drop cascades to table commerce.idempotency
+drop cascades to table commerce.outbox
+drop cascades to table commerce.audit
+drop cascades to table commerce.reconciliation_alerts
+drop cascades to function commerce.reject_append_only_mutation()
+drop cascades to function commerce.guard_plan_definition()
+drop cascades to function commerce.guard_plan_version()
+drop cascades to function commerce.guard_subscription()
+drop cascades to function commerce.guard_billing_period()
+drop cascades to function commerce.guard_account()
+drop cascades to function commerce.guard_quota()
+drop cascades to function commerce.guard_payload_consistency()
+NOTICE:  schema "commerce" already exists, skipping
+NOTICE:  trigger "commerce_usage_append_only" for relation "commerce.usage_events" does not exist, skipping
+NOTICE:  trigger "commerce_idempotency_append_only" for relation "commerce.idempotency" does not exist, skipping
+NOTICE:  trigger "commerce_audit_append_only" for relation "commerce.audit" does not exist, skipping
+NOTICE:  trigger "commerce_alerts_append_only" for relation "commerce.reconciliation_alerts" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definition_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_version_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscription_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_period_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_account_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definitions_payload_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_versions_payload_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscriptions_payload_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_periods_payload_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_accounts_payload_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_payload_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_usage_payload_guard" for relation "commerce.usage_events" does not exist, skipping
+--- PASS: TestPostgres_CommerceSubscriptionPeriodAccountAndOutboxAreAtomic (0.34s)
+=== RUN   TestPostgres_CommerceConcurrentQuotaReservationsCannotOversubscribe
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 20 other objects
+DETAIL:  drop cascades to table commerce.schema_migrations
+drop cascades to table commerce.plan_definitions
+drop cascades to table commerce.plan_versions
+drop cascades to table commerce.subscriptions
+drop cascades to table commerce.billing_periods
+drop cascades to table commerce.commercial_accounts
+drop cascades to table commerce.quota_reservations
+drop cascades to table commerce.usage_events
+drop cascades to table commerce.idempotency
+drop cascades to table commerce.outbox
+drop cascades to table commerce.audit
+drop cascades to table commerce.reconciliation_alerts
+drop cascades to function commerce.reject_append_only_mutation()
+drop cascades to function commerce.guard_plan_definition()
+drop cascades to function commerce.guard_plan_version()
+drop cascades to function commerce.guard_subscription()
+drop cascades to function commerce.guard_billing_period()
+drop cascades to function commerce.guard_account()
+drop cascades to function commerce.guard_quota()
+drop cascades to function commerce.guard_payload_consistency()
+NOTICE:  schema "commerce" already exists, skipping
+NOTICE:  trigger "commerce_usage_append_only" for relation "commerce.usage_events" does not exist, skipping
+NOTICE:  trigger "commerce_idempotency_append_only" for relation "commerce.idempotency" does not exist, skipping
+NOTICE:  trigger "commerce_audit_append_only" for relation "commerce.audit" does not exist, skipping
+NOTICE:  trigger "commerce_alerts_append_only" for relation "commerce.reconciliation_alerts" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definition_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_version_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscription_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_period_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_account_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definitions_payload_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_versions_payload_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscriptions_payload_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_periods_payload_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_accounts_payload_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_payload_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_usage_payload_guard" for relation "commerce.usage_events" does not exist, skipping
+--- PASS: TestPostgres_CommerceConcurrentQuotaReservationsCannotOversubscribe (2.21s)
+=== RUN   TestPostgres_CommerceConcurrentUsageIdempotencyUsesSingleWinner
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 20 other objects
+DETAIL:  drop cascades to table commerce.schema_migrations
+drop cascades to table commerce.plan_definitions
+drop cascades to table commerce.plan_versions
+drop cascades to table commerce.subscriptions
+drop cascades to table commerce.billing_periods
+drop cascades to table commerce.commercial_accounts
+drop cascades to table commerce.quota_reservations
+drop cascades to table commerce.usage_events
+drop cascades to table commerce.idempotency
+drop cascades to table commerce.outbox
+drop cascades to table commerce.audit
+drop cascades to table commerce.reconciliation_alerts
+drop cascades to function commerce.reject_append_only_mutation()
+drop cascades to function commerce.guard_plan_definition()
+drop cascades to function commerce.guard_plan_version()
+drop cascades to function commerce.guard_subscription()
+drop cascades to function commerce.guard_billing_period()
+drop cascades to function commerce.guard_account()
+drop cascades to function commerce.guard_quota()
+drop cascades to function commerce.guard_payload_consistency()
+NOTICE:  schema "commerce" already exists, skipping
+NOTICE:  trigger "commerce_usage_append_only" for relation "commerce.usage_events" does not exist, skipping
+NOTICE:  trigger "commerce_idempotency_append_only" for relation "commerce.idempotency" does not exist, skipping
+NOTICE:  trigger "commerce_audit_append_only" for relation "commerce.audit" does not exist, skipping
+NOTICE:  trigger "commerce_alerts_append_only" for relation "commerce.reconciliation_alerts" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definition_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_version_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscription_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_period_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_account_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definitions_payload_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_versions_payload_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscriptions_payload_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_periods_payload_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_accounts_payload_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_payload_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_usage_payload_guard" for relation "commerce.usage_events" does not exist, skipping
+--- PASS: TestPostgres_CommerceConcurrentUsageIdempotencyUsesSingleWinner (1.36s)
+=== RUN   TestPostgres_CommerceOptimisticLockPreventsLostAccountUpdate
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 20 other objects
+DETAIL:  drop cascades to table commerce.schema_migrations
+drop cascades to table commerce.plan_definitions
+drop cascades to table commerce.plan_versions
+drop cascades to table commerce.subscriptions
+drop cascades to table commerce.billing_periods
+drop cascades to table commerce.commercial_accounts
+drop cascades to table commerce.quota_reservations
+drop cascades to table commerce.usage_events
+drop cascades to table commerce.idempotency
+drop cascades to table commerce.outbox
+drop cascades to table commerce.audit
+drop cascades to table commerce.reconciliation_alerts
+drop cascades to function commerce.reject_append_only_mutation()
+drop cascades to function commerce.guard_plan_definition()
+drop cascades to function commerce.guard_plan_version()
+drop cascades to function commerce.guard_subscription()
+drop cascades to function commerce.guard_billing_period()
+drop cascades to function commerce.guard_account()
+drop cascades to function commerce.guard_quota()
+drop cascades to function commerce.guard_payload_consistency()
+NOTICE:  schema "commerce" already exists, skipping
+NOTICE:  trigger "commerce_usage_append_only" for relation "commerce.usage_events" does not exist, skipping
+NOTICE:  trigger "commerce_idempotency_append_only" for relation "commerce.idempotency" does not exist, skipping
+NOTICE:  trigger "commerce_audit_append_only" for relation "commerce.audit" does not exist, skipping
+NOTICE:  trigger "commerce_alerts_append_only" for relation "commerce.reconciliation_alerts" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definition_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_version_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscription_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_period_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_account_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definitions_payload_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_versions_payload_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscriptions_payload_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_periods_payload_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_accounts_payload_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_payload_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_usage_payload_guard" for relation "commerce.usage_events" does not exist, skipping
+--- PASS: TestPostgres_CommerceOptimisticLockPreventsLostAccountUpdate (0.40s)
+=== RUN   TestPostgres_CommerceActivePlanAndPeriodPriceVersionAreImmutable
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 20 other objects
+DETAIL:  drop cascades to table commerce.schema_migrations
+drop cascades to table commerce.plan_definitions
+drop cascades to table commerce.plan_versions
+drop cascades to table commerce.subscriptions
+drop cascades to table commerce.billing_periods
+drop cascades to table commerce.commercial_accounts
+drop cascades to table commerce.quota_reservations
+drop cascades to table commerce.usage_events
+drop cascades to table commerce.idempotency
+drop cascades to table commerce.outbox
+drop cascades to table commerce.audit
+drop cascades to table commerce.reconciliation_alerts
+drop cascades to function commerce.reject_append_only_mutation()
+drop cascades to function commerce.guard_plan_definition()
+drop cascades to function commerce.guard_plan_version()
+drop cascades to function commerce.guard_subscription()
+drop cascades to function commerce.guard_billing_period()
+drop cascades to function commerce.guard_account()
+drop cascades to function commerce.guard_quota()
+drop cascades to function commerce.guard_payload_consistency()
+NOTICE:  schema "commerce" already exists, skipping
+NOTICE:  trigger "commerce_usage_append_only" for relation "commerce.usage_events" does not exist, skipping
+NOTICE:  trigger "commerce_idempotency_append_only" for relation "commerce.idempotency" does not exist, skipping
+NOTICE:  trigger "commerce_audit_append_only" for relation "commerce.audit" does not exist, skipping
+NOTICE:  trigger "commerce_alerts_append_only" for relation "commerce.reconciliation_alerts" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definition_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_version_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscription_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_period_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_account_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definitions_payload_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_versions_payload_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscriptions_payload_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_periods_payload_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_accounts_payload_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_payload_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_usage_payload_guard" for relation "commerce.usage_events" does not exist, skipping
+--- PASS: TestPostgres_CommerceActivePlanAndPeriodPriceVersionAreImmutable (0.35s)
+=== RUN   TestPostgres_CommerceUsageAuditAndIdempotencyAreAppendOnly
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 20 other objects
+DETAIL:  drop cascades to table commerce.schema_migrations
+drop cascades to table commerce.plan_definitions
+drop cascades to table commerce.plan_versions
+drop cascades to table commerce.subscriptions
+drop cascades to table commerce.billing_periods
+drop cascades to table commerce.commercial_accounts
+drop cascades to table commerce.quota_reservations
+drop cascades to table commerce.usage_events
+drop cascades to table commerce.idempotency
+drop cascades to table commerce.outbox
+drop cascades to table commerce.audit
+drop cascades to table commerce.reconciliation_alerts
+drop cascades to function commerce.reject_append_only_mutation()
+drop cascades to function commerce.guard_plan_definition()
+drop cascades to function commerce.guard_plan_version()
+drop cascades to function commerce.guard_subscription()
+drop cascades to function commerce.guard_billing_period()
+drop cascades to function commerce.guard_account()
+drop cascades to function commerce.guard_quota()
+drop cascades to function commerce.guard_payload_consistency()
+NOTICE:  schema "commerce" already exists, skipping
+NOTICE:  trigger "commerce_usage_append_only" for relation "commerce.usage_events" does not exist, skipping
+NOTICE:  trigger "commerce_idempotency_append_only" for relation "commerce.idempotency" does not exist, skipping
+NOTICE:  trigger "commerce_audit_append_only" for relation "commerce.audit" does not exist, skipping
+NOTICE:  trigger "commerce_alerts_append_only" for relation "commerce.reconciliation_alerts" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definition_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_version_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscription_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_period_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_account_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definitions_payload_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_versions_payload_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscriptions_payload_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_periods_payload_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_accounts_payload_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_payload_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_usage_payload_guard" for relation "commerce.usage_events" does not exist, skipping
+--- PASS: TestPostgres_CommerceUsageAuditAndIdempotencyAreAppendOnly (0.46s)
+=== RUN   TestPostgres_CommercePayloadConsistencyRejectsColumnDrift
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 20 other objects
+DETAIL:  drop cascades to table commerce.schema_migrations
+drop cascades to table commerce.plan_definitions
+drop cascades to table commerce.plan_versions
+drop cascades to table commerce.subscriptions
+drop cascades to table commerce.billing_periods
+drop cascades to table commerce.commercial_accounts
+drop cascades to table commerce.quota_reservations
+drop cascades to table commerce.usage_events
+drop cascades to table commerce.idempotency
+drop cascades to table commerce.outbox
+drop cascades to table commerce.audit
+drop cascades to table commerce.reconciliation_alerts
+drop cascades to function commerce.reject_append_only_mutation()
+drop cascades to function commerce.guard_plan_definition()
+drop cascades to function commerce.guard_plan_version()
+drop cascades to function commerce.guard_subscription()
+drop cascades to function commerce.guard_billing_period()
+drop cascades to function commerce.guard_account()
+drop cascades to function commerce.guard_quota()
+drop cascades to function commerce.guard_payload_consistency()
+NOTICE:  schema "commerce" already exists, skipping
+NOTICE:  trigger "commerce_usage_append_only" for relation "commerce.usage_events" does not exist, skipping
+NOTICE:  trigger "commerce_idempotency_append_only" for relation "commerce.idempotency" does not exist, skipping
+NOTICE:  trigger "commerce_audit_append_only" for relation "commerce.audit" does not exist, skipping
+NOTICE:  trigger "commerce_alerts_append_only" for relation "commerce.reconciliation_alerts" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definition_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_version_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscription_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_period_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_account_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definitions_payload_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_versions_payload_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscriptions_payload_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_periods_payload_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_accounts_payload_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_payload_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_usage_payload_guard" for relation "commerce.usage_events" does not exist, skipping
+--- PASS: TestPostgres_CommercePayloadConsistencyRejectsColumnDrift (0.38s)
+=== RUN   TestPostgres_CommerceSchemaUsesNoFloatingMoneyColumns
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 20 other objects
+DETAIL:  drop cascades to table commerce.schema_migrations
+drop cascades to table commerce.plan_definitions
+drop cascades to table commerce.plan_versions
+drop cascades to table commerce.subscriptions
+drop cascades to table commerce.billing_periods
+drop cascades to table commerce.commercial_accounts
+drop cascades to table commerce.quota_reservations
+drop cascades to table commerce.usage_events
+drop cascades to table commerce.idempotency
+drop cascades to table commerce.outbox
+drop cascades to table commerce.audit
+drop cascades to table commerce.reconciliation_alerts
+drop cascades to function commerce.reject_append_only_mutation()
+drop cascades to function commerce.guard_plan_definition()
+drop cascades to function commerce.guard_plan_version()
+drop cascades to function commerce.guard_subscription()
+drop cascades to function commerce.guard_billing_period()
+drop cascades to function commerce.guard_account()
+drop cascades to function commerce.guard_quota()
+drop cascades to function commerce.guard_payload_consistency()
+NOTICE:  schema "commerce" already exists, skipping
+NOTICE:  trigger "commerce_usage_append_only" for relation "commerce.usage_events" does not exist, skipping
+NOTICE:  trigger "commerce_idempotency_append_only" for relation "commerce.idempotency" does not exist, skipping
+NOTICE:  trigger "commerce_audit_append_only" for relation "commerce.audit" does not exist, skipping
+NOTICE:  trigger "commerce_alerts_append_only" for relation "commerce.reconciliation_alerts" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definition_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_version_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscription_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_period_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_account_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definitions_payload_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_versions_payload_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscriptions_payload_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_periods_payload_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_accounts_payload_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_payload_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_usage_payload_guard" for relation "commerce.usage_events" does not exist, skipping
+--- PASS: TestPostgres_CommerceSchemaUsesNoFloatingMoneyColumns (0.30s)
+=== RUN   TestPostgres_CommerceInvoicePreviewIsDeterministic
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 20 other objects
+DETAIL:  drop cascades to table commerce.schema_migrations
+drop cascades to table commerce.plan_definitions
+drop cascades to table commerce.plan_versions
+drop cascades to table commerce.subscriptions
+drop cascades to table commerce.billing_periods
+drop cascades to table commerce.commercial_accounts
+drop cascades to table commerce.quota_reservations
+drop cascades to table commerce.usage_events
+drop cascades to table commerce.idempotency
+drop cascades to table commerce.outbox
+drop cascades to table commerce.audit
+drop cascades to table commerce.reconciliation_alerts
+drop cascades to function commerce.reject_append_only_mutation()
+drop cascades to function commerce.guard_plan_definition()
+drop cascades to function commerce.guard_plan_version()
+drop cascades to function commerce.guard_subscription()
+drop cascades to function commerce.guard_billing_period()
+drop cascades to function commerce.guard_account()
+drop cascades to function commerce.guard_quota()
+drop cascades to function commerce.guard_payload_consistency()
+NOTICE:  schema "commerce" already exists, skipping
+NOTICE:  trigger "commerce_usage_append_only" for relation "commerce.usage_events" does not exist, skipping
+NOTICE:  trigger "commerce_idempotency_append_only" for relation "commerce.idempotency" does not exist, skipping
+NOTICE:  trigger "commerce_audit_append_only" for relation "commerce.audit" does not exist, skipping
+NOTICE:  trigger "commerce_alerts_append_only" for relation "commerce.reconciliation_alerts" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definition_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_version_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscription_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_period_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_account_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_plan_definitions_payload_guard" for relation "commerce.plan_definitions" does not exist, skipping
+NOTICE:  trigger "commerce_plan_versions_payload_guard" for relation "commerce.plan_versions" does not exist, skipping
+NOTICE:  trigger "commerce_subscriptions_payload_guard" for relation "commerce.subscriptions" does not exist, skipping
+NOTICE:  trigger "commerce_billing_periods_payload_guard" for relation "commerce.billing_periods" does not exist, skipping
+NOTICE:  trigger "commerce_accounts_payload_guard" for relation "commerce.commercial_accounts" does not exist, skipping
+NOTICE:  trigger "commerce_quota_payload_guard" for relation "commerce.quota_reservations" does not exist, skipping
+NOTICE:  trigger "commerce_usage_payload_guard" for relation "commerce.usage_events" does not exist, skipping
+--- PASS: TestPostgres_CommerceInvoicePreviewIsDeterministic (0.34s)
+=== RUN   TestPostgres_Migrations_CleanInstallAndUpgrade
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  schema "kernel" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_Migrations_CleanInstallAndUpgrade (0.27s)
+=== RUN   TestPostgres_CreateOrganizationAndOutboxAreAtomic
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+--- PASS: TestPostgres_CreateOrganizationAndOutboxAreAtomic (0.23s)
+=== RUN   TestPostgres_ConcurrentIdempotencyUsesSingleWinner
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+--- PASS: TestPostgres_ConcurrentIdempotencyUsesSingleWinner (1.46s)
+=== RUN   TestPostgres_OperationOptimisticLockPreventsLostUpdate
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+--- PASS: TestPostgres_OperationOptimisticLockPreventsLostUpdate (0.49s)
+=== RUN   TestPostgres_AuditTableRejectsUpdateAndDelete
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+--- PASS: TestPostgres_AuditTableRejectsUpdateAndDelete (0.29s)
+=== RUN   TestPostgres_RuntimeMigrationsCleanInstallAndUpgrade
+NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table kernel.schema_migrations
+drop cascades to table kernel.organizations
+drop cascades to table kernel.memberships
+drop cascades to table kernel.operations
+drop cascades to table kernel.idempotency_records
+drop cascades to table kernel.outbox_events
+drop cascades to table kernel.inbox_events
+drop cascades to table kernel.audit_records
+drop cascades to function kernel.reject_audit_mutation()
+NOTICE:  schema "runtime" does not exist, skipping
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  relation "schema_migrations" already exists, skipping
+--- PASS: TestPostgres_RuntimeMigrationsCleanInstallAndUpgrade (0.31s)
+=== RUN   TestPostgres_RuntimeApplicationReleaseDeploymentAndOutboxAreAtomic
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeApplicationReleaseDeploymentAndOutboxAreAtomic (0.37s)
+=== RUN   TestPostgres_RuntimeConcurrentReleaseIdentityUsesSingleWinner
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeConcurrentReleaseIdentityUsesSingleWinner (1.37s)
+=== RUN   TestPostgres_RuntimeOptimisticLockPreventsLostUpdate
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeOptimisticLockPreventsLostUpdate (0.39s)
+=== RUN   TestPostgres_RuntimeReleaseArtifactAndConfigAreImmutable
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeReleaseArtifactAndConfigAreImmutable (0.36s)
+=== RUN   TestPostgres_RuntimeGitOpsCommitIsImmutable
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeGitOpsCommitIsImmutable (0.36s)
+=== RUN   TestPostgres_RuntimeAuditRejectsMutation
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeAuditRejectsMutation (0.29s)
+=== RUN   TestPostgres_RuntimePayloadConsistencyRejectsColumnDrift
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimePayloadConsistencyRejectsColumnDrift (0.37s)
+=== RUN   TestPostgres_RuntimeOnlyOneActiveReleasePerEnvironment
+NOTICE:  schema "kernel" does not exist, skipping
+NOTICE:  drop cascades to 21 other objects
+DETAIL:  drop cascades to table runtime.schema_migrations
+drop cascades to table runtime.applications
+drop cascades to table runtime.environments
+drop cascades to table runtime.runtime_cells
+drop cascades to table runtime.placements
+drop cascades to table runtime.placement_migrations
+drop cascades to table runtime.releases
+drop cascades to table runtime.deployments
+drop cascades to table runtime.gitops_commits
+drop cascades to table runtime.quarantine
+drop cascades to table runtime.idempotency
+drop cascades to table runtime.outbox
+drop cascades to table runtime.audit
+drop cascades to function runtime.reject_append_only_mutation()
+drop cascades to function runtime.guard_application_identity()
+drop cascades to function runtime.guard_environment_identity()
+drop cascades to function runtime.guard_payload_consistency()
+drop cascades to function runtime.guard_runtime_cell_identity()
+drop cascades to function runtime.guard_placement_identity()
+drop cascades to function runtime.guard_release_identity()
+drop cascades to function runtime.guard_deployment_identity()
+NOTICE:  schema "runtime" already exists, skipping
+NOTICE:  trigger "runtime_audit_append_only" for relation "runtime.audit" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_append_only" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_idempotency_append_only" for relation "runtime.idempotency" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_append_only" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_application_identity_immutable" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_identity_immutable" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_application_payload_consistency" for relation "runtime.applications" does not exist, skipping
+NOTICE:  trigger "runtime_environment_payload_consistency" for relation "runtime.environments" does not exist, skipping
+NOTICE:  trigger "runtime_cell_payload_consistency" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_payload_consistency" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_placement_migration_payload_consistency" for relation "runtime.placement_migrations" does not exist, skipping
+NOTICE:  trigger "runtime_release_payload_consistency" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_payload_consistency" for relation "runtime.deployments" does not exist, skipping
+NOTICE:  trigger "runtime_gitops_payload_consistency" for relation "runtime.gitops_commits" does not exist, skipping
+NOTICE:  trigger "runtime_quarantine_payload_consistency" for relation "runtime.quarantine" does not exist, skipping
+NOTICE:  trigger "runtime_cell_identity_immutable" for relation "runtime.runtime_cells" does not exist, skipping
+NOTICE:  trigger "runtime_placement_identity_immutable" for relation "runtime.placements" does not exist, skipping
+NOTICE:  trigger "runtime_release_identity_immutable" for relation "runtime.releases" does not exist, skipping
+NOTICE:  trigger "runtime_deployment_identity_immutable" for relation "runtime.deployments" does not exist, skipping
+--- PASS: TestPostgres_RuntimeOnlyOneActiveReleasePerEnvironment (0.50s)
+PASS
+ok  	github.com/keir-research/ai-native-paas/test/integration	18.623s
+
+===== completed =====
+Iteration 6 verification PASS

@@ -1,0 +1,215 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: paasapps.platform.example.com
+  labels:
+    app.kubernetes.io/managed-by: paas-runtime-delivery
+spec:
+  group: platform.example.com
+  scope: Namespaced
+  names:
+    plural: paasapps
+    singular: paasapp
+    kind: PaaSApp
+    shortNames:
+      - papp
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Active Release
+          type: string
+          jsonPath: .status.activeReleaseID
+        - name: URL
+          type: string
+          jsonPath: .status.url
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              additionalProperties: false
+              required: [identity, image, runtime, processes, release, route, attachmentSnapshotRef, network, lifecycle]
+              x-kubernetes-validations:
+                - rule: 'self.route.process in self.processes && self.processes[self.route.process].port > 0 && self.processes[self.route.process].minReplicas >= 1'
+                  message: route process must exist, expose a port and have at least one replica
+                - rule: 'self.processes.all(k, k.matches("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"))'
+                  message: process names must be lowercase DNS labels
+              properties:
+                identity:
+                  type: object
+                  additionalProperties: false
+                  required: [tenantID, projectID, applicationID, environmentID, environment, releaseID]
+                  properties:
+                    tenantID: {type: string, minLength: 1, maxLength: 63, pattern: '^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$'}
+                    projectID: {type: string, minLength: 1, maxLength: 63, pattern: '^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$'}
+                    applicationID: {type: string, minLength: 1, maxLength: 63, pattern: '^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$'}
+                    environmentID: {type: string, minLength: 1, maxLength: 63, pattern: '^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$'}
+                    environment: {type: string, minLength: 1, maxLength: 63, pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'}
+                    releaseID: {type: string, minLength: 1, maxLength: 63, pattern: '^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$'}
+                image:
+                  type: object
+                  additionalProperties: false
+                  required: [repository, digest, mediaType]
+                  properties:
+                    repository:
+                      type: string
+                      minLength: 3
+                      maxLength: 255
+                      pattern: '^[a-z0-9][a-z0-9.-]*(:[0-9]+)?(/[a-z0-9]([a-z0-9._-]*[a-z0-9])?)+$'
+                    digest:
+                      type: string
+                      pattern: '^sha256:[0-9a-f]{64}$'
+                    mediaType: {type: string, minLength: 1, maxLength: 255, pattern: '^[^\r\n]+$'}
+                runtime:
+                  type: object
+                  additionalProperties: false
+                  required: [isolation, unit]
+                  properties:
+                    isolation:
+                      type: string
+                      enum: [sandboxed, dedicated]
+                    unit: {type: string, minLength: 1, maxLength: 63, pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'}
+                processes:
+                  type: object
+                  minProperties: 1
+                  maxProperties: 32
+                  additionalProperties:
+                    type: object
+                    additionalProperties: false
+                    required: [minReplicas, maxReplicas]
+                    x-kubernetes-validations:
+                      - rule: 'self.maxReplicas >= self.minReplicas'
+                        message: maxReplicas must be greater than or equal to minReplicas
+                      - rule: 'self.maxReplicas == self.minReplicas || self.minReplicas >= 1'
+                        message: HPA-backed autoscaling requires minReplicas of at least one
+                    properties:
+                      command:
+                        type: array
+                        maxItems: 64
+                        items: {type: string, minLength: 1, maxLength: 4096, pattern: '^[^\r\n]+$'}
+                      port:
+                        type: integer
+                        minimum: 0
+                        maximum: 65535
+                      minReplicas:
+                        type: integer
+                        minimum: 0
+                      maxReplicas:
+                        type: integer
+                        minimum: 0
+                        maximum: 1000
+                      healthPath:
+                        type: string
+                        pattern: '^/[^\r\n]*$'
+                      startupTimeoutSeconds:
+                        type: integer
+                        minimum: 1
+                        maximum: 3600
+                      readinessTimeoutSeconds:
+                        type: integer
+                        minimum: 1
+                        maximum: 3600
+                release:
+                  type: object
+                  additionalProperties: false
+                  required: [strategy, rolloutTimeoutSeconds]
+                  properties:
+                    strategy:
+                      type: string
+                      enum: [Rolling]
+                    previousReleaseID: {type: string, minLength: 1, maxLength: 63, pattern: '^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$'}
+                    rolloutTimeoutSeconds:
+                      type: integer
+                      minimum: 1
+                      maximum: 86400
+                    migration:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        command:
+                          type: array
+                          maxItems: 64
+                          items: {type: string, minLength: 1, maxLength: 4096, pattern: '^[^\r\n]+$'}
+                        timeoutSeconds:
+                          type: integer
+                          minimum: 1
+                          maximum: 86400
+                route:
+                  type: object
+                  additionalProperties: false
+                  required: [generatedHostname, process]
+                  properties:
+                    generatedHostname:
+                      type: string
+                      minLength: 1
+                      maxLength: 253
+                      pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
+                    process: {type: string, minLength: 1, maxLength: 63, pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'}
+                attachmentSnapshotRef:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  pattern: '^[^\r\n]+$'
+                network:
+                  type: object
+                  additionalProperties: false
+                  required: [egressProfile]
+                  properties:
+                    egressProfile:
+                      type: string
+                      enum: [public-default, deny-all]
+                    peers:
+                      type: array
+                      maxItems: 0
+                      items: {type: string}
+                lifecycle:
+                  type: object
+                  additionalProperties: false
+                  required: [state]
+                  properties:
+                    state:
+                      type: string
+                      enum: [Active, Suspending, Suspended, Resuming, DeletingRuntime, Retaining, Deleted]
+            status:
+              type: object
+              additionalProperties: false
+              properties:
+                observedGeneration: {type: integer, format: int64}
+                phase: {type: string}
+                activeReleaseID: {type: string}
+                activeBackendService: {type: string, maxLength: 63, pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'}
+                activeBackendPort: {type: integer, minimum: 0, maximum: 65535}
+                candidateReleaseID: {type: string}
+                candidateSpecHash: {type: string, pattern: '^sha256:[0-9a-f]{64}$'}
+                migrationCompletedReleaseID: {type: string}
+                url: {type: string}
+                readyReplicas: {type: integer, minimum: 0}
+                startedAt: {type: string, format: date-time}
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [type, status]
+                    properties:
+                      type: {type: string}
+                      status: {type: string}
+                      reason: {type: string}
+                      message: {type: string}
+                      observedGeneration: {type: integer, format: int64}
+                      lastTransitionTime: {type: string, format: date-time}

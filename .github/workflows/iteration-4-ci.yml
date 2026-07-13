@@ -1,0 +1,68 @@
+name: runtime-delivery
+
+on:
+  push:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'Makefile'
+      - 'migrations/runtime/**'
+      - 'deploy/**'
+      - 'scripts/verify-iteration-4*'
+      - 'scripts/runtime-api-smoke.sh'
+      - '.github/workflows/iteration-4-ci.yml'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-without-kubernetes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: true
+      - run: make fmt-check vet test integration-compile
+      - run: make race-runtime
+      - run: make tdd-iteration4 manifests-iteration4 build smoke-runtime-api
+      - run: make fuzz-runtime FUZZTIME=10s
+      - run: |
+          go test -count=1 -covermode=atomic \
+            -coverpkg=./internal/runtime/...,./pkg/contracts/runtime/v1 \
+            -coverprofile=coverage-runtime.out \
+            ./internal/runtime/... ./pkg/contracts/runtime/v1 ./test/acceptance ./test/contract
+          go tool cover -html=coverage-runtime.out -o coverage-runtime.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iteration-4-runtime-coverage
+          path: coverage-runtime.html
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: paas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d paas_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      TEST_POSTGRES_DSN: host=127.0.0.1 port=5432 user=postgres password=postgres dbname=paas_test sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: true
+      - run: sudo apt-get update && sudo apt-get install -y libpq-dev pkg-config
+      - run: make test-runtime-postgres

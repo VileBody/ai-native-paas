@@ -1,0 +1,386 @@
+{
+  "iteration": 4,
+  "missing": [],
+  "present": 63,
+  "required": 63,
+  "tests": [
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestApplication_CreateBelongsToTenantProject"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestEnvironment_DefaultProductionIsUnique"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestEnvironment_NameIsUniqueWithinApplication"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestEnvironment_NamespaceNameIsDeterministic"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestEnvironment_CannotChangeTenant"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestRelease_RejectsNonReleasableArtifact"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestRelease_StoresExactDigest"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestRelease_SameArtifactAndConfigIsIdempotent"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestRelease_ConfigChangeCreatesNewRelease"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestRelease_OnlyOneActiveReleasePerEnvironment"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestPlacement_SelectsRegionAndIsolationCompatibleCell"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestPlacement_RejectsCellWithoutCapacity"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestPlacement_IsStickyAcrossDeployments"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestPlacement_DrainingCellRejectsNewApplications"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/service_test.go"
+      ],
+      "name": "TestPlacement_ExplicitMigrationCreatesNewPlacementOperation"
+    },
+    {
+      "locations": [
+        "internal/runtime/gitops/renderer_test.go"
+      ],
+      "name": "TestRenderer_SameReleaseProducesByteStableManifest"
+    },
+    {
+      "locations": [
+        "internal/runtime/gitops/renderer_test.go"
+      ],
+      "name": "TestRenderer_ContainsDigestNotMutableTag"
+    },
+    {
+      "locations": [
+        "internal/runtime/gitops/renderer_test.go"
+      ],
+      "name": "TestRenderer_ContainsOnlyPaaSAppAndNamespace"
+    },
+    {
+      "locations": [
+        "internal/runtime/gitops/renderer_test.go"
+      ],
+      "name": "TestRenderer_DoesNotSerializeSecretValues"
+    },
+    {
+      "locations": [
+        "internal/runtime/gitops/renderer_test.go"
+      ],
+      "name": "TestRenderer_PathIsCellTenantAppEnvironment"
+    },
+    {
+      "locations": [
+        "internal/runtime/gitops/renderer_test.go"
+      ],
+      "name": "TestRenderer_GoldenFileMatchesV1alpha1Contract"
+    },
+    {
+      "locations": [
+        "internal/runtime/gitops/repository_test.go"
+      ],
+      "name": "TestGitOpsCommit_IdempotentByReleaseID"
+    },
+    {
+      "locations": [
+        "internal/runtime/gitops/repository_test.go"
+      ],
+      "name": "TestGitOpsCommit_RecordsCommitSHA"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/gitops_saga_test.go"
+      ],
+      "name": "TestGitOpsCommit_DBFailureAfterPushIsRecoveredByReconciler"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/gitops_saga_test.go"
+      ],
+      "name": "TestGitOpsCommit_ConcurrentDeployUsesOptimisticLock"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/gitops_saga_test.go"
+      ],
+      "name": "TestGitOpsCommit_RevertCreatesExplicitRollbackRelease"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestOperator_CreatesDeploymentServiceAndHTTPRoute"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestOperator_SetsOwnerReferencesOnChildren"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestOperator_SetsRuntimeClassGVisorForSandboxedTier"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestOperator_SetsRestrictedSecurityContext"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestOperator_DisablesServiceAccountToken"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestOperator_SetsRequestsLimitsAndEphemeralStorage"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestOperator_CreatesDefaultDenyNetworkPolicy"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestOperator_ReconcileIsIdempotent"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestOperator_UpdatesStatusObservedGeneration"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestRollout_ReadinessSuccessActivatesRelease"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestRollout_ReadinessFailureKeepsPreviousReleaseActive"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestRollout_MigrationRunsOncePerRelease"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestRollout_MigrationFailureBlocksTrafficSwitch"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestRollout_TimeoutMarksDeploymentDegraded"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestRollout_RetryDoesNotRepeatSuccessfulMigration"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestOperator_HPAOwnsReplicaCountWhenAutoscalingEnabled"
+    },
+    {
+      "locations": [
+        "test/contract/runtime_manifests_test.go"
+      ],
+      "name": "TestArgo_DoesNotManageGeneratedDeploymentReplicas"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestOperator_ManualScaleUpdatesDesiredPolicyNotChildDirectly"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestDrift_ChildMutationIsReconciledByOperator"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/rollback_test.go"
+      ],
+      "name": "TestRollback_ReusesPreviousArtifactDigest"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/rollback_test.go"
+      ],
+      "name": "TestRollback_DoesNotInvokeBuildPort"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/rollback_test.go"
+      ],
+      "name": "TestRollback_CreatesNewAuditableRelease"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/rollback_test.go"
+      ],
+      "name": "TestRollback_RejectsArtifactNoLongerAllowedByCriticalPolicyUnlessOverride"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestDelete_RemovesRouteBeforeWorkload"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestDelete_UsesRetentionStateBeforeNamespaceRemoval"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestDelete_DoesNotDeleteAttachmentReferences"
+    },
+    {
+      "locations": [
+        "internal/runtime/operator/reconciler_test.go"
+      ],
+      "name": "TestDelete_IsRecoverableBeforeFinalPurge"
+    },
+    {
+      "locations": [
+        "test/contract/runtime_manifests_test.go"
+      ],
+      "name": "TestDelete_ArgoApplicationSetPreservesResourcesOnControllerRemoval"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/status_test.go"
+      ],
+      "name": "TestStatus_PaaSAppReadyMarksDeploymentReady"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/status_test.go"
+      ],
+      "name": "TestStatus_ArgoSyncedButAppNotReadyStaysDeploying"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/status_test.go"
+      ],
+      "name": "TestStatus_MissedWatchEventRecoveredByPeriodicRead"
+    },
+    {
+      "locations": [
+        "internal/runtime/application/status_test.go"
+      ],
+      "name": "TestStatus_UnknownKubernetesObjectIsQuarantined"
+    },
+    {
+      "locations": [
+        "test/contract/runtime_manifests_test.go"
+      ],
+      "name": "TestArgoApplication_UsesRestrictedAppProject"
+    },
+    {
+      "locations": [
+        "test/contract/runtime_manifests_test.go"
+      ],
+      "name": "TestArgoApplication_AutoSyncPruneSelfHealEnabled"
+    },
+    {
+      "locations": [
+        "test/contract/runtime_manifests_test.go"
+      ],
+      "name": "TestArgoApplication_SourceIsOnlyCellGitOpsRepository"
+    },
+    {
+      "locations": [
+        "test/contract/runtime_manifests_test.go"
+      ],
+      "name": "TestArgoApplication_DestinationIsOnlyOwnedNamespace"
+    },
+    {
+      "locations": [
+        "test/contract/runtime_manifests_test.go"
+      ],
+      "name": "TestArgoAppProject_DeniesClusterScopedResources"
+    }
+  ]
+}

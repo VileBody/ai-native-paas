@@ -1,0 +1,22 @@
+{
+  "iteration": 3,
+  "domain": "build-and-artifact",
+  "verdict": "PASS",
+  "execution_mode": "composite-independent-gates",
+  "generated_at": "2026-07-12T18:39:50Z",
+  "go_version": "go1.23.2",
+  "postgres_version": "18.4",
+  "tdd_tests_expected": 62,
+  "tdd_tests_present": 62,
+  "top_level_tests": 313,
+  "build_related_top_level_tests": 120,
+  "fuzz_executions": 1100510,
+  "coverage_statements_percent": 57.0,
+  "live_postgres": {
+    "iteration_1_kernel_tests": 5,
+    "iteration_3_build_tests": 8,
+    "iteration_2_source_tagged_entries": 14,
+    "verdict": "PASS"
+  },
+  "single_wrapper_note": "host interrupted one long wrapper; all gates rerun independently and logged"
+}

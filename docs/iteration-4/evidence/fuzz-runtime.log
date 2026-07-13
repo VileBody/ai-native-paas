@@ -1,0 +1,29 @@
+$ go test ./pkg/contracts/runtime/v1 -run=^$ -fuzz=FuzzPaaSAppValidateNeverPanics -fuzztime=10s
+fuzz: elapsed: 0s, gathering baseline coverage: 0/3 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 3/3 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 126 (42/sec), new interesting: 2 (total: 5)
+fuzz: elapsed: 6s, execs: 126 (0/sec), new interesting: 2 (total: 5)
+fuzz: elapsed: 9s, execs: 161658 (53839/sec), new interesting: 6 (total: 9)
+fuzz: elapsed: 11s, execs: 161658 (0/sec), new interesting: 6 (total: 9)
+PASS
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/runtime/v1	11.022s
+$ go test ./internal/runtime/gitops -run=^$ -fuzz=FuzzGitOpsPathValidationCannotEscape -fuzztime=10s
+fuzz: elapsed: 0s, gathering baseline coverage: 0/4 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 4/4 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 136636 (45540/sec), new interesting: 29 (total: 33)
+fuzz: elapsed: 6s, execs: 316825 (60057/sec), new interesting: 54 (total: 58)
+fuzz: elapsed: 9s, execs: 475598 (52929/sec), new interesting: 64 (total: 68)
+fuzz: elapsed: 10s, execs: 528956 (49337/sec), new interesting: 68 (total: 72)
+PASS
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/gitops	10.096s
+$ go test ./internal/runtime/domain -run=^$ -fuzz=FuzzRuntimeObjectNamesRemainDNSBounded -fuzztime=10s
+fuzz: elapsed: 0s, gathering baseline coverage: 0/3 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 3/3 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 23563 (7852/sec), new interesting: 52 (total: 55)
+$ go test ./internal/runtime/domain -run=^$ -fuzz=FuzzRuntimeObjectNamesRemainDNSBounded -fuzztime=5s (separate completion after grouped tool timeout)
+fuzz: elapsed: 0s, gathering baseline coverage: 0/61 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 61/61 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 63491 (21157/sec), new interesting: 27 (total: 88)
+fuzz: elapsed: 5s, execs: 123789 (27592/sec), new interesting: 48 (total: 109)
+PASS
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/domain	5.209s

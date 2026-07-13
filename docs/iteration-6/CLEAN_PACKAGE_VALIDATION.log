@@ -1,0 +1,92 @@
+Iteration 6 clean directory validation
+Started: 2026-07-13T11:26:49Z
+Go: go version go1.23.2 linux/amd64
+===== gofmt =====
+===== tdd =====
+{
+  "missing": [],
+  "present": 52,
+  "required": 52
+}
+===== vet =====
+ok  	github.com/keir-research/ai-native-paas/test/integration	0.063s [no tests to run]
+===== cumulative default =====
+ok  	github.com/keir-research/ai-native-paas/adapters/oidc	0.606s
+?   	github.com/keir-research/ai-native-paas/cmd/build-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/commerce-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/kernel-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/runtime-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/runtime-operator	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/source-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/contracts/kernel/v1	[no test files]
+ok  	github.com/keir-research/ai-native-paas/adapters/postgres/kernel	0.503s
+ok  	github.com/keir-research/ai-native-paas/internal/build/application	1.109s
+ok  	github.com/keir-research/ai-native-paas/internal/build/cache	0.509s
+ok  	github.com/keir-research/ai-native-paas/internal/build/detect	0.801s
+ok  	github.com/keir-research/ai-native-paas/internal/build/dockerfilevm	0.511s
+ok  	github.com/keir-research/ai-native-paas/internal/build/domain	0.705s
+?   	github.com/keir-research/ai-native-paas/internal/build/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/build/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/commerce/domain	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/commerce/postgres	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/commerce/testkit	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/build/httpapi	0.616s
+ok  	github.com/keir-research/ai-native-paas/internal/build/kpack	0.307s
+?   	github.com/keir-research/ai-native-paas/internal/runtime/kube	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/postgres	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/build/localoci	24.141s
+ok  	github.com/keir-research/ai-native-paas/internal/build/logs	0.304s
+ok  	github.com/keir-research/ai-native-paas/internal/build/memory	0.500s
+ok  	github.com/keir-research/ai-native-paas/internal/build/postgres	0.405s
+ok  	github.com/keir-research/ai-native-paas/internal/build/registry	22.303s
+ok  	github.com/keir-research/ai-native-paas/internal/build/sbom	0.504s
+ok  	github.com/keir-research/ai-native-paas/internal/build/scanner	0.412s
+ok  	github.com/keir-research/ai-native-paas/internal/build/signer	0.407s
+ok  	github.com/keir-research/ai-native-paas/internal/build/source	23.952s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/application	0.615s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/httpapi	0.799s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/memory	0.401s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel	0.607s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/httpapi	0.513s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/memory	0.204s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/application	9.397s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/domain	0.207s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/gitops	7.819s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/httpapi	0.304s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/kubeapi	0.699s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/operator	0.305s
+ok  	github.com/keir-research/ai-native-paas/internal/source/application	0.392s
+ok  	github.com/keir-research/ai-native-paas/internal/source/domain	0.304s
+ok  	github.com/keir-research/ai-native-paas/internal/source/gitlab	0.606s
+ok  	github.com/keir-research/ai-native-paas/internal/source/httpapi	0.400s
+ok  	github.com/keir-research/ai-native-paas/internal/source/postgres	0.286s
+ok  	github.com/keir-research/ai-native-paas/internal/source/webhook	0.294s
+ok  	github.com/keir-research/ai-native-paas/internal/source/workspace	16.338s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/build/v1	0.294s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/runtime/v1	0.296s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/source/v1	0.303s
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	16.793s
+ok  	github.com/keir-research/ai-native-paas/test/architecture	0.804s
+ok  	github.com/keir-research/ai-native-paas/test/contract	0.104s
+===== commerce race =====
+?   	github.com/keir-research/ai-native-paas/internal/commerce/domain	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/commerce/postgres	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/commerce/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/application	1.192s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/httpapi	1.106s
+ok  	github.com/keir-research/ai-native-paas/internal/commerce/memory	1.075s
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	7.147s
+ok  	github.com/keir-research/ai-native-paas/test/contract	1.106s
+ok  	github.com/keir-research/ai-native-paas/test/architecture	1.530s
+===== build/smoke =====
+commerce-api process smoke: PASS
+===== completed =====
+CLEAN_DIRECTORY_VALIDATION=PASS
+Finished: 2026-07-13T11:28:28Z

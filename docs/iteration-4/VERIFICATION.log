@@ -1,0 +1,32 @@
+Iteration 4 verification summary
+Date: 2026-07-12
+Scope: all realistically executable gates without a live Kubernetes API server
+
+PASS  gofmt check
+PASS  go vet ./...
+PASS  PostgreSQL-tagged vet/compile
+PASS  go test ./... -count=1
+PASS  targeted runtime race suite
+PASS  runtime acceptance race suite
+PASS  runtime shuffle/repetition suites
+PASS  TDD parity 63/63
+PASS  Kubernetes YAML parse: 5 files / 7 documents
+PASS  Argo/CRD/RBAC manifest contract tests
+PASS  three runtime fuzz targets / 814,403 confirmed executions
+PASS  runtime-api and runtime-operator binary builds
+PASS  runtime-api process smoke including cross-tenant denial
+PASS  runtime PostgreSQL 9/9 on PostgreSQL 18.4 under -race
+PASS  cumulative Iterations 1-4 PostgreSQL suite under -race
+PASS  production-scope secret/mutable-tag scan
+PASS  clean no-Kubernetes runtime acceptance: commit → ready → second release → rollback
+
+INCOMPLETE  cumulative go test -race ./...
+Reason: exceeded 20-minute execution limit in inherited heavy Git/OCI suites.
+No race failure was emitted before termination. This command is not counted as PASS.
+The authoritative Iteration 4 targeted race suites passed.
+
+NOT RUN  live Kubernetes / envtest / kind / Argo reconciliation / gVisor execution
+Reason: Kubernetes API server, kubectl, kind and container runtime were unavailable.
+Detailed mandatory acceptance list: docs/iteration-4/KUBERNETES_TODO.md
+
+Overall verdict: GREEN_WITHOUT_LIVE_KUBERNETES

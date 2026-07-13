@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: runtime-cell-a
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: paas-runtime-delivery
+spec:
+  description: Restricted delivery boundary for runtime cell A
+  sourceRepos:
+    - https://git.example.invalid/platform/runtime-cell-a.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: app-*
+  # Namespace is the only cluster-scoped object Argo may create. All other
+  # cluster-scoped kinds are denied by omission.
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: platform.example.com
+      kind: PaaSApp
+  orphanedResources:
+    warn: true
+  permitOnlyProjectScopedClusters: true

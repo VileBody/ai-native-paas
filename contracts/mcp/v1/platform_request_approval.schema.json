@@ -1,0 +1,57 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v1/platform_request_approval.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "enum": [
+        "application.delete.production",
+        "service.purge.database",
+        "domain.transfer",
+        "commercial.increase_paid_limits",
+        "deployment.production",
+        "service.disable_backups",
+        "network.expose_smtp"
+      ],
+      "maxLength": 4096,
+      "minLength": 1,
+      "type": "string"
+    },
+    "payload": {},
+    "resource": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+          "type": "string"
+        },
+        "type": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ],
+      "type": "object"
+    },
+    "ttl_seconds": {
+      "maximum": 86400,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "action",
+    "resource",
+    "payload",
+    "ttl_seconds"
+  ],
+  "title": "platform_request_approval arguments",
+  "type": "object"
+}

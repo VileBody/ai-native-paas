@@ -1,0 +1,48 @@
+{
+  "iteration": 4,
+  "domain": "runtime-delivery",
+  "verdict": "GREEN_WITHOUT_LIVE_KUBERNETES",
+  "tested_at": "2026-07-12",
+  "toolchain": {
+    "go": "1.23.2",
+    "postgresql": "18.4"
+  },
+  "tests": {
+    "tdd_required": 63,
+    "tdd_present": 63,
+    "tdd_missing": 0,
+    "iteration4_related_unique": 103,
+    "cumulative_unique": 419,
+    "runtime_postgresql_passed": 9,
+    "runtime_postgresql_failed": 0,
+    "runtime_fuzz_targets": 3,
+    "runtime_fuzz_confirmed_executions": 814403
+  },
+  "coverage": {
+    "runtime_untagged_statement_percent": 61.9,
+    "runtime_postgresql_tagged_combined_percent": 32.9
+  },
+  "gates": {
+    "format": "PASS",
+    "vet": "PASS",
+    "default_suite": "PASS",
+    "targeted_runtime_race": "PASS",
+    "runtime_acceptance_race": "PASS",
+    "shuffle_repetition": "PASS",
+    "live_postgresql_runtime": "PASS",
+    "live_postgresql_cumulative_iterations_1_to_4": "PASS",
+    "tdd_parity": "PASS",
+    "manifest_yaml_parse": "PASS",
+    "manifest_contracts": "PASS",
+    "binary_build": "PASS",
+    "runtime_api_process_smoke": "PASS",
+    "production_secret_scan": "PASS",
+    "cumulative_race_all_packages": "INCOMPLETE_20_MINUTE_TOOL_LIMIT",
+    "live_kubernetes": "NOT_RUN"
+  },
+  "limitations": [
+    "No live Kubernetes API server, envtest or kind cluster was available.",
+    "The full cumulative race command did not complete within the tool limit; targeted Iteration 4 race gates passed.",
+    "Kubernetes-only acceptance requirements are enumerated in docs/iteration-4/KUBERNETES_TODO.md."
+  ]
+}

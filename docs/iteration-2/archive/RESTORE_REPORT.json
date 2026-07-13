@@ -1,0 +1,23 @@
+{
+  "archive": "/mnt/data/ai-native-paas-iteration-1.zip",
+  "detected_root": "/mnt/data/iter2-stage/ai-native-paas-tdd-roadmap",
+  "output": "/mnt/data/ai-native-paas-iteration-2",
+  "go_mod": "module github.com/keir-research/ai-native-paas\n\ngo 1.23\n",
+  "top_level": [
+    ".github",
+    ".gitignore",
+    "Makefile",
+    "README.md",
+    "adapters",
+    "bin",
+    "cmd",
+    "contracts",
+    "coverage.html",
+    "coverage.out",
+    "docs",
+    "go.mod",
+    "internal",
+    "scripts",
+    "test"
+  ]
+}

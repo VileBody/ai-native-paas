@@ -1,0 +1,87 @@
+{
+  "$id": "https://platform.example.com/contracts/mcp/v1/invocation-request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "agent_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "api_version": {
+      "const": "agent.platform.example.com/v1"
+    },
+    "approval_grant_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "arguments": {},
+    "correlation_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "idempotency_key": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "semantics_version": {
+      "const": "v1"
+    },
+    "task_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "tenant_id": {
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "tool": {
+      "enum": [
+        "platform_add_domain",
+        "platform_apply_repository_patch",
+        "platform_bind_service",
+        "platform_cancel_operation",
+        "platform_create_branch",
+        "platform_create_merge_request",
+        "platform_create_project",
+        "platform_deploy",
+        "platform_get_build",
+        "platform_get_deployment",
+        "platform_get_logs",
+        "platform_get_operation",
+        "platform_get_project",
+        "platform_get_usage",
+        "platform_list_secret_metadata",
+        "platform_provision_service",
+        "platform_request_approval",
+        "platform_request_build",
+        "platform_rollback",
+        "platform_set_secret"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "api_version",
+    "semantics_version",
+    "tenant_id",
+    "agent_id",
+    "task_id",
+    "tool",
+    "arguments",
+    "idempotency_key",
+    "correlation_id"
+  ],
+  "title": "Agent invocation request",
+  "type": "object"
+}

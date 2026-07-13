@@ -1,0 +1,6 @@
+PASS deploy/argocd/runtime-applicationset.yaml: 1 document(s)
+PASS deploy/argocd/runtime-appproject.yaml: 1 document(s)
+PASS deploy/crds/platform.example.com_paasapps.yaml: 1 document(s)
+PASS deploy/rbac/runtime-operator-deployment.yaml: 1 document(s)
+PASS deploy/rbac/runtime-operator.yaml: 3 document(s)
+RESULT: PASS files=5 documents=7

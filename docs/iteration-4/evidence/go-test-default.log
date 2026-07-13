@@ -1,0 +1,56 @@
+$ go test ./... -count=1
+ok  	github.com/keir-research/ai-native-paas/adapters/oidc	0.200s
+?   	github.com/keir-research/ai-native-paas/cmd/build-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/kernel-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/runtime-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/runtime-operator	[no test files]
+?   	github.com/keir-research/ai-native-paas/cmd/source-api	[no test files]
+?   	github.com/keir-research/ai-native-paas/contracts/kernel/v1	[no test files]
+ok  	github.com/keir-research/ai-native-paas/adapters/postgres/kernel	0.109s
+ok  	github.com/keir-research/ai-native-paas/internal/build/application	0.302s
+ok  	github.com/keir-research/ai-native-paas/internal/build/cache	0.106s
+ok  	github.com/keir-research/ai-native-paas/internal/build/detect	0.202s
+ok  	github.com/keir-research/ai-native-paas/internal/build/dockerfilevm	0.106s
+ok  	github.com/keir-research/ai-native-paas/internal/build/domain	0.108s
+?   	github.com/keir-research/ai-native-paas/internal/build/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/build/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/kube	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/build/httpapi	0.283s
+ok  	github.com/keir-research/ai-native-paas/internal/build/kpack	0.185s
+?   	github.com/keir-research/ai-native-paas/internal/runtime/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/postgres	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/runtime/testkit	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/memory	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/support	[no test files]
+?   	github.com/keir-research/ai-native-paas/internal/source/testkit	[no test files]
+ok  	github.com/keir-research/ai-native-paas/internal/build/localoci	10.273s
+ok  	github.com/keir-research/ai-native-paas/internal/build/logs	0.182s
+ok  	github.com/keir-research/ai-native-paas/internal/build/memory	0.187s
+ok  	github.com/keir-research/ai-native-paas/internal/build/postgres	0.186s
+ok  	github.com/keir-research/ai-native-paas/internal/build/registry	9.885s
+ok  	github.com/keir-research/ai-native-paas/internal/build/sbom	0.189s
+ok  	github.com/keir-research/ai-native-paas/internal/build/scanner	0.185s
+ok  	github.com/keir-research/ai-native-paas/internal/build/signer	0.188s
+ok  	github.com/keir-research/ai-native-paas/internal/build/source	10.088s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel	0.282s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/httpapi	0.292s
+ok  	github.com/keir-research/ai-native-paas/internal/kernel/memory	0.185s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/application	4.102s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/domain	0.185s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/gitops	3.590s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/httpapi	0.117s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/kubeapi	0.206s
+ok  	github.com/keir-research/ai-native-paas/internal/runtime/operator	0.098s
+ok  	github.com/keir-research/ai-native-paas/internal/source/application	0.099s
+ok  	github.com/keir-research/ai-native-paas/internal/source/domain	0.021s
+ok  	github.com/keir-research/ai-native-paas/internal/source/gitlab	0.128s
+ok  	github.com/keir-research/ai-native-paas/internal/source/httpapi	0.496s
+ok  	github.com/keir-research/ai-native-paas/internal/source/postgres	0.396s
+ok  	github.com/keir-research/ai-native-paas/internal/source/webhook	0.399s
+ok  	github.com/keir-research/ai-native-paas/internal/source/workspace	7.409s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/build/v1	0.402s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/runtime/v1	0.307s
+ok  	github.com/keir-research/ai-native-paas/pkg/contracts/source/v1	0.396s
+ok  	github.com/keir-research/ai-native-paas/test/acceptance	8.093s
+ok  	github.com/keir-research/ai-native-paas/test/architecture	0.311s
+ok  	github.com/keir-research/ai-native-paas/test/contract	0.027s
