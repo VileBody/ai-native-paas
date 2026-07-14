@@ -80,6 +80,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libguestfs-tools qemu-utils xz-utils jq unzip
       - name: Verify libguestfs appliance
         env:
+          LIBGUESTFS_APPEND: ipv6.disable=1
           LIBGUESTFS_BACKEND: direct
           LIBGUESTFS_BACKEND_SETTINGS: force_tcg
         run: |
@@ -94,8 +95,17 @@ jobs:
             echo "passt must be unavailable so libguestfs falls back to QEMU SLIRP" >&2
             exit 1
           fi
+      - name: Verify libguestfs network
+        env:
+          LIBGUESTFS_APPEND: ipv6.disable=1
+          LIBGUESTFS_BACKEND: direct
+          LIBGUESTFS_BACKEND_SETTINGS: force_tcg
+        run: |
+          guestfish --network -a /dev/null run : debug sh \
+            "ip -4 address show dev eth0; ip route; cat /etc/resolv.conf; getent ahostsv4 snapshot.debian.org"
       - run: ./scripts/build-workspace-image.sh
         env:
+          LIBGUESTFS_APPEND: ipv6.disable=1
           LIBGUESTFS_BACKEND: direct
           LIBGUESTFS_BACKEND_SETTINGS: force_tcg
       - name: Sign disk image and manifest
