@@ -335,7 +335,10 @@ func (s *Service) RunBuild(ctx context.Context, tenantID, actorID, buildID strin
 		return build, artifact, nil
 	}
 	if build.State != buildv1.BuildQueued {
-		return build, artifact, domain.NewError(domain.CodeConflict, "automatic resume of partial build is not implemented")
+		// Another worker already owns the atomic QUEUED -> FETCHING_SOURCE
+		// transition. This caller is an observer of the same operation and must
+		// not start a duplicate pipeline.
+		return build, artifact, nil
 	}
 	if s.Fetcher == nil || s.Registry == nil || s.SBOM == nil || s.Scanner == nil || s.Signer == nil || s.Verifier == nil || s.Logs == nil {
 		return build, artifact, domain.NewError(domain.CodeUnavailable, "build pipeline is not configured")
@@ -344,6 +347,12 @@ func (s *Service) RunBuild(ctx context.Context, tenantID, actorID, buildID strin
 		return build, artifact, domain.NewError(domain.CodeUnavailable, "runtime detector is unavailable")
 	}
 	if err := s.startBuild(ctx, actorID, &build); err != nil {
+		if domain.HasCode(err, domain.CodeStaleVersion) || domain.HasCode(err, domain.CodeConflict) {
+			observed, observedArtifact, loadErr := s.load(ctx, tenantID, buildID)
+			if loadErr == nil && observed.State != buildv1.BuildQueued {
+				return observed, observedArtifact, nil
+			}
+		}
 		return build, artifact, err
 	}
 	snapshot, err := s.Fetcher.Fetch(ctx, build.TenantID, build.Source, s.SourceLimits)

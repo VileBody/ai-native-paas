@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **922**
-- Reused now: **56**
-- New local/contract tests required: **35**
+- Discovered Go tests/fuzz targets: **923**
+- Reused now: **57**
+- New local/contract tests required: **34**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -57,7 +57,7 @@ A release gate may become green only after every referenced test exists and pass
 | `B9` | REUSED | registry integration | `internal/build/registry/local_test.go::TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery` |
 | `B10` | REUSED | domain + PostgreSQL | `test/integration/postgres_build_test.go::TestBuild_TrustChainRequiredBeforeArtifactReleasable` |
 | `B11` | REUSED | policy | `internal/build/dockerfilepolicy/policy_test.go::TestBuild_MutableBaseOrOutputTagCannotDefineProductionArtifact` |
-| `B12` | NEW | PostgreSQL + concurrency | `test/pivot/build_v2_test.go::TestBuild_SameIdentityConcurrentRequestsExecuteOnce` |
+| `B12` | REUSED | PostgreSQL + concurrency | `test/integration/postgres_build_test.go::TestBuild_SameIdentityConcurrentRequestsExecuteOnce` |
 | `B13` | LIVE_ONLY | application/system | `test/pivot/build_v2_test.go::TestBuild_CancelStopsExecutionAndRevokesBuildCredentials` |
 | `B14` | NEW | registry integration | `test/pivot/build_v2_test.go::TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests` |
 | `B15` | REUSED | contract/crypto | `internal/build/provenance/provenance_test.go::TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest` |

@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 922,
-  "discovered_unique_test_name_count": 920,
+  "discovered_go_test_count": 923,
+  "discovered_unique_test_name_count": 921,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -438,10 +438,10 @@
       "id": "B12",
       "level": "PostgreSQL + concurrency",
       "name": "TestBuild_SameIdentityConcurrentRequestsExecuteOnce",
-      "status": "NEW",
-      "test_file": "test/pivot/build_v2_test.go",
+      "status": "REUSED",
+      "test_file": "test/integration/postgres_build_test.go",
       "test_name": "TestBuild_SameIdentityConcurrentRequestsExecuteOnce",
-      "test_ref": "test/pivot/build_v2_test.go::TestBuild_SameIdentityConcurrentRequestsExecuteOnce"
+      "test_ref": "test/integration/postgres_build_test.go::TestBuild_SameIdentityConcurrentRequestsExecuteOnce"
     },
     {
       "family": "B",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 35,
-      "REUSED": 56
+      "NEW": 34,
+      "REUSED": 57
     },
     "unmapped": 0
   }

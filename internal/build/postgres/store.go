@@ -32,7 +32,7 @@ func NewStore(db *sql.DB) (*Store, error) {
 	if db == nil {
 		return nil, errors.New("postgres db is nil")
 	}
-	return &Store{DB: db, MaxSerializableRetries: 6}, nil
+	return &Store{DB: db, MaxSerializableRetries: 32}, nil
 }
 
 func (s *Store) Migrate(ctx context.Context) error {
@@ -95,7 +95,7 @@ func (s *Store) Transact(ctx context.Context, fn func(application.Tx) error) err
 	}
 	attempts := s.MaxSerializableRetries
 	if attempts <= 0 {
-		attempts = 6
+		attempts = 32
 	}
 	var last error
 	for attempt := 0; attempt < attempts; attempt++ {

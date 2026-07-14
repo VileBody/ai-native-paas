@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -423,5 +424,105 @@ func TestBuild_TrustChainRequiredBeforeArtifactReleasable(t *testing.T) {
 	decision, err := service.EvaluateArtifact(ctx, build.TenantID, artifact.ID)
 	if err != nil || !decision.Allowed {
 		t.Fatalf("complete trust chain decision=%+v err=%v", decision, err)
+	}
+}
+
+func TestBuild_SameIdentityConcurrentRequestsExecuteOnce(t *testing.T) {
+	db, store := migratedBuildStore(t)
+	clock := &testkit.Clock{T: time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)}
+	builder := &testkit.Builder{Output: application.BuildOutput{ManifestDigest: "sha256:" + strings.Repeat("a", 64), MediaType: "application/vnd.oci.image.manifest.v1+json"}}
+	service := &application.Service{
+		Store: store, Fetcher: &testkit.Fetcher{Snapshot: application.SourceSnapshot{Path: t.TempDir()}},
+		Detector:   &testkit.Detector{Detection: application.Detection{Runtime: "go", Backend: application.BackendBuildpacks, BuildpackID: "paketo/go"}},
+		Buildpacks: builder,
+		Registry:   &testkit.Registry{Published: application.PublishedArtifact{Repository: "registry.test/tenants/tenant-pg/apps/project-pg", Digest: "sha256:" + strings.Repeat("a", 64), MediaType: "application/vnd.oci.image.manifest.v1+json"}},
+		SBOM:       testkit.SBOM{Result: application.SBOMResult{Digest: pgRawDigest([]byte("sbom")), MediaType: "application/spdx+json", Document: []byte("sbom")}},
+		Scanner:    testkit.Scanner{Result: domain.ScanResult{Scanner: "scanner", PolicyVersion: "v1", Passed: true, FindingsDigest: "sha256:" + strings.Repeat("c", 64), ScannedAt: clock.Now()}},
+		Signer:     testkit.Signer{Record: domain.SignatureRecord{Issuer: "platform", Algorithm: "ed25519", Digest: "sha256:" + strings.Repeat("a", 64), Signature: "signature", SignedAt: clock.Now()}},
+		Verifier:   &testkit.Verifier{}, Logs: logs.New(), Clock: clock, IDs: &testkit.IDs{}, RepositoryBase: "registry.test/tenants",
+	}
+	base := application.RequestBuildCommand{
+		TenantID: "tenant-pg", ActorID: "actor-pg", CorrelationID: "correlation-concurrent",
+		Source:        sourcev1.SourceRevision{ProjectID: "project-pg", RepositoryID: "repository-pg", Branch: "main", CommitSHA: strings.Repeat("d", 40)},
+		BuilderDigest: "sha256:" + strings.Repeat("e", 64), RunImageDigest: "sha256:" + strings.Repeat("f", 64), PlatformVersion: "v2",
+	}
+	const workers = 20
+	buildIDs := make(chan string, workers)
+	errorsChannel := make(chan error, workers)
+	var group sync.WaitGroup
+	for index := range workers {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			command := base
+			command.IdempotencyKey = fmt.Sprintf("request-%d", index)
+			result, err := service.RequestBuild(context.Background(), command)
+			if err != nil {
+				errorsChannel <- err
+				return
+			}
+			buildIDs <- result.Build.ID
+		}()
+	}
+	group.Wait()
+	close(buildIDs)
+	close(errorsChannel)
+	for err := range errorsChannel {
+		t.Errorf("request: %v", err)
+	}
+	uniqueIDs := map[string]struct{}{}
+	for id := range buildIDs {
+		uniqueIDs[id] = struct{}{}
+	}
+	if len(uniqueIDs) != 1 {
+		t.Fatalf("build ids=%v", uniqueIDs)
+	}
+	var buildID string
+	for id := range uniqueIDs {
+		buildID = id
+	}
+
+	runErrors := make(chan error, workers)
+	observedIDs := make(chan string, workers)
+	for range workers {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			build, _, err := service.RunBuild(context.Background(), "tenant-pg", "actor-pg", buildID)
+			if err != nil {
+				runErrors <- err
+				return
+			}
+			observedIDs <- build.ID
+		}()
+	}
+	group.Wait()
+	close(runErrors)
+	close(observedIDs)
+	for err := range runErrors {
+		t.Errorf("run: %v", err)
+	}
+	observedCount := 0
+	for id := range observedIDs {
+		observedCount++
+		if id != buildID {
+			t.Errorf("observed build id=%s want=%s", id, buildID)
+		}
+	}
+	if observedCount != workers {
+		t.Fatalf("observers=%d want=%d", observedCount, workers)
+	}
+	if len(builder.Requests) != 1 {
+		t.Fatalf("builder executions=%d", len(builder.Requests))
+	}
+	var artifacts, startedEvents int
+	if err := db.QueryRow(`SELECT count(*) FROM build.artifacts WHERE build_id=$1`, buildID).Scan(&artifacts); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT count(*) FROM build.outbox WHERE aggregate_id=$1 AND topic='build.started.v1'`, buildID).Scan(&startedEvents); err != nil {
+		t.Fatal(err)
+	}
+	if artifacts != 1 || startedEvents != 1 {
+		t.Fatalf("artifacts=%d started events=%d", artifacts, startedEvents)
 	}
 }
