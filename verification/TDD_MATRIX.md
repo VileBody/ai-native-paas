@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **907**
-- Reused now: **46**
+- Discovered Go tests/fuzz targets: **908**
+- Reused now: **47**
 - New local/contract tests required: **44**
-- Live/provider/system tests required: **67**
+- Live/provider/system tests required: **66**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -46,7 +46,7 @@ A release gate may become green only after every referenced test exists and pass
 | `S16` | REUSED | application + provider | `test/pivot/source_v2_test.go::TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge` |
 | `S17` | REUSED | real Git integration | `internal/workspaceagent/source_v2_test.go::TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig` |
 | `S18` | REUSED | reconciliation | `test/pivot/source_v2_test.go::TestSource_UnknownProviderProjectIsQuarantinedNotAdopted` |
-| `B1` | LIVE_ONLY | domain | `test/pivot/build_v2_test.go::TestBuild_IdentityIncludesCommitAndCanonicalBuildSpec` |
+| `B1` | REUSED | domain | `test/pivot/build_v2_test.go::TestBuild_IdentityIncludesCommitAndCanonicalBuildSpec` |
 | `B2` | NEW | application | `test/pivot/build_v2_test.go::TestBuild_ExplicitBuildSpecOverridesRuntimeDetection` |
 | `B3` | NEW | application | `test/pivot/build_v2_test.go::TestBuild_BuildpacksRemainOptionalFallback` |
 | `B4` | NEW | application | `test/pivot/build_v2_test.go::TestBuild_DockerfileRunsOnlyInDisposableIsolationBackend` |

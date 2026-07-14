@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 907,
-  "discovered_unique_test_name_count": 905,
+  "discovered_go_test_count": 908,
+  "discovered_unique_test_name_count": 906,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -328,7 +328,7 @@
       "id": "B1",
       "level": "domain",
       "name": "TestBuild_IdentityIncludesCommitAndCanonicalBuildSpec",
-      "status": "LIVE_ONLY",
+      "status": "REUSED",
       "test_file": "test/pivot/build_v2_test.go",
       "test_name": "TestBuild_IdentityIncludesCommitAndCanonicalBuildSpec",
       "test_ref": "test/pivot/build_v2_test.go::TestBuild_IdentityIncludesCommitAndCanonicalBuildSpec"
@@ -1589,9 +1589,9 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 67,
+      "LIVE_ONLY": 66,
       "NEW": 44,
-      "REUSED": 46
+      "REUSED": 47
     },
     "unmapped": 0
   }
