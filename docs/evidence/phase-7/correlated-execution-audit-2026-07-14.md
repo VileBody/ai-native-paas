@@ -58,7 +58,7 @@ suite. It did not access the admin managed PostgreSQL.
 Matrix result:
 
 - 157 requirements;
-- 969 discovered Go test/fuzz targets;
+- 970 discovered Go test/fuzz targets;
 - `REUSED 91`, `NEW 0`, `LIVE_ONLY 66`;
 - zero unmapped requirements.
 

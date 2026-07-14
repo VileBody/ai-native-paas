@@ -82,13 +82,13 @@ func TestKernel_OIDCAndMTLSIdentityCannotBeConfused(t *testing.T) {
 func TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction(t *testing.T) {
 	var invoked bool
 	handler := Middleware{Profile: platformprofile.Production}.Wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { invoked = true }))
-	for _, configure := range []func(*http.Request){
-		func(request *http.Request) {},
-		func(request *http.Request) { request.Header.Set("X-Tenant-ID", "tenant-1") },
-		func(request *http.Request) { request.Header.Set("X-Agent-ID", "agent-1") },
-	} {
+	requests := []*http.Request{httptest.NewRequest(http.MethodPost, "/mcp/v2/invoke", nil)}
+	for _, header := range developmentIdentityHeaders {
 		request := httptest.NewRequest(http.MethodPost, "/mcp/v2/invoke", nil)
-		configure(request)
+		request.Header.Set(header, "forged")
+		requests = append(requests, request)
+	}
+	for _, request := range requests {
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)
 		if response.Code != http.StatusUnauthorized {
@@ -97,6 +97,35 @@ func TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction(t *tes
 	}
 	if invoked {
 		t.Fatal("unverified agent request reached tool dispatch")
+	}
+}
+
+func TestProductionOIDCAndMTLSRejectForgedPrincipalRoleBeforeDispatch(t *testing.T) {
+	var invoked bool
+	verified := Middleware{
+		Profile: platformprofile.Production,
+		OIDC: oidcVerifierFunc(func(_ context.Context, _ string) (Identity, error) {
+			return Identity{SubjectID: "user-1", TenantID: "tenant-1", UserID: "user-1"}, nil
+		}),
+		MTLS: mtlsVerifierFunc(func(_ context.Context, _ *x509.Certificate) (Identity, error) {
+			return Identity{SubjectID: "service-1", TenantID: "tenant-1", AgentID: "agent-1"}, nil
+		}),
+	}.Wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { invoked = true }))
+
+	oidcRequest := httptest.NewRequest(http.MethodPost, "/v1/admin/rate-cards", nil)
+	oidcRequest.Header.Set("Authorization", "Bearer valid-user-token")
+	oidcRequest.Header.Set("X-Principal-Role", "platform-admin")
+	oidcResponse := httptest.NewRecorder()
+	verified.ServeHTTP(oidcResponse, oidcRequest)
+
+	mtlsRequest := httptest.NewRequest(http.MethodPost, "/v1/admin/rate-cards", nil)
+	mtlsRequest.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{{}}}
+	mtlsRequest.Header.Set("X-Principal-Role", "platform-admin")
+	mtlsResponse := httptest.NewRecorder()
+	verified.ServeHTTP(mtlsResponse, mtlsRequest)
+
+	if oidcResponse.Code != http.StatusUnauthorized || mtlsResponse.Code != http.StatusUnauthorized || invoked {
+		t.Fatalf("forged role reached dispatch: oidc=%d mtls=%d invoked=%t", oidcResponse.Code, mtlsResponse.Code, invoked)
 	}
 }
 

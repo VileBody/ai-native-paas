@@ -46,7 +46,7 @@ func IdentityFromContext(ctx context.Context) (Identity, bool) {
 	return identity, ok
 }
 
-var developmentIdentityHeaders = []string{"X-Tenant-ID", "X-Project-ID", "X-Principal-ID", "X-Principal-Kind", "X-Agent-ID", "X-User-ID", "X-Scopes"}
+var developmentIdentityHeaders = []string{"X-Tenant-ID", "X-Project-ID", "X-Principal-ID", "X-Principal-Kind", "X-Principal-Role", "X-Agent-ID", "X-User-ID", "X-Scopes"}
 
 func (m Middleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
