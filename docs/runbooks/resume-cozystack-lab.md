@@ -4,6 +4,9 @@ Prerequisites:
 
 - Timeweb account balance covers one more dedicated 8 vCPU / 32 GiB / 100 GiB
   server, three 260 GiB data disks and the floating IP;
+- Timeweb confirms that preset `6633` can be provisioned in `msk-1`; two
+  post-top-up creates reached terminal provider state `error` before cloud-init,
+  so balance alone is no longer sufficient evidence;
 - state-service loopback port-forward is active;
 - `TWC_TOKEN`, `TF_HTTP_USERNAME`, `TF_HTTP_PASSWORD`,
   `TF_VAR_state_passphrase`, `TF_VAR_project_id` and the current operator
