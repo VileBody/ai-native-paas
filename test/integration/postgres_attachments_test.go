@@ -18,6 +18,7 @@ import (
 	attachmentspostgres "github.com/keir-research/ai-native-paas/internal/attachments/postgres"
 	"github.com/keir-research/ai-native-paas/internal/attachments/testkit"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
+	attachmentsv2 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v2"
 )
 
 func migratedAttachmentsStore(t *testing.T) (*sql.DB, *attachmentspostgres.Store) {
@@ -56,10 +57,10 @@ func TestPostgres_AttachmentsMigrationsCleanInstallAndUpgrade(t *testing.T) {
 	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM attachments.schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 4 {
-		t.Fatalf("migration count=%d want=4", count)
+	if count != 5 {
+		t.Fatalf("migration count=%d want=5", count)
 	}
-	for _, table := range []string{"secret_sets", "secrets", "service_plans", "service_instances", "service_bindings", "domain_claims", "snapshots", "idempotency", "outbox", "audit"} {
+	for _, table := range []string{"secret_sets", "secrets", "service_plans", "service_instances", "service_bindings", "domain_claims", "snapshots", "environment_inputs_snapshots", "idempotency", "outbox", "audit"} {
 		var exists bool
 		if err := db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='attachments' AND table_name=$1)`, table).Scan(&exists); err != nil {
 			t.Fatal(err)
@@ -68,6 +69,60 @@ func TestPostgres_AttachmentsMigrationsCleanInstallAndUpgrade(t *testing.T) {
 			t.Fatalf("missing attachments.%s", table)
 		}
 	}
+}
+
+func TestInputsSnapshot_IsImmutableAndContainsReferencesOnly(t *testing.T) {
+	db, store := migratedAttachmentsStore(t)
+	ctx := context.Background()
+	now := time.Date(2026, 7, 14, 13, 0, 0, 0, time.UTC)
+	snapshot := attachmentsv2.EnvironmentInputsSnapshot{
+		SnapshotID: "inputs-1", ProjectID: "project-1", Environment: "production", CreatedAt: now,
+		SecretVersions:     []attachmentsv2.SecretVersionRef{{SecretID: "secret-1", Name: "API_TOKEN", Version: 1, ValueHash: "sha256:" + strings.Repeat("a", 64)}},
+		CredentialBindings: []attachmentsv2.CredentialBindingRef{{BindingID: "credential-binding-1", Provider: "openbao", CredentialID: "credential-1", Audience: "runtime", ExpiresAt: now.Add(time.Hour)}},
+		Resources:          []attachmentsv2.ManagedResourceRef{{ResourceID: "resource-1", Provider: "cozystack", Kind: "postgresql", ExternalIdentity: "postgresql/project-1/main", LifecyclePolicy: "retain"}},
+		Capabilities:       []attachmentsv2.CapabilityBindingRef{{BindingID: "capability-1", Kind: "llm", Endpoint: "https://gateway.example/v1", TokenRef: "openbao/project-1/llm", BudgetID: "budget-1"}},
+		Recipes:            []attachmentsv2.RecipeLock{{RecipeID: "postgresql", Version: "1.0.0", ContentDigest: "sha256:" + strings.Repeat("b", 64), SignatureDigest: "sha256:" + strings.Repeat("c", 64)}},
+	}
+	snapshot.Digest, _ = snapshot.Fingerprint()
+	stored, err := store.PublishEnvironmentInputsSnapshot(ctx, snapshot)
+	if err != nil || stored.Digest != snapshot.Digest {
+		t.Fatalf("stored=%+v err=%v", stored, err)
+	}
+	if replay, replayErr := store.PublishEnvironmentInputsSnapshot(ctx, snapshot); replayErr != nil || replay.Digest != snapshot.Digest {
+		t.Fatalf("exact retry=%+v err=%v", replay, replayErr)
+	}
+
+	mutated := snapshot
+	mutated.SecretVersions = append([]attachmentsv2.SecretVersionRef(nil), snapshot.SecretVersions...)
+	mutated.SecretVersions[0].Version = 2
+	mutated.Digest, _ = mutated.Fingerprint()
+	if _, err = store.PublishEnvironmentInputsSnapshot(ctx, mutated); !attachmentErrorCode(err, domain.CodeConflict) {
+		t.Fatalf("same-ID mutation was accepted: %v", err)
+	}
+	if _, err = db.ExecContext(ctx, `UPDATE attachments.environment_inputs_snapshots SET digest=$1 WHERE id=$2`, "sha256:"+strings.Repeat("d", 64), snapshot.SnapshotID); err == nil {
+		t.Fatal("direct snapshot update was accepted")
+	}
+	if _, err = db.ExecContext(ctx, `DELETE FROM attachments.environment_inputs_snapshots WHERE id=$1`, snapshot.SnapshotID); err == nil {
+		t.Fatal("direct snapshot deletion was accepted")
+	}
+
+	raw, _ := json.Marshal(snapshot)
+	withPlaintext := strings.TrimSuffix(string(raw), "}") + `,"value":"plaintext-secret-sentinel"}`
+	if _, err = attachmentsv2.DecodeEnvironmentInputsSnapshot([]byte(withPlaintext)); err == nil {
+		t.Fatal("plaintext value field was accepted by strict snapshot decoder")
+	}
+	var persisted string
+	if err = db.QueryRowContext(ctx, `SELECT payload::text FROM attachments.environment_inputs_snapshots WHERE id=$1`, snapshot.SnapshotID).Scan(&persisted); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(persisted, "plaintext-secret-sentinel") || strings.Contains(persisted, `"value"`) || strings.Contains(persisted, `"password"`) {
+		t.Fatalf("snapshot payload contains plaintext-shaped data: %s", persisted)
+	}
+}
+
+func attachmentErrorCode(err error, code domain.Code) bool {
+	var typed *domain.Error
+	return errors.As(err, &typed) && typed.Code == code
 }
 
 func TestPostgres_AttachmentMutationAndOutboxCommitAtomically(t *testing.T) {

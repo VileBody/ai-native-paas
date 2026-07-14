@@ -158,6 +158,72 @@ func TestRuntime_RollbackCreatesAuditableGitRevision(t *testing.T) {
 	}
 }
 
+func TestInputsSnapshot_SameImageNewInputsCreatesNewRuntimeRevision(t *testing.T) {
+	f := newFixture(t)
+	firstRequest := f.request("inputs-snapshot-1")
+	firstRequest.Configuration.AttachmentSnapshotRef = "inputs-1"
+	first, err := f.service.Deploy(context.Background(), firstRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondRequest := f.request("inputs-snapshot-2")
+	secondRequest.Configuration.AttachmentSnapshotRef = "inputs-2"
+	second, err := f.service.Deploy(context.Background(), secondRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ReleaseID == second.ReleaseID {
+		t.Fatal("new inputs snapshot reused the old runtime revision")
+	}
+	snapshot := f.store.Snapshot()
+	firstRelease, secondRelease := snapshot.Releases[first.ReleaseID], snapshot.Releases[second.ReleaseID]
+	if firstRelease.Artifact != secondRelease.Artifact || firstRelease.Identity == secondRelease.Identity ||
+		firstRelease.Configuration.AttachmentSnapshotRef != "inputs-1" || secondRelease.Configuration.AttachmentSnapshotRef != "inputs-2" {
+		t.Fatalf("first=%+v second=%+v", firstRelease, secondRelease)
+	}
+	if _, ok := snapshot.Commits[firstRelease.ID]; !ok {
+		t.Fatal("first inputs revision has no auditable GitOps commit")
+	}
+	if _, ok := snapshot.Commits[secondRelease.ID]; !ok {
+		t.Fatal("second inputs revision has no auditable GitOps commit")
+	}
+}
+
+func TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs(t *testing.T) {
+	f := newFixture(t)
+	requestA := f.request("inputs-history-a")
+	requestA.Configuration.AttachmentSnapshotRef = "inputs-history-1"
+	revisionA, err := f.service.Deploy(context.Background(), requestA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestB := f.request("inputs-history-b")
+	requestB.Configuration.AttachmentSnapshotRef = "inputs-history-2"
+	revisionB, err := f.service.Deploy(context.Background(), requestB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rollback, err := f.service.RollbackWithRequest(context.Background(), application.RollbackRequest{
+		TenantID: f.app.TenantID, EnvironmentID: f.env.ID, TargetReleaseID: revisionA.ReleaseID,
+		ActorID: "user-1", IdempotencyKey: "rollback-inputs-history",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := f.store.Snapshot()
+	target := snapshot.Releases[revisionA.ReleaseID]
+	current := snapshot.Releases[revisionB.ReleaseID]
+	restored := snapshot.Releases[rollback.ReleaseID]
+	if restored.RollbackOf != target.ID || restored.Artifact != target.Artifact ||
+		restored.Configuration.AttachmentSnapshotRef != target.Configuration.AttachmentSnapshotRef {
+		t.Fatalf("target=%+v restored=%+v", target, restored)
+	}
+	if restored.Configuration.AttachmentSnapshotRef == current.Configuration.AttachmentSnapshotRef ||
+		restored.Configuration.AttachmentSnapshotRef != "inputs-history-1" {
+		t.Fatalf("current inputs leaked into rollback: current=%+v restored=%+v", current, restored)
+	}
+}
+
 func TestGitOpsCommit_ConflictingRecoveryIsRejected(t *testing.T) {
 	f := newFixture(t)
 	_, err := f.service.Deploy(context.Background(), f.request("conflict"))

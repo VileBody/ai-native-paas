@@ -2,10 +2,12 @@
 package v2
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"sort"
 	"strings"
@@ -45,6 +47,13 @@ type CredentialBindingRef struct {
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
+func (r CredentialBindingRef) Validate() error {
+	if !validReference(r.BindingID) || strings.TrimSpace(r.Provider) == "" || !validReference(r.CredentialID) || strings.TrimSpace(r.Audience) == "" || r.ExpiresAt.IsZero() {
+		return errors.New("invalid credential binding reference")
+	}
+	return nil
+}
+
 type ManagedResourceRef struct {
 	ResourceID       string `json:"resource_id"`
 	Provider         string `json:"provider"`
@@ -53,12 +62,26 @@ type ManagedResourceRef struct {
 	LifecyclePolicy  string `json:"lifecycle_policy"`
 }
 
+func (r ManagedResourceRef) Validate() error {
+	if !validReference(r.ResourceID) || strings.TrimSpace(r.Provider) == "" || strings.TrimSpace(r.Kind) == "" || !validReference(r.ExternalIdentity) || strings.TrimSpace(r.LifecyclePolicy) == "" {
+		return errors.New("invalid managed resource reference")
+	}
+	return nil
+}
+
 type CapabilityBindingRef struct {
 	BindingID string `json:"binding_id"`
 	Kind      string `json:"kind"`
 	Endpoint  string `json:"endpoint"`
 	TokenRef  string `json:"token_ref"`
 	BudgetID  string `json:"budget_id"`
+}
+
+func (r CapabilityBindingRef) Validate() error {
+	if !validReference(r.BindingID) || strings.TrimSpace(r.Kind) == "" || strings.TrimSpace(r.Endpoint) == "" || !validReference(r.TokenRef) || !validReference(r.BudgetID) {
+		return errors.New("invalid capability binding reference")
+	}
+	return nil
 }
 
 type RecipeLock struct {
@@ -97,25 +120,93 @@ func (s EnvironmentInputsSnapshot) Validate() error {
 			return err
 		}
 	}
+	for _, credential := range s.CredentialBindings {
+		if err := credential.Validate(); err != nil || !credential.ExpiresAt.After(s.CreatedAt) {
+			if err == nil {
+				err = errors.New("credential binding is expired at snapshot publication")
+			}
+			return err
+		}
+	}
+	for _, resource := range s.Resources {
+		if err := resource.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, capability := range s.Capabilities {
+		if err := capability.Validate(); err != nil {
+			return err
+		}
+	}
 	for _, recipe := range s.Recipes {
 		if err := recipe.Validate(); err != nil {
 			return err
 		}
 	}
-	return uniqueSorted(s.SecretVersions, func(v SecretVersionRef) string { return v.Name })
+	for _, check := range []error{
+		uniqueSorted(s.SecretVersions, func(v SecretVersionRef) string { return v.Name }),
+		uniqueSorted(s.CredentialBindings, func(v CredentialBindingRef) string { return v.BindingID }),
+		uniqueSorted(s.Resources, func(v ManagedResourceRef) string { return v.ResourceID }),
+		uniqueSorted(s.Capabilities, func(v CapabilityBindingRef) string { return v.BindingID }),
+		uniqueSorted(s.Recipes, func(v RecipeLock) string { return v.RecipeID }),
+	} {
+		if check != nil {
+			return check
+		}
+	}
+	fingerprint, err := s.Fingerprint()
+	if err != nil || fingerprint != s.Digest {
+		return errors.New("environment inputs snapshot digest mismatch")
+	}
+	return nil
 }
 
 func (s EnvironmentInputsSnapshot) Fingerprint() (string, error) {
 	copy := s
 	copy.Digest = ""
 	copy.SecretVersions = append([]SecretVersionRef(nil), s.SecretVersions...)
+	copy.CredentialBindings = append([]CredentialBindingRef(nil), s.CredentialBindings...)
+	copy.Resources = append([]ManagedResourceRef(nil), s.Resources...)
+	copy.Capabilities = append([]CapabilityBindingRef(nil), s.Capabilities...)
+	copy.Recipes = append([]RecipeLock(nil), s.Recipes...)
 	sort.Slice(copy.SecretVersions, func(i, j int) bool { return copy.SecretVersions[i].Name < copy.SecretVersions[j].Name })
+	sort.Slice(copy.CredentialBindings, func(i, j int) bool {
+		return copy.CredentialBindings[i].BindingID < copy.CredentialBindings[j].BindingID
+	})
+	sort.Slice(copy.Resources, func(i, j int) bool { return copy.Resources[i].ResourceID < copy.Resources[j].ResourceID })
+	sort.Slice(copy.Capabilities, func(i, j int) bool { return copy.Capabilities[i].BindingID < copy.Capabilities[j].BindingID })
+	sort.Slice(copy.Recipes, func(i, j int) bool { return copy.Recipes[i].RecipeID < copy.Recipes[j].RecipeID })
 	raw, err := json.Marshal(copy)
 	if err != nil {
 		return "", err
 	}
 	sum := sha256.Sum256(raw)
 	return fmt.Sprintf("sha256:%x", sum), nil
+}
+
+// DecodeEnvironmentInputsSnapshot is the strict API boundary. In particular,
+// plaintext-style fields such as value, token or password are not accepted as
+// forward-compatible extensions.
+func DecodeEnvironmentInputsSnapshot(raw []byte) (EnvironmentInputsSnapshot, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var snapshot EnvironmentInputsSnapshot
+	if err := decoder.Decode(&snapshot); err != nil {
+		return EnvironmentInputsSnapshot{}, errors.New("invalid environment inputs snapshot")
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return EnvironmentInputsSnapshot{}, errors.New("environment inputs snapshot must be one JSON document")
+	}
+	if err := snapshot.Validate(); err != nil {
+		return EnvironmentInputsSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func validReference(value string) bool {
+	value = strings.TrimSpace(value)
+	return value != "" && len(value) <= 255 && !strings.ContainsAny(value, "\x00\r\n\t")
 }
 
 func uniqueSorted[T any](values []T, key func(T) string) error {

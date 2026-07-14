@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 933,
-  "discovered_unique_test_name_count": 931,
+  "discovered_go_test_count": 936,
+  "discovered_unique_test_name_count": 934,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -918,30 +918,30 @@
       "id": "A5.27",
       "level": "domain + PostgreSQL",
       "name": "TestInputsSnapshot_IsImmutableAndContainsReferencesOnly",
-      "status": "NEW",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "test/integration/postgres_attachments_test.go",
       "test_name": "TestInputsSnapshot_IsImmutableAndContainsReferencesOnly",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestInputsSnapshot_IsImmutableAndContainsReferencesOnly"
+      "test_ref": "test/integration/postgres_attachments_test.go::TestInputsSnapshot_IsImmutableAndContainsReferencesOnly"
     },
     {
       "family": "A5",
       "id": "A5.28",
       "level": "cross-domain",
       "name": "TestInputsSnapshot_SameImageNewInputsCreatesNewRuntimeRevision",
-      "status": "NEW",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/runtime/application/gitops_saga_test.go",
       "test_name": "TestInputsSnapshot_SameImageNewInputsCreatesNewRuntimeRevision",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestInputsSnapshot_SameImageNewInputsCreatesNewRuntimeRevision"
+      "test_ref": "internal/runtime/application/gitops_saga_test.go::TestInputsSnapshot_SameImageNewInputsCreatesNewRuntimeRevision"
     },
     {
       "family": "A5",
       "id": "A5.29",
       "level": "cross-domain",
       "name": "TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs",
-      "status": "NEW",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/runtime/application/gitops_saga_test.go",
       "test_name": "TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs"
+      "test_ref": "internal/runtime/application/gitops_saga_test.go::TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs"
     },
     {
       "family": "A5",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 24,
-      "REUSED": 67
+      "NEW": 21,
+      "REUSED": 70
     },
     "unmapped": 0
   }

@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **933**
-- Reused now: **67**
-- New local/contract tests required: **24**
+- Discovered Go tests/fuzz targets: **936**
+- Reused now: **70**
+- New local/contract tests required: **21**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -105,9 +105,9 @@ A release gate may become green only after every referenced test exists and pass
 | `A5.24` | LIVE_ONLY | contract | `test/pivot/attachments_v2_test.go::TestCapability_ProviderSubstitutionPreservesPlatformContract` |
 | `A5.25` | LIVE_ONLY | security | `test/pivot/attachments_v2_test.go::TestCapability_ApifyOrBrightDataCredentialCannotBeUsedOutsideGateway` |
 | `A5.26` | NEW | concurrency | `test/pivot/attachments_v2_test.go::TestCapability_RateLimitIsPerProjectAndDoesNotLeakCrossTenantState` |
-| `A5.27` | NEW | domain + PostgreSQL | `test/pivot/attachments_v2_test.go::TestInputsSnapshot_IsImmutableAndContainsReferencesOnly` |
-| `A5.28` | NEW | cross-domain | `test/pivot/attachments_v2_test.go::TestInputsSnapshot_SameImageNewInputsCreatesNewRuntimeRevision` |
-| `A5.29` | NEW | cross-domain | `test/pivot/attachments_v2_test.go::TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs` |
+| `A5.27` | REUSED | domain + PostgreSQL | `test/integration/postgres_attachments_test.go::TestInputsSnapshot_IsImmutableAndContainsReferencesOnly` |
+| `A5.28` | REUSED | cross-domain | `internal/runtime/application/gitops_saga_test.go::TestInputsSnapshot_SameImageNewInputsCreatesNewRuntimeRevision` |
+| `A5.29` | REUSED | cross-domain | `internal/runtime/application/gitops_saga_test.go::TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs` |
 | `A5.30` | LIVE_ONLY | DNS provider integration | `test/pivot/attachments_v2_test.go::TestDomain_OwnershipProofRequiresIndependentDNSObservations` |
 | `A5.31` | LIVE_ONLY | provider/runtime integration | `test/pivot/attachments_v2_test.go::TestDomain_RouteActivatesOnlyAfterOwnershipAndTLSReady` |
 | `A5.32` | NEW | domain + fake clock | `test/pivot/attachments_v2_test.go::TestDomain_ReleaseEntersQuarantineBeforeAnotherTenantCanClaim` |

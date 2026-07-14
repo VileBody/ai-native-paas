@@ -3,6 +3,7 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -19,6 +20,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/attachments/application"
 	"github.com/keir-research/ai-native-paas/internal/attachments/domain"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
+	attachmentsv2 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v2"
 )
 
 //go:embed migrations/*.sql
@@ -27,6 +29,59 @@ var migrationFS embed.FS
 type Store struct {
 	DB                     *sql.DB
 	MaxSerializableRetries int
+}
+
+// PublishEnvironmentInputsSnapshot persists the immutable, references-only v2
+// contract. An exact retry is idempotent; reusing an ID with different content
+// is rejected.
+func (s *Store) PublishEnvironmentInputsSnapshot(ctx context.Context, snapshot attachmentsv2.EnvironmentInputsSnapshot) (attachmentsv2.EnvironmentInputsSnapshot, error) {
+	if s == nil || s.DB == nil {
+		return attachmentsv2.EnvironmentInputsSnapshot{}, errors.New("postgres db is nil")
+	}
+	if err := snapshot.Validate(); err != nil {
+		return attachmentsv2.EnvironmentInputsSnapshot{}, domain.NewError(domain.CodeInvalidArgument, err.Error())
+	}
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		return attachmentsv2.EnvironmentInputsSnapshot{}, err
+	}
+	result, err := s.DB.ExecContext(ctx, `
+		INSERT INTO attachments.environment_inputs_snapshots(id,project_id,environment,digest,payload,created_at)
+		VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(id) DO NOTHING`,
+		snapshot.SnapshotID, snapshot.ProjectID, snapshot.Environment, snapshot.Digest, raw, snapshot.CreatedAt)
+	if err != nil {
+		return attachmentsv2.EnvironmentInputsSnapshot{}, mapDB(err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return attachmentsv2.EnvironmentInputsSnapshot{}, err
+	}
+	if rows == 1 {
+		return snapshot, nil
+	}
+	stored, err := s.GetEnvironmentInputsSnapshot(ctx, snapshot.ProjectID, snapshot.SnapshotID)
+	if err != nil {
+		return attachmentsv2.EnvironmentInputsSnapshot{}, err
+	}
+	storedRaw, _ := json.Marshal(stored)
+	if !bytes.Equal(storedRaw, raw) {
+		return attachmentsv2.EnvironmentInputsSnapshot{}, domain.NewError(domain.CodeConflict, "environment inputs snapshot id is immutable")
+	}
+	return stored, nil
+}
+
+func (s *Store) GetEnvironmentInputsSnapshot(ctx context.Context, projectID, snapshotID string) (attachmentsv2.EnvironmentInputsSnapshot, error) {
+	var raw []byte
+	if s == nil || s.DB == nil {
+		return attachmentsv2.EnvironmentInputsSnapshot{}, errors.New("postgres db is nil")
+	}
+	if err := s.DB.QueryRowContext(ctx, `SELECT payload FROM attachments.environment_inputs_snapshots WHERE project_id=$1 AND id=$2`, projectID, snapshotID).Scan(&raw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return attachmentsv2.EnvironmentInputsSnapshot{}, domain.NewError(domain.CodeNotFound, "environment inputs snapshot not found")
+		}
+		return attachmentsv2.EnvironmentInputsSnapshot{}, err
+	}
+	return attachmentsv2.DecodeEnvironmentInputsSnapshot(raw)
 }
 
 var _ application.Store = (*Store)(nil)
