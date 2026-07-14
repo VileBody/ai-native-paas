@@ -122,3 +122,17 @@ type CredentialSourceRequest struct {
 type CredentialSource interface {
 	Resolve(context.Context, CredentialSourceRequest) (workspacev1.AgentCredentialView, error)
 }
+
+type CommandOutputScope struct {
+	TenantID       string
+	ProjectID      string
+	WorkspaceID    string
+	TaskID         string
+	CommandID      string
+	AgentSessionID string
+	VMID           string
+}
+
+type CommandOutputStore interface {
+	PutChunk(context.Context, CommandOutputScope, workspacev1.AgentOutputChunk) error
+}

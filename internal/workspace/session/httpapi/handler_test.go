@@ -37,6 +37,16 @@ type credentialResolver struct {
 	request workspace.CredentialResolveRequest
 }
 
+type outputWriter struct {
+	request workspace.CredentialResolveRequest
+	chunk   workspacev1.AgentOutputChunk
+}
+
+func (w *outputWriter) RecordOutputChunk(_ context.Context, request workspace.CredentialResolveRequest, chunk workspacev1.AgentOutputChunk) error {
+	w.request, w.chunk = request, chunk
+	return nil
+}
+
 func (r *credentialResolver) ResolveCredentials(_ context.Context, request workspace.CredentialResolveRequest) (workspacev1.AgentCredentialView, error) {
 	r.request = request
 	return workspacev1.AgentCredentialView{Values: map[string]string{"TOKEN": "short-lived"}, ExpiresAt: time.Date(2026, 7, 14, 12, 10, 0, 0, time.UTC)}, nil
@@ -132,6 +142,26 @@ func TestWorkspaceAgentHTTP_CredentialScopeComesOnlyFromVerifiedSession(t *testi
 	denied := serve(handler, withCertificate(httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/credentials:resolve", strings.NewReader(body)), foreign))
 	if denied.Code != http.StatusForbidden {
 		t.Fatalf("foreign credential request status=%d body=%s", denied.Code, denied.Body.String())
+	}
+}
+
+func TestWorkspaceAgentHTTP_OutputChunkIsDigestAndSessionBound(t *testing.T) {
+	handler, _, _, certificate := handlerFixture(t)
+	connected := connectAgent(t, handler, certificate)
+	writer := &outputWriter{}
+	handler.Outputs = writer
+	body := fmt.Sprintf(`{"session_id":%q,"execution_session_id":%q,"command_id":"command-1","stream":"STDOUT","sequence":0,"data":"c2FmZQ==","chunk_sha256":"sha256:8b3369944dd2a3fab39e32d1aeb1f763946a458ae3e6368a46432adc8f3a0860","final":true,"total_sha256":"sha256:8b3369944dd2a3fab39e32d1aeb1f763946a458ae3e6368a46432adc8f3a0860"}`, connected.SessionID, connected.SessionID)
+	response := serve(handler, withCertificate(httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/output-chunks", strings.NewReader(body)), certificate))
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("output status=%d body=%s", response.Code, response.Body.String())
+	}
+	if writer.request.TenantID != "tenant-1" || writer.request.ProjectID != "project-1" || writer.request.AgentSessionID != connected.SessionID || writer.request.VMID != "vm-1" || string(writer.chunk.Data) != "safe" {
+		t.Fatalf("output request=%#v chunk=%#v", writer.request, writer.chunk)
+	}
+	tampered := strings.Replace(body, "c2FmZQ==", "ZXZpbA==", 1)
+	denied := serve(handler, withCertificate(httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/output-chunks", strings.NewReader(tampered)), certificate))
+	if denied.Code != http.StatusBadRequest {
+		t.Fatalf("tampered output accepted: %d %s", denied.Code, denied.Body.String())
 	}
 }
 

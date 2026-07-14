@@ -20,6 +20,7 @@ type Service struct {
 	Sessions           AgentSessions
 	Leases             LeaseRevoker
 	Credentials        CredentialSource
+	Outputs            CommandOutputStore
 	Clock              Clock
 	IDs                IDGenerator
 	Policy             CommandPolicy
@@ -316,12 +317,9 @@ func (s *Service) ResolveCredentials(ctx context.Context, request CredentialReso
 			return workspacev1.AgentCredentialView{}, ErrPolicyDenied
 		}
 	}
-	command, err := s.Store.GetCommand(ctx, request.TenantID, request.ProjectID, request.CommandID)
+	command, err := s.authorizeExecution(ctx, request)
 	if err != nil {
 		return workspacev1.AgentCredentialView{}, err
-	}
-	if command.State != workspacev1.CommandRunning || command.WorkspaceID != request.WorkspaceID || command.TaskID != request.TaskID || command.AgentSessionID != request.AgentSessionID || command.ExecutionVMID != request.VMID {
-		return workspacev1.AgentCredentialView{}, ErrPolicyDenied
 	}
 	if len(command.Spec.EnvironmentRefs) == 0 && len(command.CredentialLeases) == 0 {
 		return workspacev1.AgentCredentialView{Values: map[string]string{}, ExpiresAt: s.Clock.Now().UTC().Add(time.Minute)}, nil
@@ -331,6 +329,31 @@ func (s *Service) ResolveCredentials(ctx context.Context, request CredentialReso
 		CommandID: command.ID, AgentSessionID: command.AgentSessionID, VMID: command.ExecutionVMID,
 		EnvironmentRefs: cloneStringMap(command.Spec.EnvironmentRefs), CredentialLeases: append([]string(nil), command.CredentialLeases...),
 	})
+}
+
+func (s *Service) RecordOutputChunk(ctx context.Context, request CredentialResolveRequest, chunk workspacev1.AgentOutputChunk) error {
+	if s == nil || s.Store == nil || s.Outputs == nil || chunk.Validate() != nil {
+		return errors.New("workspace output service is unavailable")
+	}
+	command, err := s.authorizeExecution(ctx, request)
+	if err != nil {
+		return err
+	}
+	return s.Outputs.PutChunk(ctx, CommandOutputScope{
+		TenantID: command.TenantID, ProjectID: command.ProjectID, WorkspaceID: command.WorkspaceID, TaskID: command.TaskID,
+		CommandID: command.ID, AgentSessionID: command.AgentSessionID, VMID: command.ExecutionVMID,
+	}, chunk)
+}
+
+func (s *Service) authorizeExecution(ctx context.Context, request CredentialResolveRequest) (Command, error) {
+	command, err := s.Store.GetCommand(ctx, request.TenantID, request.ProjectID, request.CommandID)
+	if err != nil {
+		return Command{}, err
+	}
+	if command.State != workspacev1.CommandRunning || command.WorkspaceID != request.WorkspaceID || command.TaskID != request.TaskID || command.AgentSessionID != request.AgentSessionID || command.ExecutionVMID != request.VMID {
+		return Command{}, ErrPolicyDenied
+	}
+	return command, nil
 }
 
 // Dispatch performs the asynchronous outbox step for a queued command. A

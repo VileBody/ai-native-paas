@@ -16,6 +16,7 @@ type agentControlFake struct {
 	outcomeFailures int
 	outcomes        []workspacev1.AgentCommandOutcome
 	acks            []bool
+	outputChunks    []workspacev1.AgentOutputChunk
 }
 
 func (c *agentControlFake) Connect(context.Context) (workspacev1.AgentSessionView, error) {
@@ -44,6 +45,10 @@ func (c *agentControlFake) Outcome(_ context.Context, outcome workspacev1.AgentC
 func (c *agentControlFake) ResolveEnvironment(context.Context, workspacev1.AgentCredentialResolve) (workspacev1.AgentCredentialView, error) {
 	return workspacev1.AgentCredentialView{}, errors.New("unused")
 }
+func (c *agentControlFake) UploadOutput(_ context.Context, chunk workspacev1.AgentOutputChunk) error {
+	c.outputChunks = append(c.outputChunks, chunk)
+	return nil
+}
 func (c *agentControlFake) Rotate(context.Context, string) error { return nil }
 func (c *agentControlFake) CertificateNotAfter() time.Time       { return time.Now().Add(time.Hour) }
 
@@ -58,6 +63,18 @@ func (e *executorFake) Execute(context.Context, string, workspacev1.CommandSpec,
 type outputSinkFake struct{ calls int }
 
 func (s *outputSinkFake) Persist(string, []byte, []byte, bool) error { s.calls++; return nil }
+func (s *outputSinkFake) Stream(commandID string, emit func(workspacev1.AgentOutputChunk) error) error {
+	for _, stream := range []workspacev1.AgentOutputStream{workspacev1.AgentOutputStdout, workspacev1.AgentOutputStderr} {
+		if err := emit(workspacev1.AgentOutputChunk{
+			CommandID: commandID, Stream: stream, Sequence: 0,
+			ChunkSHA256: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Final: true,
+			TotalSHA256: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func TestWorkspaceAgent_LostOutcomeResponseIsReplayedWithoutRepeatingCommand(t *testing.T) {
 	now := time.Date(2026, 7, 14, 17, 0, 0, 0, time.UTC)

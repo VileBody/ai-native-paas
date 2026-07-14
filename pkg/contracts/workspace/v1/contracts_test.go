@@ -22,3 +22,24 @@ func TestWorkspaceContracts_EnvironmentContainsReferencesNotPlaintext(t *testing
 		}
 	}
 }
+
+func TestWorkspaceOutputChunk_RejectsTamperedAndNonFinalTerminalMetadata(t *testing.T) {
+	valid := AgentOutputChunk{
+		SessionID: "session-1", CommandID: "command-1", Stream: AgentOutputStdout, Data: []byte("safe"),
+		ChunkSHA256: "sha256:8b3369944dd2a3fab39e32d1aeb1f763946a458ae3e6368a46432adc8f3a0860", Final: true,
+		TotalSHA256: "sha256:8b3369944dd2a3fab39e32d1aeb1f763946a458ae3e6368a46432adc8f3a0860",
+	}
+	if err := valid.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	tampered := valid
+	tampered.Data = []byte("evil")
+	if err := tampered.Validate(); err == nil {
+		t.Fatal("tampered output chunk accepted")
+	}
+	nonFinal := valid
+	nonFinal.Final = false
+	if err := nonFinal.Validate(); err == nil {
+		t.Fatal("non-final output chunk carried stream digest")
+	}
+}

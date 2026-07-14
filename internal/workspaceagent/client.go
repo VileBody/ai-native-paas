@@ -154,6 +154,13 @@ func (c *Client) ResolveEnvironment(ctx context.Context, request workspacev1.Age
 	return view, nil
 }
 
+func (c *Client) UploadOutput(ctx context.Context, chunk workspacev1.AgentOutputChunk) error {
+	if chunk.Validate() != nil {
+		return errors.New("workspace output chunk is invalid")
+	}
+	return c.doJSON(ctx, http.MethodPost, "/api/v1/workspace-agent/output-chunks", chunk, http.StatusNoContent, nil)
+}
+
 func (c *Client) Rotate(ctx context.Context, sessionID string) error {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {

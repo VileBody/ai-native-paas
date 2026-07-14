@@ -2,6 +2,8 @@
 package v1
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"regexp"
 	"strings"
@@ -189,4 +191,45 @@ type AgentCredentialResolve struct {
 type AgentCredentialView struct {
 	Values    map[string]string `json:"values"`
 	ExpiresAt time.Time         `json:"expires_at"`
+}
+
+type AgentOutputStream string
+
+const (
+	AgentOutputStdout AgentOutputStream = "STDOUT"
+	AgentOutputStderr AgentOutputStream = "STDERR"
+)
+
+// AgentOutputChunk carries already-redacted output. A stream always ends in
+// one final chunk (which may contain zero bytes) and binds both the chunk and
+// complete stream digests before encrypted object storage accepts it.
+type AgentOutputChunk struct {
+	SessionID          string            `json:"session_id"`
+	ExecutionSessionID string            `json:"execution_session_id,omitempty"`
+	CommandID          string            `json:"command_id"`
+	Stream             AgentOutputStream `json:"stream"`
+	Sequence           int64             `json:"sequence"`
+	Data               []byte            `json:"data"`
+	ChunkSHA256        string            `json:"chunk_sha256"`
+	Final              bool              `json:"final"`
+	Truncated          bool              `json:"truncated,omitempty"`
+	TotalSHA256        string            `json:"total_sha256,omitempty"`
+}
+
+func (c AgentOutputChunk) Validate() error {
+	if strings.TrimSpace(c.SessionID) == "" || strings.TrimSpace(c.CommandID) == "" || c.Stream != AgentOutputStdout && c.Stream != AgentOutputStderr || c.Sequence < 0 || c.Sequence > 1<<20 || len(c.Data) > 32<<10 || !digest.MatchString(c.ChunkSHA256) {
+		return errors.New("invalid workspace output chunk")
+	}
+	chunkDigest := sha256.Sum256(c.Data)
+	if c.ChunkSHA256 != "sha256:"+hex.EncodeToString(chunkDigest[:]) {
+		return errors.New("invalid workspace output chunk digest")
+	}
+	if c.Final {
+		if !digest.MatchString(c.TotalSHA256) {
+			return errors.New("invalid workspace output stream digest")
+		}
+	} else if c.Truncated || c.TotalSHA256 != "" {
+		return errors.New("non-final workspace output carries terminal metadata")
+	}
+	return nil
 }

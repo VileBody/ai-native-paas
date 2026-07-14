@@ -23,6 +23,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	"github.com/keir-research/ai-native-paas/internal/workspace/bootstrap"
+	workspacelogstore "github.com/keir-research/ai-native-paas/internal/workspace/logstore"
 	workspaceopenbao "github.com/keir-research/ai-native-paas/internal/workspace/openbao"
 	workspacepostgres "github.com/keir-research/ai-native-paas/internal/workspace/postgres"
 	"github.com/keir-research/ai-native-paas/internal/workspace/session"
@@ -58,6 +59,13 @@ type config struct {
 	TimewebSystemDiskMiB   int64
 	WorkspaceVPCID         string
 	WorkspaceImages        map[string]string
+	LogS3Endpoint          string
+	LogS3Region            string
+	LogS3Bucket            string
+	LogS3Prefix            string
+	LogS3AccessKeyFile     string
+	LogS3SecretKeyFile     string
+	LogEncryptionKeyFile   string
 	ControlPlaneURL        string
 	AllowedEgressHosts     []string
 	EgressGatewayCIDRs     []string
@@ -73,6 +81,7 @@ func main() {
 		platformprofile.Prod("timeweb-workspace-provider"),
 		platformprofile.Prod("openbao-pki-and-lease-revocation"),
 		platformprofile.Prod("openbao-command-credential-broker"),
+		platformprofile.Prod("client-encrypted-s3-command-logs"),
 		platformprofile.Prod("verified-spiffe-mtls"),
 	)
 	if err != nil || profile != platformprofile.Production {
@@ -123,6 +132,32 @@ func main() {
 		os.Exit(1)
 	}
 	defer clear(timewebToken)
+	logAccessKey, err := readSecureFile(settings.LogS3AccessKeyFile, 16<<10)
+	if err != nil {
+		logger.Error("load workspace log S3 access key", "error", err)
+		os.Exit(1)
+	}
+	defer clear(logAccessKey)
+	logSecretKey, err := readSecureFile(settings.LogS3SecretKeyFile, 16<<10)
+	if err != nil {
+		logger.Error("load workspace log S3 secret key", "error", err)
+		os.Exit(1)
+	}
+	defer clear(logSecretKey)
+	logEncryptionKey, err := readExactSecureFile(settings.LogEncryptionKeyFile, 32)
+	if err != nil {
+		logger.Error("load workspace log encryption key", "error", err)
+		os.Exit(1)
+	}
+	defer clear(logEncryptionKey)
+	logStore, err := workspacelogstore.NewS3(workspacelogstore.Config{
+		Endpoint: settings.LogS3Endpoint, Region: settings.LogS3Region, Bucket: settings.LogS3Bucket, Prefix: settings.LogS3Prefix,
+		AccessKey: string(logAccessKey), SecretKey: string(logSecretKey), EncryptionKey: logEncryptionKey,
+	})
+	if err != nil {
+		logger.Error("initialize encrypted workspace log store", "error", err)
+		os.Exit(1)
+	}
 	provider, err := workspacetimeweb.New(workspacetimeweb.Config{
 		BaseURL: settings.TimewebAPIURL, Token: string(timewebToken), ProjectID: settings.TimewebProjectID,
 		ConfiguratorID: settings.TimewebConfiguratorID, AvailabilityZone: settings.TimewebZone,
@@ -138,7 +173,7 @@ func main() {
 	sessions := &session.Registry{Store: &sessionpostgres.Store{DB: db}, Clock: clock, IDs: ids}
 	workerID := ids.New("workspace-manager")
 	service := &workspace.Service{
-		Store: store, Provider: provider, Sessions: sessions, Leases: issuer, Credentials: credentialSource, Clock: clock, IDs: ids,
+		Store: store, Provider: provider, Sessions: sessions, Leases: issuer, Credentials: credentialSource, Outputs: logStore, Clock: clock, IDs: ids,
 		Policy: workspace.DefaultCommandPolicy(), ReconcilerID: workerID, WorkspaceVPCID: settings.WorkspaceVPCID,
 		AllowedEgressHosts: settings.AllowedEgressHosts, EgressGatewayCIDRs: settings.EgressGatewayCIDRs,
 		DNSResolverCIDRs: settings.DNSResolverCIDRs, DeniedCIDRs: settings.DeniedCIDRs,
@@ -152,7 +187,7 @@ func main() {
 		os.Exit(1)
 	}
 	agentHandler := sessionhttp.Handler{
-		Registry: sessions, Workspaces: service, Credentials: service, Bindings: service, Certificates: issuer,
+		Registry: sessions, Workspaces: service, Credentials: service, Outputs: service, Bindings: service, Certificates: issuer,
 		Principals: sessionhttp.SPIFFEResolver{TrustDomain: settings.TrustDomain}, MaxBodyBytes: 64 << 10,
 	}
 	handler := http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
@@ -242,7 +277,11 @@ func loadConfig() (config, error) {
 		TimewebZone: env("TIMEWEB_AVAILABILITY_ZONE", "msk-1"), WorkspaceVPCID: required("WORKSPACE_VPC_ID"),
 		ControlPlaneURL: required("WORKSPACE_AGENT_PUBLIC_URL"), AllowedEgressHosts: csv("WORKSPACE_ALLOWED_EGRESS_HOSTS"),
 		EgressGatewayCIDRs: csv("WORKSPACE_EGRESS_GATEWAY_CIDRS"), DNSResolverCIDRs: csv("WORKSPACE_DNS_RESOLVER_CIDRS"),
-		DeniedCIDRs: csv("WORKSPACE_DENIED_CIDRS"),
+		DeniedCIDRs:   csv("WORKSPACE_DENIED_CIDRS"),
+		LogS3Endpoint: required("WORKSPACE_LOG_S3_ENDPOINT"), LogS3Region: env("WORKSPACE_LOG_S3_REGION", "ru-1"),
+		LogS3Bucket: required("WORKSPACE_LOG_S3_BUCKET"), LogS3Prefix: env("WORKSPACE_LOG_S3_PREFIX", "workspace-command-logs"),
+		LogS3AccessKeyFile: required("WORKSPACE_LOG_S3_ACCESS_KEY_FILE"), LogS3SecretKeyFile: required("WORKSPACE_LOG_S3_SECRET_KEY_FILE"),
+		LogEncryptionKeyFile: required("WORKSPACE_LOG_ENCRYPTION_KEY_FILE"),
 	}
 	var err error
 	if settings.OpenBaoTTL, err = duration("OPENBAO_WORKSPACE_CERT_TTL", 15*time.Minute); err != nil {
@@ -272,6 +311,9 @@ func loadConfig() (config, error) {
 		"WORKSPACE_TRUST_DOMAIN": settings.TrustDomain, "OPENBAO_ADDR": settings.OpenBaoAddress,
 		"OPENBAO_TOKEN_FILE": settings.OpenBaoTokenFile, "TIMEWEB_TOKEN_FILE": settings.TimewebTokenFile,
 		"WORKSPACE_VPC_ID": settings.WorkspaceVPCID, "WORKSPACE_AGENT_PUBLIC_URL": settings.ControlPlaneURL,
+		"WORKSPACE_LOG_S3_ENDPOINT": settings.LogS3Endpoint, "WORKSPACE_LOG_S3_BUCKET": settings.LogS3Bucket,
+		"WORKSPACE_LOG_S3_ACCESS_KEY_FILE": settings.LogS3AccessKeyFile, "WORKSPACE_LOG_S3_SECRET_KEY_FILE": settings.LogS3SecretKeyFile,
+		"WORKSPACE_LOG_ENCRYPTION_KEY_FILE": settings.LogEncryptionKeyFile,
 	} {
 		if strings.TrimSpace(value) == "" {
 			return config{}, fmt.Errorf("%s is required", name)
@@ -305,6 +347,23 @@ func readSecureFile(filename string, maximum int64) ([]byte, error) {
 	raw = bytes.TrimSpace(raw)
 	if len(raw) < 16 {
 		return nil, errors.New("credential file is invalid")
+	}
+	return raw, nil
+}
+
+func readExactSecureFile(filename string, size int64) ([]byte, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, errors.New("open exact credential file")
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || info.Size() != size {
+		return nil, errors.New("exact credential file permissions or size are invalid")
+	}
+	raw, err := io.ReadAll(io.LimitReader(file, size+1))
+	if err != nil || int64(len(raw)) != size {
+		return nil, errors.New("read exact credential file")
 	}
 	return raw, nil
 }

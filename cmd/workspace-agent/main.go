@@ -23,6 +23,7 @@ func main() {
 		platformprofile.Prod("process-group-executor"),
 		platformprofile.Prod("streaming-secret-redaction"),
 		platformprofile.Prod("remote-command-credential-broker"),
+		platformprofile.Prod("durable-remote-redacted-output"),
 	)
 	if err != nil || profile != platformprofile.Production {
 		logger.Error("workspace-agent requires a valid production profile")

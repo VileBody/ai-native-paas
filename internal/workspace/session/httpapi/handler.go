@@ -21,6 +21,7 @@ type Handler struct {
 	Registry     *session.Registry
 	Workspaces   *workspace.Service
 	Credentials  WorkspaceCredentialResolver
+	Outputs      WorkspaceOutputWriter
 	Bindings     AgentBindingResolver
 	Certificates CertificateRotator
 	Principals   PrincipalResolver
@@ -38,6 +39,10 @@ type CertificateRotator interface {
 
 type WorkspaceCredentialResolver interface {
 	ResolveCredentials(context.Context, workspace.CredentialResolveRequest) (workspacev1.AgentCredentialView, error)
+}
+
+type WorkspaceOutputWriter interface {
+	RecordOutputChunk(context.Context, workspace.CredentialResolveRequest, workspacev1.AgentOutputChunk) error
 }
 
 func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
@@ -59,9 +64,40 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		h.outcome(response, request)
 	case request.Method == http.MethodPost && request.URL.Path == "/api/v1/workspace-agent/credentials:resolve":
 		h.resolveCredentials(response, request)
+	case request.Method == http.MethodPost && request.URL.Path == "/api/v1/workspace-agent/output-chunks":
+		h.outputChunk(response, request)
 	default:
 		writeError(response, http.StatusNotFound, "NOT_FOUND", "route not found")
 	}
+}
+
+func (h Handler) outputChunk(response http.ResponseWriter, request *http.Request) {
+	principal, ok := h.authenticate(response, request)
+	if !ok {
+		return
+	}
+	if h.Outputs == nil {
+		writeError(response, http.StatusServiceUnavailable, "UNAVAILABLE", "workspace output service unavailable")
+		return
+	}
+	var body workspacev1.AgentOutputChunk
+	if decode(request, h.bodyLimit(), &body) != nil || body.Validate() != nil {
+		writeError(response, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid workspace output chunk")
+		return
+	}
+	bound, err := h.Registry.AuthorizeOutcomeFor(request.Context(), principal, body.SessionID, body.ExecutionSessionID)
+	if err != nil {
+		writeSessionError(response, err)
+		return
+	}
+	if err := h.Outputs.RecordOutputChunk(request.Context(), workspace.CredentialResolveRequest{
+		TenantID: bound.TenantID, ProjectID: bound.ProjectID, WorkspaceID: bound.WorkspaceID, TaskID: bound.TaskID,
+		CommandID: body.CommandID, AgentSessionID: bound.ID, VMID: bound.VMID,
+	}, body); err != nil {
+		writeError(response, http.StatusForbidden, "PERMISSION_DENIED", "workspace output chunk is not command-scoped")
+		return
+	}
+	response.WriteHeader(http.StatusNoContent)
 }
 
 func (h Handler) resolveCredentials(response http.ResponseWriter, request *http.Request) {

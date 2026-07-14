@@ -33,6 +33,8 @@ type JournalRecord struct {
 	ExecutionSessionID string                           `json:"execution_session_id,omitempty"`
 	State              JournalState                     `json:"state"`
 	Outcome            *workspacev1.AgentCommandOutcome `json:"outcome,omitempty"`
+	OutputReady        bool                             `json:"output_ready"`
+	OutputUploaded     bool                             `json:"output_uploaded"`
 	Reported           bool                             `json:"reported"`
 	UpdatedAt          time.Time                        `json:"updated_at"`
 }
@@ -150,13 +152,49 @@ func (j *Journal) MarkReported(commandID string) error {
 	if err != nil {
 		return err
 	}
-	if record.State != JournalTerminal || record.Outcome == nil {
+	if record.State != JournalTerminal || record.Outcome == nil || !record.OutputUploaded {
 		return errors.New("workspace command has no terminal outcome")
 	}
 	if record.Reported {
 		return nil
 	}
 	record.Reported = true
+	record.UpdatedAt = j.now().UTC()
+	return j.persist(record)
+}
+
+func (j *Journal) MarkOutputReady(commandID string) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	record, err := j.load(commandID)
+	if err != nil {
+		return err
+	}
+	if record.State != JournalRunning && record.State != JournalTerminal {
+		return errors.New("workspace command cannot persist output")
+	}
+	if record.OutputReady {
+		return nil
+	}
+	record.OutputReady = true
+	record.UpdatedAt = j.now().UTC()
+	return j.persist(record)
+}
+
+func (j *Journal) MarkOutputUploaded(commandID string) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	record, err := j.load(commandID)
+	if err != nil {
+		return err
+	}
+	if record.State != JournalTerminal || record.Outcome == nil || !record.OutputReady {
+		return errors.New("workspace command output is not ready")
+	}
+	if record.OutputUploaded {
+		return nil
+	}
+	record.OutputUploaded = true
 	record.UpdatedAt = j.now().UTC()
 	return j.persist(record)
 }

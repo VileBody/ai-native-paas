@@ -33,6 +33,12 @@ func TestWorkspaceAgentJournal_PersistsTerminalOutcomeBeforeReportingAndRejectsC
 	if _, err := journal.Finish("command-1", outcome); err != nil {
 		t.Fatal(err)
 	}
+	if err := journal.MarkOutputReady("command-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.MarkOutputUploaded("command-1"); err != nil {
+		t.Fatal(err)
+	}
 
 	restarted, err := NewJournal(directory, "workspace-1", func() time.Time { return now.Add(time.Minute) })
 	if err != nil {

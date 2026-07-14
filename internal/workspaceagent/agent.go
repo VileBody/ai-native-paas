@@ -17,6 +17,7 @@ type ControlPlane interface {
 	Acknowledge(context.Context, string, string, bool) error
 	Outcome(context.Context, workspacev1.AgentCommandOutcome) error
 	ResolveEnvironment(context.Context, workspacev1.AgentCredentialResolve) (workspacev1.AgentCredentialView, error)
+	UploadOutput(context.Context, workspacev1.AgentOutputChunk) error
 	Rotate(context.Context, string) error
 	CertificateNotAfter() time.Time
 }
@@ -27,6 +28,7 @@ type CommandExecutor interface {
 
 type OutputSink interface {
 	Persist(commandID string, stdout, stderr []byte, truncated bool) error
+	Stream(commandID string, emit func(workspacev1.AgentOutputChunk) error) error
 }
 
 type Agent struct {
@@ -239,6 +241,10 @@ func (a *Agent) consumeResult(sessionID string) error {
 		a.active = nil
 		if err := a.Outputs.Persist(completion.commandID, completion.result.Stdout, completion.result.Stderr, completion.result.OutputTruncated); err != nil {
 			a.log("workspace command output persistence failed")
+			completion.result.State = workspacev1.CommandFailed
+			completion.result.ExitCode = nil
+		} else if err := a.Journal.MarkOutputReady(completion.commandID); err != nil {
+			return err
 		}
 		outcome := workspacev1.AgentCommandOutcome{
 			CommandID: completion.commandID, ExecutionSessionID: completion.executionSessionID, State: completion.result.State,
@@ -259,6 +265,26 @@ func (a *Agent) flushOutcomes(ctx context.Context, sessionID string) error {
 		return err
 	}
 	for _, record := range records {
+		if !record.OutputReady {
+			if err := a.Outputs.Persist(record.CommandID, nil, nil, false); err != nil {
+				return err
+			}
+			if err := a.Journal.MarkOutputReady(record.CommandID); err != nil {
+				return err
+			}
+		}
+		if !record.OutputUploaded {
+			if err := a.Outputs.Stream(record.CommandID, func(chunk workspacev1.AgentOutputChunk) error {
+				chunk.SessionID = sessionID
+				chunk.ExecutionSessionID = record.ExecutionSessionID
+				return a.Control.UploadOutput(ctx, chunk)
+			}); err != nil {
+				return err
+			}
+			if err := a.Journal.MarkOutputUploaded(record.CommandID); err != nil {
+				return err
+			}
+		}
 		outcome := *record.Outcome
 		outcome.SessionID = sessionID
 		if strings.TrimSpace(outcome.ExecutionSessionID) == "" {

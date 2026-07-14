@@ -132,6 +132,16 @@ type fakeCredentials struct {
 	request CredentialSourceRequest
 }
 
+type fakeOutputs struct {
+	scope CommandOutputScope
+	chunk workspacev1.AgentOutputChunk
+}
+
+func (f *fakeOutputs) PutChunk(_ context.Context, scope CommandOutputScope, chunk workspacev1.AgentOutputChunk) error {
+	f.scope, f.chunk = scope, chunk
+	return nil
+}
+
 func (f *fakeCredentials) Resolve(_ context.Context, request CredentialSourceRequest) (workspacev1.AgentCredentialView, error) {
 	f.request = request
 	return workspacev1.AgentCredentialView{Values: map[string]string{"GITLAB_TOKEN": "short-lived-token"}, ExpiresAt: time.Date(2026, 7, 14, 6, 10, 0, 0, time.UTC)}, nil
@@ -154,6 +164,7 @@ type fixture struct {
 	sessions    *fakeSessions
 	leases      *fakeLeases
 	credentials *fakeCredentials
+	outputs     *fakeOutputs
 	clock       *testClock
 	scope       Scope
 	spec        workspacev1.WorkspaceSpec
@@ -166,15 +177,16 @@ func newFixture() *fixture {
 	sessions := &fakeSessions{connected: true, vmID: "twc-vm-1"}
 	leases := &fakeLeases{}
 	credentials := &fakeCredentials{}
+	outputs := &fakeOutputs{}
 	service := &Service{
-		Store: store, Provider: provider, Sessions: sessions, Leases: leases, Credentials: credentials, Clock: clock, IDs: &testIDs{},
+		Store: store, Provider: provider, Sessions: sessions, Leases: leases, Credentials: credentials, Outputs: outputs, Clock: clock, IDs: &testIDs{},
 		Policy: DefaultCommandPolicy(), ReconcilerID: "workspace-manager-1", WorkspaceVPCID: "vpc-workspace",
 		AllowedEgressHosts: []string{"gitlab.com", "registry.npmjs.org", "ai-native-paas-registry.registry.twcstorage.ru"},
 		EgressGatewayCIDRs: []string{"192.168.75.4/32"}, DNSResolverCIDRs: []string{"192.168.75.1/32"},
 		DeniedCIDRs: []string{"192.168.73.0/24", "192.168.74.0/24", "10.0.0.0/8", "172.16.0.0/12"},
 	}
 	return &fixture{
-		service: service, store: store, provider: provider, sessions: sessions, leases: leases, credentials: credentials, clock: clock,
+		service: service, store: store, provider: provider, sessions: sessions, leases: leases, credentials: credentials, outputs: outputs, clock: clock,
 		scope: Scope{TenantID: "tenant-1", ProjectID: "project-1", ActorID: "agent-1"},
 		spec: workspacev1.WorkspaceSpec{
 			ProjectID: "project-1", TaskID: "task-1", ImageDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -212,6 +224,18 @@ func TestWorkspace_CredentialsUsePersistedCommandAndMTLSExecutionBinding(t *test
 		CommandID: view.CommandID, AgentSessionID: "mtls-session-1", VMID: "attacker-vm",
 	}); !errors.Is(err, ErrPolicyDenied) {
 		t.Fatalf("foreign execution binding accepted: %v", err)
+	}
+	chunk := workspacev1.AgentOutputChunk{
+		SessionID: "mtls-session-1", ExecutionSessionID: "mtls-session-1", CommandID: view.CommandID,
+		Stream: workspacev1.AgentOutputStdout, Sequence: 0, Data: []byte("safe"),
+		ChunkSHA256: "sha256:8b3369944dd2a3fab39e32d1aeb1f763946a458ae3e6368a46432adc8f3a0860", Final: true,
+		TotalSHA256: "sha256:8b3369944dd2a3fab39e32d1aeb1f763946a458ae3e6368a46432adc8f3a0860",
+	}
+	if err := f.service.RecordOutputChunk(context.Background(), CredentialResolveRequest{
+		TenantID: f.scope.TenantID, ProjectID: f.scope.ProjectID, WorkspaceID: ready.WorkspaceID, TaskID: "task-1",
+		CommandID: view.CommandID, AgentSessionID: "mtls-session-1", VMID: "twc-vm-1",
+	}, chunk); err != nil || f.outputs.scope.CommandID != view.CommandID || f.outputs.chunk.SessionID != "mtls-session-1" {
+		t.Fatalf("output scope=%#v chunk=%#v err=%v", f.outputs.scope, f.outputs.chunk, err)
 	}
 }
 
