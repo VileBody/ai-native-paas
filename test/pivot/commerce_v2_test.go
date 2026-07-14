@@ -266,6 +266,103 @@ func TestCost_ApprovalInvalidatedWhenPlanHashChanges(t *testing.T) {
 	}
 }
 
+func TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 7, 14, 15, 0, 0, 0, time.UTC)
+	ids := &budgetIDs{}
+	store := commercememory.New()
+	commerce := &commerceapp.Service{
+		Store: store, Clock: budgetClock{now: now}, IDs: ids, Ownership: commerceapp.AllowAllOwnership{},
+	}
+	if _, err := commerce.CreatePlanDefinition(ctx, commerceapp.CreatePlanDefinitionCommand{ID: "partial-plan", Name: "Partial apply beta"}); err != nil {
+		t.Fatal(err)
+	}
+	version, err := commerce.CreatePlanVersion(ctx, commerceapp.CreatePlanVersionCommand{
+		ID: "partial-plan-v1", DefinitionID: "partial-plan", PolicyVersion: "partial-policy-v1", Number: 1,
+		Spec: commercev1.PlanSpec{
+			Currency: "RUB", Features: map[string]bool{"deploy": true},
+			Quotas: map[string]int64{"project.budget.minor": 100},
+			Prices: map[commercev1.Meter]commercev1.Price{commercev1.MeterDatabasePlanSeconds: {MinorUnits: 1, PerQuantity: 1}},
+		},
+		EffectiveFrom: now.Add(-time.Hour),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = commerce.ActivatePlanVersion(ctx, version.ID); err != nil {
+		t.Fatal(err)
+	}
+	_, period, err := commerce.StartSubscription(ctx, commerceapp.StartSubscriptionCommand{
+		ID: "partial-subscription", TenantID: "tenant-partial", PlanVersionID: version.ID, PeriodID: "partial-period",
+		State: commercedomain.SubscriptionActive, PeriodStart: now.Add(-time.Hour), PeriodEnd: now.Add(30 * 24 * time.Hour),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reservation, err := commerce.Reserve(ctx, commercev1.QuotaRequest{
+		TenantID: "tenant-partial", ProjectID: "project-partial", Resource: "project.budget.minor", Quantity: 100,
+		IdempotencyKey: "partial-apply-reservation", At: now, ExpiresAt: now.Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = commerce.Commit(ctx, reservation.ID); err != nil {
+		t.Fatal(err)
+	}
+	command := commerceapp.SettleApplyReservationCommand{
+		TenantID: "tenant-partial", ProjectID: "project-partial", OperationID: "operation-partial",
+		ReservationID: reservation.ID, IdempotencyKey: "settle-partial-apply", ObservedAt: now,
+		Resources: []commerceapp.ObservedResourceAllocation{{
+			ExternalIdentity: "cozystack:postgresql/project-partial/main", ResourceType: "managed-database",
+			Meter: commercev1.MeterDatabasePlanSeconds, UsageQuantity: 3600, ReservationQuantity: 40,
+			WindowStart: now.Add(-time.Hour), WindowEnd: now, Metadata: map[string]string{"plan": "small"},
+		}},
+	}
+	sibling, err := commerce.Reserve(ctx, commercev1.QuotaRequest{
+		TenantID: "tenant-partial", ProjectID: "project-sibling", Resource: "project.budget.minor", Quantity: 100,
+		IdempotencyKey: "sibling-project-reservation", At: now, ExpiresAt: now.Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("independent sibling project budget was not available: %v", err)
+	}
+	if err = commerce.Commit(ctx, sibling.ID); err != nil {
+		t.Fatal(err)
+	}
+	wrongProject := command
+	wrongProject.ReservationID = sibling.ID
+	wrongProject.IdempotencyKey = "cross-project-settlement"
+	if _, err = commerce.SettleApplyReservation(ctx, wrongProject); !commercedomain.HasCode(err, commercedomain.CodePermissionDenied) || len(store.Usage("tenant-partial", period.ID)) != 0 {
+		t.Fatalf("sibling project reservation was settled or charged: usage=%#v err=%v", store.Usage("tenant-partial", period.ID), err)
+	}
+	result, err := commerce.SettleApplyReservation(ctx, command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Settlement.State != commercev2.SettlementPartialRecoverable || !result.Settlement.Recoverable || result.Settlement.SettledQuantity != 40 || result.Settlement.ReleasedQuantity != 60 || result.Settlement.ObservedResourceCount != 1 || result.Reservation.State != "SETTLED" {
+		t.Fatalf("unexpected partial settlement: %#v", result)
+	}
+	usage := store.Usage("tenant-partial", period.ID)
+	if len(usage) != 1 || usage[0].Meter != commercev1.MeterDatabasePlanSeconds || usage[0].Quantity != 3600 || usage[0].Metadata["operation_id"] != "operation-partial" {
+		t.Fatalf("created database usage was not settled once: %#v", usage)
+	}
+	replayed, err := commerce.SettleApplyReservation(ctx, command)
+	if err != nil || replayed.Settlement.SettlementID != result.Settlement.SettlementID || len(store.Usage("tenant-partial", period.ID)) != 1 {
+		t.Fatalf("settlement replay was not idempotent: result=%#v usage=%#v err=%v", replayed, store.Usage("tenant-partial", period.ID), err)
+	}
+	if _, err = commerce.Reserve(ctx, commercev1.QuotaRequest{
+		TenantID: "tenant-partial", ProjectID: "project-partial", Resource: "project.budget.minor", Quantity: 60,
+		IdempotencyKey: "released-remainder", At: now, ExpiresAt: now.Add(time.Hour),
+	}); err != nil {
+		t.Fatalf("released reservation remainder was unavailable: %v", err)
+	}
+	if _, err = commerce.Reserve(ctx, commercev1.QuotaRequest{
+		TenantID: "tenant-partial", ProjectID: "project-partial", Resource: "project.budget.minor", Quantity: 1,
+		IdempotencyKey: "oversubscribe-after-settlement", At: now, ExpiresAt: now.Add(time.Hour),
+	}); !commercedomain.HasCode(err, commercedomain.CodeQuotaExceeded) {
+		t.Fatalf("settled database allocation stopped counting against quota: %v", err)
+	}
+}
+
 func TestQuota_ExpiredReservationCannotAuthorizeLateApply(t *testing.T) {
 	service, store, now := infrastructureFixture()
 	result, err := service.Plan(context.Background(), planCommand("expiring-reservation", "staging", knownResourcePlan))
@@ -320,7 +417,7 @@ func TestBudget_WorkspaceCommandStoppedBeforeExceedingHardLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	consumed, err := commerce.Reserve(ctx, commercev1.QuotaRequest{
-		TenantID: "tenant-budget", Resource: commercebudget.Resource, Quantity: 50, IdempotencyKey: "already-consumed",
+		TenantID: "tenant-budget", ProjectID: "project-budget", Resource: commercebudget.Resource, Quantity: 50, IdempotencyKey: "already-consumed",
 		At: now, ExpiresAt: now.Add(time.Hour),
 	})
 	if err != nil {

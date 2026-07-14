@@ -278,33 +278,37 @@ type QuotaReservationState string
 const (
 	QuotaReserved  QuotaReservationState = "RESERVED"
 	QuotaCommitted QuotaReservationState = "COMMITTED"
+	QuotaSettled   QuotaReservationState = "SETTLED"
 	QuotaReleased  QuotaReservationState = "RELEASED"
 	QuotaRejected  QuotaReservationState = "REJECTED"
 )
 
 type QuotaReservation struct {
-	ID             string
-	TenantID       string
-	Resource       string
-	PolicyVersion  string
-	Reason         string
-	Quantity       int64
-	State          QuotaReservationState
-	IdempotencyKey string
-	Fingerprint    string
-	ExpiresAt      time.Time
-	Version        int64
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID               string
+	TenantID         string
+	ProjectID        string
+	Resource         string
+	PolicyVersion    string
+	Reason           string
+	Quantity         int64
+	SettledQuantity  int64
+	ReleasedQuantity int64
+	State            QuotaReservationState
+	IdempotencyKey   string
+	Fingerprint      string
+	ExpiresAt        time.Time
+	Version          int64
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
-func NewQuotaReservation(id, tenantID, resource, policyVersion, key, fingerprint string, quantity int64, expiresAt, now time.Time) (QuotaReservation, error) {
-	id, tenantID, resource, policyVersion, key = strings.TrimSpace(id), strings.TrimSpace(tenantID), strings.TrimSpace(resource), strings.TrimSpace(policyVersion), strings.TrimSpace(key)
+func NewQuotaReservation(id, tenantID, projectID, resource, policyVersion, key, fingerprint string, quantity int64, expiresAt, now time.Time) (QuotaReservation, error) {
+	id, tenantID, projectID, resource, policyVersion, key = strings.TrimSpace(id), strings.TrimSpace(tenantID), strings.TrimSpace(projectID), strings.TrimSpace(resource), strings.TrimSpace(policyVersion), strings.TrimSpace(key)
 	if id == "" || tenantID == "" || resource == "" || policyVersion == "" || key == "" || quantity <= 0 || !expiresAt.After(now) {
 		return QuotaReservation{}, NewError(CodeInvalidArgument, "quota reservation is invalid")
 	}
 	now = now.UTC()
-	return QuotaReservation{ID: id, TenantID: tenantID, Resource: resource, PolicyVersion: policyVersion, Quantity: quantity, State: QuotaReserved, IdempotencyKey: key, Fingerprint: fingerprint, ExpiresAt: expiresAt.UTC(), Version: 1, CreatedAt: now, UpdatedAt: now}, nil
+	return QuotaReservation{ID: id, TenantID: tenantID, ProjectID: projectID, Resource: resource, PolicyVersion: policyVersion, Quantity: quantity, State: QuotaReserved, IdempotencyKey: key, Fingerprint: fingerprint, ExpiresAt: expiresAt.UTC(), Version: 1, CreatedAt: now, UpdatedAt: now}, nil
 }
 func (q *QuotaReservation) Commit(now time.Time) error {
 	if q.State == QuotaCommitted {
@@ -329,16 +333,47 @@ func (q *QuotaReservation) Release(now time.Time) error {
 		return NewError(CodeConflict, "reservation cannot be released")
 	}
 	q.State = QuotaReleased
+	q.SettledQuantity = 0
+	q.ReleasedQuantity = q.Quantity
 	q.Version++
 	q.UpdatedAt = now.UTC()
 	return nil
 }
-func (q QuotaReservation) CountsAgainstLimit(now time.Time) bool {
-	if q.State == QuotaCommitted {
-		return true
+
+func (q *QuotaReservation) Settle(quantity int64, now time.Time) error {
+	if quantity < 0 || quantity > q.Quantity {
+		return NewError(CodeInvalidArgument, "settlement quantity exceeds reservation")
 	}
-	return q.State == QuotaReserved && now.UTC().Before(q.ExpiresAt)
+	if q.State == QuotaSettled {
+		if q.SettledQuantity == quantity && q.ReleasedQuantity == q.Quantity-quantity {
+			return nil
+		}
+		return NewError(CodeConflict, "reservation already settled differently")
+	}
+	if q.State != QuotaReserved && q.State != QuotaCommitted {
+		return NewError(CodeConflict, "reservation cannot be settled")
+	}
+	q.State = QuotaSettled
+	q.SettledQuantity = quantity
+	q.ReleasedQuantity = q.Quantity - quantity
+	q.Version++
+	q.UpdatedAt = now.UTC()
+	return nil
+}
+
+func (q QuotaReservation) QuantityAgainstLimit(now time.Time) int64 {
+	switch q.State {
+	case QuotaCommitted:
+		return q.Quantity
+	case QuotaReserved:
+		if now.UTC().Before(q.ExpiresAt) {
+			return q.Quantity
+		}
+	case QuotaSettled:
+		return q.SettledQuantity
+	}
+	return 0
 }
 func (q QuotaReservation) Contract() commercev1.QuotaReservation {
-	return commercev1.QuotaReservation{ID: q.ID, TenantID: q.TenantID, Resource: q.Resource, PolicyVersion: q.PolicyVersion, Reason: q.Reason, Quantity: q.Quantity, State: string(q.State), ExpiresAt: q.ExpiresAt, Version: q.Version, CreatedAt: q.CreatedAt, UpdatedAt: q.UpdatedAt}
+	return commercev1.QuotaReservation{ID: q.ID, TenantID: q.TenantID, ProjectID: q.ProjectID, Resource: q.Resource, PolicyVersion: q.PolicyVersion, Reason: q.Reason, Quantity: q.Quantity, SettledQuantity: q.SettledQuantity, ReleasedQuantity: q.ReleasedQuantity, State: string(q.State), ExpiresAt: q.ExpiresAt, Version: q.Version, CreatedAt: q.CreatedAt, UpdatedAt: q.UpdatedAt}
 }

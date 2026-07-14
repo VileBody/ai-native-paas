@@ -16,6 +16,7 @@ import (
 	commercepostgres "github.com/keir-research/ai-native-paas/internal/commerce/postgres"
 	"github.com/keir-research/ai-native-paas/internal/commerce/testkit"
 	commercev1 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1"
+	commercev2 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v2"
 )
 
 var commerceBaseTime = time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
@@ -105,8 +106,8 @@ func TestPostgres_CommerceMigrationsCleanInstallAndUpgrade(t *testing.T) {
 	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM commerce.schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 3 {
-		t.Fatalf("migration count=%d want=3", count)
+	if count != 4 {
+		t.Fatalf("migration count=%d want=4", count)
 	}
 	for _, table := range []string{"plan_definitions", "plan_versions", "subscriptions", "billing_periods", "commercial_accounts", "quota_reservations", "usage_events", "idempotency", "outbox", "audit", "reconciliation_alerts"} {
 		var exists bool
@@ -237,6 +238,52 @@ func TestPostgres_CommerceConcurrentQuotaReservationsCannotOversubscribe(t *test
 	}
 	if quantity != 2 {
 		t.Fatalf("reserved quantity=%d", quantity)
+	}
+}
+
+func TestPostgres_CommercePartialApplySettlementIsAtomicAndIdempotent(t *testing.T) {
+	f := newPostgresCommerceFixture(t)
+	ctx := context.Background()
+	reservation, err := f.svc.Reserve(ctx, commercev1.QuotaRequest{
+		TenantID: "tenant-1", ProjectID: "project-1", Resource: "project.budget.minor", Quantity: 100,
+		IdempotencyKey: "postgres-partial-reservation", At: f.clock.Now(), ExpiresAt: f.clock.Now().Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = f.svc.Commit(ctx, reservation.ID); err != nil {
+		t.Fatal(err)
+	}
+	command := application.SettleApplyReservationCommand{
+		TenantID: "tenant-1", ProjectID: "project-1", OperationID: "operation-pg-partial",
+		ReservationID: reservation.ID, IdempotencyKey: "postgres-partial-settlement", ObservedAt: f.clock.Now(),
+		Resources: []application.ObservedResourceAllocation{{
+			ExternalIdentity: "cozystack:postgresql/project-1/main", ResourceType: "managed-database",
+			Meter: commercev1.MeterDatabasePlanSeconds, UsageQuantity: 3600, ReservationQuantity: 40,
+			WindowStart: f.clock.Now().Add(-time.Hour), WindowEnd: f.clock.Now(),
+		}},
+	}
+	first, err := f.svc.SettleApplyReservation(ctx, command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := f.svc.SettleApplyReservation(ctx, command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Settlement.State != commercev2.SettlementPartialRecoverable || first.Settlement.SettlementID != second.Settlement.SettlementID || first.Reservation.SettledQuantity != 40 || first.Reservation.ReleasedQuantity != 60 {
+		t.Fatalf("unexpected PostgreSQL settlement replay: first=%#v second=%#v", first, second)
+	}
+	var state string
+	var settled, released, usageCount int64
+	if err := f.db.QueryRowContext(ctx, `SELECT state,(payload->>'SettledQuantity')::bigint,(payload->>'ReleasedQuantity')::bigint FROM commerce.quota_reservations WHERE id=$1`, reservation.ID).Scan(&state, &settled, &released); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.db.QueryRowContext(ctx, `SELECT count(*) FROM commerce.usage_events WHERE tenant_id='tenant-1' AND idempotency_key LIKE 'postgres-partial-settlement:resource:%'`).Scan(&usageCount); err != nil {
+		t.Fatal(err)
+	}
+	if state != "SETTLED" || settled != 40 || released != 60 || usageCount != 1 {
+		t.Fatalf("non-atomic PostgreSQL settlement state=%s settled=%d released=%d usage=%d", state, settled, released, usageCount)
 	}
 }
 

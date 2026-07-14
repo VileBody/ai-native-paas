@@ -440,7 +440,7 @@ func (a *txAdapter) InsertQuotaReservation(v domain.QuotaReservation) error {
 	if err != nil {
 		return err
 	}
-	_, err = a.tx.Exec(`INSERT INTO commerce.quota_reservations(id,tenant_id,resource,policy_version,reason,quantity,state,idempotency_key,fingerprint,expires_at,version,payload,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, v.ID, v.TenantID, v.Resource, v.PolicyVersion, v.Reason, v.Quantity, string(v.State), v.IdempotencyKey, v.Fingerprint, v.ExpiresAt, v.Version, raw, v.CreatedAt, v.UpdatedAt)
+	_, err = a.tx.Exec(`INSERT INTO commerce.quota_reservations(id,tenant_id,project_id,resource,policy_version,reason,quantity,state,idempotency_key,fingerprint,expires_at,version,payload,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`, v.ID, v.TenantID, v.ProjectID, v.Resource, v.PolicyVersion, v.Reason, v.Quantity, string(v.State), v.IdempotencyKey, v.Fingerprint, v.ExpiresAt, v.Version, raw, v.CreatedAt, v.UpdatedAt)
 	return mapDB(err)
 }
 func (a *txAdapter) UpdateQuotaReservation(v domain.QuotaReservation, expected int64) error {

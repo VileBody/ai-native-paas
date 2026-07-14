@@ -123,3 +123,43 @@ type UsageFact struct {
 	DeduplicationKey string    `json:"deduplication_key"`
 	OccurredAt       time.Time `json:"occurred_at"`
 }
+
+type SettlementState string
+
+const (
+	SettlementApplied            SettlementState = "APPLIED"
+	SettlementPartialRecoverable SettlementState = "PARTIAL_APPLY_RECOVERABLE"
+)
+
+type ReservationSettlement struct {
+	SettlementID          string          `json:"settlement_id"`
+	ReservationID         string          `json:"reservation_id"`
+	ProjectID             string          `json:"project_id"`
+	Resource              string          `json:"resource"`
+	OperationID           string          `json:"operation_id"`
+	SettledQuantity       int64           `json:"settled_quantity"`
+	ReleasedQuantity      int64           `json:"released_quantity"`
+	ObservedResourceCount int64           `json:"observed_resource_count"`
+	State                 SettlementState `json:"state"`
+	Recoverable           bool            `json:"recoverable"`
+	SettledAt             time.Time       `json:"settled_at"`
+}
+
+func (s ReservationSettlement) Validate() error {
+	if strings.TrimSpace(s.SettlementID) == "" || strings.TrimSpace(s.ReservationID) == "" || strings.TrimSpace(s.ProjectID) == "" || strings.TrimSpace(s.Resource) == "" || strings.TrimSpace(s.OperationID) == "" || s.SettledQuantity < 0 || s.ReleasedQuantity < 0 || s.ObservedResourceCount < 0 || s.SettledAt.IsZero() {
+		return errors.New("invalid reservation settlement")
+	}
+	switch s.State {
+	case SettlementApplied:
+		if s.Recoverable || s.ReleasedQuantity != 0 {
+			return errors.New("invalid applied reservation settlement")
+		}
+	case SettlementPartialRecoverable:
+		if !s.Recoverable || s.ReleasedQuantity == 0 {
+			return errors.New("invalid partial reservation settlement")
+		}
+	default:
+		return errors.New("invalid reservation settlement state")
+	}
+	return nil
+}

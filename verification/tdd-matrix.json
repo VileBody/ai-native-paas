@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 992,
-  "discovered_unique_test_name_count": 990,
+  "discovered_go_test_count": 994,
+  "discovered_unique_test_name_count": 992,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1048,7 +1048,7 @@
       "id": "C8",
       "level": "application/provider",
       "name": "TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder",
-      "status": "LIVE_ONLY",
+      "status": "REUSED",
       "test_file": "test/pivot/commerce_v2_test.go",
       "test_name": "TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder",
       "test_ref": "test/pivot/commerce_v2_test.go::TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder"
@@ -1589,8 +1589,8 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 53,
-      "REUSED": 104
+      "LIVE_ONLY": 52,
+      "REUSED": 105
     },
     "unmapped": 0
   }

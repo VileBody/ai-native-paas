@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math"
 	"math/big"
 	"sort"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/keir-research/ai-native-paas/internal/commerce/domain"
 	commercev1 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1"
+	commercev2 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v2"
 )
 
 type CreatePlanDefinitionCommand struct{ ID, Name string }
@@ -43,6 +45,32 @@ type ReconcileUsageCommand struct {
 	WindowStart      time.Time
 	WindowEnd        time.Time
 	ObservedQuantity int64
+}
+
+type ObservedResourceAllocation struct {
+	ExternalIdentity    string
+	ResourceType        string
+	Meter               commercev1.Meter
+	UsageQuantity       int64
+	ReservationQuantity int64
+	WindowStart         time.Time
+	WindowEnd           time.Time
+	Metadata            map[string]string
+}
+
+type SettleApplyReservationCommand struct {
+	TenantID       string
+	ProjectID      string
+	OperationID    string
+	ReservationID  string
+	IdempotencyKey string
+	ObservedAt     time.Time
+	Resources      []ObservedResourceAllocation
+}
+
+type ApplySettlementResult struct {
+	Settlement  commercev2.ReservationSettlement
+	Reservation commercev1.QuotaReservation
 }
 
 func (s *Service) CreatePlanDefinition(ctx context.Context, cmd CreatePlanDefinitionCommand) (domain.PlanDefinition, error) {
@@ -236,7 +264,7 @@ func (s *Service) Check(ctx context.Context, req commercev1.EntitlementRequest) 
 				decision.Reason = "resource quota is not defined"
 				return nil
 			}
-			used := activeQuota(tx, req.TenantID, req.Resource, at)
+			used := activeQuota(tx, req.TenantID, req.Resource, "", at)
 			decision.Limit = limit
 			decision.Remaining = max64(0, limit-used)
 			if req.Quantity > decision.Remaining {
@@ -253,7 +281,7 @@ func (s *Service) Reserve(ctx context.Context, req commercev1.QuotaRequest) (com
 	if err := s.require(); err != nil {
 		return commercev1.QuotaReservation{}, err
 	}
-	req.TenantID, req.Resource, req.IdempotencyKey = strings.TrimSpace(req.TenantID), strings.TrimSpace(req.Resource), strings.TrimSpace(req.IdempotencyKey)
+	req.TenantID, req.ProjectID, req.Resource, req.IdempotencyKey = strings.TrimSpace(req.TenantID), strings.TrimSpace(req.ProjectID), strings.TrimSpace(req.Resource), strings.TrimSpace(req.IdempotencyKey)
 	if req.TenantID == "" || req.Resource == "" || req.IdempotencyKey == "" || req.Quantity <= 0 {
 		return commercev1.QuotaReservation{}, domain.NewError(domain.CodeInvalidArgument, "quota request is invalid")
 	}
@@ -293,11 +321,11 @@ func (s *Service) Reserve(ctx context.Context, req commercev1.QuotaRequest) (com
 		if !ok {
 			return domain.NewError(domain.CodePermissionDenied, "resource is not included in plan")
 		}
-		used := activeQuota(tx, req.TenantID, req.Resource, at)
+		used := activeQuota(tx, req.TenantID, req.Resource, req.ProjectID, at)
 		if req.Quantity > limit-used {
 			return domain.NewError(domain.CodeQuotaExceeded, "quota exceeded")
 		}
-		q, err := domain.NewQuotaReservation(s.newID("quota"), req.TenantID, req.Resource, pv.PolicyVersion, req.IdempotencyKey, fingerprint, req.Quantity, req.ExpiresAt, at)
+		q, err := domain.NewQuotaReservation(s.newID("quota"), req.TenantID, req.ProjectID, req.Resource, pv.PolicyVersion, req.IdempotencyKey, fingerprint, req.Quantity, req.ExpiresAt, at)
 		if err != nil {
 			return err
 		}
@@ -312,17 +340,160 @@ func (s *Service) Reserve(ctx context.Context, req commercev1.QuotaRequest) (com
 	})
 	return result, err
 }
-func activeQuota(tx Tx, tenant, resource string, at time.Time) int64 {
+func activeQuota(tx Tx, tenant, resource, projectID string, at time.Time) int64 {
 	var total int64
 	for _, q := range tx.ListQuotaReservations(tenant, resource) {
-		if q.CountsAgainstLimit(at) {
-			if q.Quantity > math.MaxInt64-total {
-				return math.MaxInt64
-			}
-			total += q.Quantity
+		if projectID != "" && q.ProjectID != projectID {
+			continue
 		}
+		quantity := q.QuantityAgainstLimit(at)
+		if quantity > math.MaxInt64-total {
+			return math.MaxInt64
+		}
+		total += quantity
 	}
 	return total
+}
+
+func (s *Service) SettleApplyReservation(ctx context.Context, cmd SettleApplyReservationCommand) (ApplySettlementResult, error) {
+	if err := s.require(); err != nil {
+		return ApplySettlementResult{}, err
+	}
+	cmd.TenantID = strings.TrimSpace(cmd.TenantID)
+	cmd.ProjectID = strings.TrimSpace(cmd.ProjectID)
+	cmd.OperationID = strings.TrimSpace(cmd.OperationID)
+	cmd.ReservationID = strings.TrimSpace(cmd.ReservationID)
+	cmd.IdempotencyKey = strings.TrimSpace(cmd.IdempotencyKey)
+	cmd.ObservedAt = cmd.ObservedAt.UTC()
+	if cmd.TenantID == "" || cmd.ProjectID == "" || cmd.OperationID == "" || cmd.ReservationID == "" || cmd.IdempotencyKey == "" || cmd.ObservedAt.IsZero() {
+		return ApplySettlementResult{}, domain.NewError(domain.CodeInvalidArgument, "apply settlement identity is invalid")
+	}
+	resources := append([]ObservedResourceAllocation(nil), cmd.Resources...)
+	seen := make(map[string]struct{}, len(resources))
+	for index := range resources {
+		item := &resources[index]
+		item.ExternalIdentity = strings.TrimSpace(item.ExternalIdentity)
+		item.ResourceType = strings.TrimSpace(item.ResourceType)
+		item.WindowStart = item.WindowStart.UTC()
+		item.WindowEnd = item.WindowEnd.UTC()
+		item.Metadata = cloneStringMap(item.Metadata)
+		if len(item.Metadata) == 0 {
+			item.Metadata = nil
+		}
+		identity := item.ExternalIdentity + "\x00" + string(item.Meter)
+		if item.ExternalIdentity == "" || item.ResourceType == "" || !commercev1.ValidMeter(item.Meter) || item.UsageQuantity <= 0 || item.ReservationQuantity <= 0 || !item.WindowStart.Before(item.WindowEnd) {
+			return ApplySettlementResult{}, domain.NewError(domain.CodeInvalidArgument, "observed resource allocation is invalid")
+		}
+		if _, duplicate := seen[identity]; duplicate {
+			return ApplySettlementResult{}, domain.NewError(domain.CodeInvalidArgument, "observed resource allocation is duplicated")
+		}
+		seen[identity] = struct{}{}
+		owned, err := s.ownership().Owns(ctx, cmd.TenantID, item.ResourceType, item.ExternalIdentity)
+		if err != nil {
+			return ApplySettlementResult{}, domain.Wrap(domain.CodeUnavailable, "resource ownership unavailable", err)
+		}
+		if !owned {
+			return ApplySettlementResult{}, domain.NewError(domain.CodePermissionDenied, "observed resource is not owned by tenant")
+		}
+	}
+	sort.Slice(resources, func(i, j int) bool {
+		return resources[i].ExternalIdentity+"\x00"+string(resources[i].Meter) < resources[j].ExternalIdentity+"\x00"+string(resources[j].Meter)
+	})
+	fingerprintValue := fingerprint(struct {
+		TenantID      string
+		ProjectID     string
+		OperationID   string
+		ReservationID string
+		ObservedAt    time.Time
+		Resources     []ObservedResourceAllocation
+	}{cmd.TenantID, cmd.ProjectID, cmd.OperationID, cmd.ReservationID, cmd.ObservedAt, resources})
+	var result ApplySettlementResult
+	err := s.Store.Transact(ctx, func(tx Tx) error {
+		reservation, ok := tx.GetQuotaReservation(cmd.ReservationID)
+		if !ok {
+			return domain.NewError(domain.CodeNotFound, "quota reservation not found")
+		}
+		if reservation.TenantID != cmd.TenantID {
+			return domain.NewError(domain.CodePermissionDenied, "quota reservation belongs to another tenant")
+		}
+		if reservation.ProjectID == "" || reservation.ProjectID != cmd.ProjectID {
+			return domain.NewError(domain.CodePermissionDenied, "quota reservation belongs to another project")
+		}
+		if existing, ok := tx.GetIdempotency(cmd.TenantID, "apply-settlement", cmd.IdempotencyKey); ok {
+			if existing.Fingerprint != fingerprintValue {
+				return domain.NewError(domain.CodeConflict, "apply settlement idempotency payload mismatch")
+			}
+			result = applySettlementResult(existing.ResourceID, cmd, reservation, len(resources))
+			return nil
+		}
+		if reservation.State == domain.QuotaSettled {
+			return domain.NewError(domain.CodeConflict, "quota reservation already settled")
+		}
+		settledQuantity := int64(0)
+		for _, item := range resources {
+			next, ok := safeAdd(settledQuantity, item.ReservationQuantity)
+			if !ok || next > reservation.Quantity {
+				return domain.NewError(domain.CodeInvalidArgument, "observed allocation exceeds reservation")
+			}
+			settledQuantity = next
+		}
+		for index, item := range resources {
+			metadata := cloneStringMap(item.Metadata)
+			if metadata == nil {
+				metadata = map[string]string{}
+			}
+			metadata["project_id"] = cmd.ProjectID
+			metadata["operation_id"] = cmd.OperationID
+			metadata["reservation_id"] = cmd.ReservationID
+			metadata["source"] = "provider_discovery"
+			event := commercev1.UsageEvent{
+				TenantID: cmd.TenantID, ResourceType: item.ResourceType, ResourceID: item.ExternalIdentity,
+				Meter: item.Meter, Kind: commercev1.UsageStandard, Quantity: item.UsageQuantity,
+				IdempotencyKey: fmt.Sprintf("%s:resource:%d", cmd.IdempotencyKey, index),
+				OccurredAt:     cmd.ObservedAt, WindowStart: item.WindowStart, WindowEnd: item.WindowEnd, Metadata: metadata,
+			}
+			if err := s.appendUsageTx(tx, event); err != nil {
+				return err
+			}
+		}
+		oldVersion := reservation.Version
+		if err := reservation.Settle(settledQuantity, cmd.ObservedAt); err != nil {
+			return err
+		}
+		if err := tx.UpdateQuotaReservation(reservation, oldVersion); err != nil {
+			return err
+		}
+		settlementID := s.newID("settlement")
+		if err := tx.InsertIdempotency(IdempotencyRecord{TenantID: cmd.TenantID, Scope: "apply-settlement", Key: cmd.IdempotencyKey, Fingerprint: fingerprintValue, ResourceID: settlementID, CreatedAt: s.now()}); err != nil {
+			return err
+		}
+		result = applySettlementResult(settlementID, cmd, reservation, len(resources))
+		return s.record(tx, cmd.TenantID, "commerce.apply.settled", settlementID, result.Settlement)
+	})
+	if err != nil {
+		return ApplySettlementResult{}, err
+	}
+	if err := result.Settlement.Validate(); err != nil {
+		return ApplySettlementResult{}, domain.Wrap(domain.CodeInternal, "invalid apply settlement result", err)
+	}
+	return result, nil
+}
+
+func applySettlementResult(settlementID string, cmd SettleApplyReservationCommand, reservation domain.QuotaReservation, observed int) ApplySettlementResult {
+	state := commercev2.SettlementApplied
+	recoverable := false
+	if reservation.ReleasedQuantity > 0 {
+		state = commercev2.SettlementPartialRecoverable
+		recoverable = true
+	}
+	return ApplySettlementResult{
+		Settlement: commercev2.ReservationSettlement{
+			SettlementID: settlementID, ReservationID: reservation.ID, ProjectID: cmd.ProjectID, Resource: reservation.Resource, OperationID: cmd.OperationID,
+			SettledQuantity: reservation.SettledQuantity, ReleasedQuantity: reservation.ReleasedQuantity,
+			ObservedResourceCount: int64(observed), State: state, Recoverable: recoverable, SettledAt: reservation.UpdatedAt,
+		},
+		Reservation: reservation.Contract(),
+	}
 }
 func (s *Service) Commit(ctx context.Context, id string) error {
 	return s.transitionQuota(ctx, id, true)

@@ -120,6 +120,7 @@ type EntitlementDecision struct {
 }
 type QuotaRequest struct {
 	TenantID       string    `json:"tenant_id"`
+	ProjectID      string    `json:"project_id,omitempty"`
 	Resource       string    `json:"resource"`
 	Quantity       int64     `json:"quantity"`
 	IdempotencyKey string    `json:"idempotency_key"`
@@ -127,17 +128,20 @@ type QuotaRequest struct {
 	At             time.Time `json:"at"`
 }
 type QuotaReservation struct {
-	ID            string    `json:"id"`
-	TenantID      string    `json:"tenant_id"`
-	Resource      string    `json:"resource"`
-	PolicyVersion string    `json:"policy_version"`
-	Reason        string    `json:"reason,omitempty"`
-	Quantity      int64     `json:"quantity"`
-	State         string    `json:"state"`
-	ExpiresAt     time.Time `json:"expires_at"`
-	Version       int64     `json:"version"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID               string    `json:"id"`
+	TenantID         string    `json:"tenant_id"`
+	ProjectID        string    `json:"project_id,omitempty"`
+	Resource         string    `json:"resource"`
+	PolicyVersion    string    `json:"policy_version"`
+	Reason           string    `json:"reason,omitempty"`
+	Quantity         int64     `json:"quantity"`
+	SettledQuantity  int64     `json:"settled_quantity,omitempty"`
+	ReleasedQuantity int64     `json:"released_quantity,omitempty"`
+	State            string    `json:"state"`
+	ExpiresAt        time.Time `json:"expires_at"`
+	Version          int64     `json:"version"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 type UsageEvent struct {
 	ID             string            `json:"id"`

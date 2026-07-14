@@ -28,7 +28,7 @@ func (a Adapter) ReserveAndCommit(ctx context.Context, request workspace.Command
 	}
 	now := request.RequestedAt.UTC()
 	reservation, err := a.Quotas.Reserve(ctx, commercev1.QuotaRequest{
-		TenantID: request.TenantID, Resource: Resource, Quantity: request.RequestedSeconds,
+		TenantID: request.TenantID, ProjectID: request.ProjectID, Resource: Resource, Quantity: request.RequestedSeconds,
 		IdempotencyKey: "workspace-command:" + request.ProjectID + ":" + request.TaskID + ":" + request.CommandID,
 		At:             now, ExpiresAt: now.Add(time.Duration(request.RequestedSeconds)*time.Second + 15*time.Minute),
 	})
