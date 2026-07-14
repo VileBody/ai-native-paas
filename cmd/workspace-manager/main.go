@@ -344,7 +344,7 @@ func readSecureFile(filename string, maximum int64) ([]byte, error) {
 	}
 	defer file.Close()
 	info, err := file.Stat()
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || info.Size() < 16 || info.Size() > maximum {
+	if err != nil || !secureCredentialMode(info.Mode()) || info.Size() < 16 || info.Size() > maximum {
 		return nil, errors.New("credential file permissions or size are invalid")
 	}
 	raw, err := io.ReadAll(io.LimitReader(file, maximum+1))
@@ -365,7 +365,7 @@ func readExactSecureFile(filename string, size int64) ([]byte, error) {
 	}
 	defer file.Close()
 	info, err := file.Stat()
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || info.Size() != size {
+	if err != nil || !secureCredentialMode(info.Mode()) || info.Size() != size {
 		return nil, errors.New("exact credential file permissions or size are invalid")
 	}
 	raw, err := io.ReadAll(io.LimitReader(file, size+1))
@@ -373,6 +373,17 @@ func readExactSecureFile(filename string, size int64) ([]byte, error) {
 		return nil, errors.New("read exact credential file")
 	}
 	return raw, nil
+}
+
+func secureCredentialMode(mode os.FileMode) bool {
+	if !mode.IsRegular() {
+		return false
+	}
+	permissions := mode.Perm()
+	// Kubernetes projected secrets are root:fsGroup and conventionally 0440
+	// or 0640. Owner write and group read are safe; execution, group write and
+	// every world permission remain forbidden.
+	return permissions&0o400 != 0 && permissions&0o137 == 0
 }
 
 func required(name string) string { return strings.TrimSpace(os.Getenv(name)) }

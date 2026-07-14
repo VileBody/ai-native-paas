@@ -1,0 +1,10 @@
+{
+  "schema": "ai-native-paas.io/admin-control-plane-images/v1",
+  "project_api": {
+    "git_revision": "a6f29089fb28d7b8fcf3ed05b939f1b3ca4e6de0",
+    "github_actions_run": 29316712412,
+    "image": "ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-project-api@sha256:e99b5732f86f8ca7f3cd2857d712443da50c76af10779b65dbad23329d7bf7dd",
+    "provenance": "mode=max",
+    "sbom": true
+  }
+}

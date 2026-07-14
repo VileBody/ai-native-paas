@@ -1,0 +1,233 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: project-api
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: project-api
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: project-api-rate-card
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: project-api
+data:
+  beta-default.json: |-
+    {
+      "schema": "ai-native-paas.io/infrastructure-price-book/v1",
+      "rate_card": {
+        "rate_card_id": "beta-default",
+        "version": "2026-07-14",
+        "markup_basis_points": 2500,
+        "currency": "RUB",
+        "price_snapshot_id": "timeweb-msk-2026-07-14"
+      },
+      "prices": {
+        "twc_server": {
+          "meter": "timeweb.server.month",
+          "unit": "server-month",
+          "provider_minor_per_quantity": 100000,
+          "known": true
+        },
+        "twc_database_cluster": {
+          "meter": "timeweb.postgresql.month",
+          "unit": "cluster-month",
+          "provider_minor_per_quantity": 150000,
+          "known": true
+        },
+        "twc_s3_bucket": {
+          "meter": "timeweb.s3.bucket.month",
+          "unit": "bucket-month",
+          "provider_minor_per_quantity": 0,
+          "unknown_maximum_minor": 1000000,
+          "known": false
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: project-api
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: project-api
+    ai-native-paas.io/owner: control-plane
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: project-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: project-api
+        ai-native-paas.io/owner: control-plane
+    spec:
+      serviceAccountName: project-api
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: craas-ai-native-paas-registry
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: ai-native-paas.io/pool
+                    operator: In
+                    values: [system]
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: project-api
+      tolerations:
+        - key: ai-native-paas.io/system
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      containers:
+        - name: project-api
+          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-project-api@sha256:e99b5732f86f8ca7f3cd2857d712443da50c76af10779b65dbad23329d7bf7dd
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8088
+          env:
+            - name: PLATFORM_PROFILE
+              value: production
+            - name: PROJECT_API_ADDR
+              value: :8088
+            - name: GITLAB_URL
+              value: https://gitlab.com
+            - name: GITLAB_ADMIN_TOKEN_FILE
+              value: /var/run/secrets/project-api/gitlab-admin-token
+            - name: ENROLLMENT_SIGNING_KEY_FILE
+              value: /var/run/secrets/project-api/enrollment-signing-key
+            - name: INFRASTRUCTURE_PRICE_BOOK_FILE
+              value: /etc/ai-native-paas/rate-card/beta-default.json
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-postgres
+                  key: DATABASE_URL
+            - name: GITLAB_NAMESPACE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: project-api-settings
+                  key: GITLAB_NAMESPACE_ID
+            - name: MCP_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: project-api-settings
+                  key: MCP_BASE_URL
+            - name: OIDC_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: project-api-settings
+                  key: OIDC_ISSUER
+            - name: OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: project-api-settings
+                  key: OIDC_CLIENT_ID
+            - name: WORKSPACE_IMAGE_DIGEST
+              valueFrom:
+                configMapKeyRef:
+                  name: project-api-release
+                  key: WORKSPACE_IMAGE_DIGEST
+          volumeMounts:
+            - name: project-api-secrets
+              mountPath: /var/run/secrets/project-api
+              readOnly: true
+            - name: rate-card
+              mountPath: /etc/ai-native-paas/rate-card
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: project-api-secrets
+          secret:
+            secretName: project-api-secrets
+            defaultMode: 0440
+            items:
+              - key: GITLAB_ADMIN_TOKEN
+                path: gitlab-admin-token
+              - key: ENROLLMENT_SIGNING_KEY
+                path: enrollment-signing-key
+        - name: rate-card
+          configMap:
+            name: project-api-rate-card
+      terminationGracePeriodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: project-api
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: project-api
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: project-api
+  ports:
+    - name: http
+      port: 8088
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: project-api
+  namespace: ai-native-paas-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: project-api
