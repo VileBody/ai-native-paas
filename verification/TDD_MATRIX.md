@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **765**
-- Reused now: **18**
-- New local/contract tests required: **55**
-- Live/provider/system tests required: **84**
+- Discovered Go tests/fuzz targets: **777**
+- Reused now: **26**
+- New local/contract tests required: **53**
+- Live/provider/system tests required: **78**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -133,15 +133,15 @@ A release gate may become green only after every referenced test exists and pass
 | `G2` | REUSED | contract/golden | `test/contract/mcp_v2_test.go::TestMCPV2_CatalogAndSchemasAreVersionedStableAndClosed` |
 | `G3` | REUSED | application | `test/contract/mcp_v2_test.go::TestMCPV1CompatibilityCannotBypassV2Governance` |
 | `G4` | REUSED | fuzz/security | `internal/kernel/execution/execution_tdd_test.go::TestAgent_ToolArgumentsCannotOverrideVerifiedScope` |
-| `G5` | LIVE_ONLY | application/provider | `test/pivot/agent_workspace_test.go::TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile` |
-| `G6` | LIVE_ONLY | provider/system | `test/pivot/agent_workspace_test.go::TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials` |
-| `G7` | LIVE_ONLY | architecture/system | `test/pivot/agent_workspace_test.go::TestWorkspace_CommandRunsOnlyInsideWorkspaceNotControlPlaneHost` |
-| `G8` | NEW | policy | `test/pivot/agent_workspace_test.go::TestWorkspace_CommandPolicyRejectsForbiddenExecutableAndFlags` |
-| `G9` | LIVE_ONLY | system/network | `test/pivot/agent_workspace_test.go::TestWorkspace_NetworkProfileAllowsRequiredAndDeniesSensitiveDestinations` |
+| `G5` | REUSED | application/provider | `internal/workspace/service_tdd_test.go::TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile` |
+| `G6` | REUSED | provider/system | `internal/workspace/service_tdd_test.go::TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials` |
+| `G7` | REUSED | architecture/system | `internal/workspace/service_tdd_test.go::TestWorkspace_CommandRunsOnlyInsideWorkspaceNotControlPlaneHost` |
+| `G8` | REUSED | policy | `internal/workspace/service_tdd_test.go::TestWorkspace_CommandPolicyRejectsForbiddenExecutableAndFlags` |
+| `G9` | REUSED | system/network | `internal/workspace/service_tdd_test.go::TestWorkspace_NetworkProfileAllowsRequiredAndDeniesSensitiveDestinations` |
 | `G10` | REUSED | integration/fuzz | `internal/security/redact/redact_tdd_test.go::TestWorkspace_StdoutStderrStreamingRedactsSecretsAcrossChunkBoundaries` |
-| `G11` | LIVE_ONLY | system | `test/pivot/agent_workspace_test.go::TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage` |
-| `G12` | LIVE_ONLY | chaos | `test/pivot/agent_workspace_test.go::TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply` |
-| `G13` | NEW | concurrency | `test/pivot/agent_workspace_test.go::TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations` |
+| `G11` | REUSED | system | `internal/workspace/service_tdd_test.go::TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage` |
+| `G12` | REUSED | chaos | `internal/workspace/service_tdd_test.go::TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply` |
+| `G13` | REUSED | concurrency | `internal/workspace/service_tdd_test.go::TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations` |
 | `G14` | NEW | application | `test/pivot/agent_workspace_test.go::TestAgent_DeployWorkflowStartsFromExactRepositoryRevision` |
 | `G15` | LIVE_ONLY | application/OpenTofu integration | `test/pivot/agent_workspace_test.go::TestInfraPlan_IsPureIdempotentAndStoresCanonicalPlanHash` |
 | `G16` | NEW | cross-domain | `test/pivot/agent_workspace_test.go::TestInfraApply_RequiresMatchingPlanReservationAndApproval` |

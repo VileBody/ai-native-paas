@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 765,
-  "discovered_unique_test_name_count": 763,
+  "discovered_go_test_count": 777,
+  "discovered_unique_test_name_count": 775,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1198,50 +1198,50 @@
       "id": "G5",
       "level": "application/provider",
       "name": "TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspace/service_tdd_test.go",
       "test_name": "TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile"
+      "test_ref": "internal/workspace/service_tdd_test.go::TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile"
     },
     {
       "family": "G",
       "id": "G6",
       "level": "provider/system",
       "name": "TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspace/service_tdd_test.go",
       "test_name": "TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials"
+      "test_ref": "internal/workspace/service_tdd_test.go::TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials"
     },
     {
       "family": "G",
       "id": "G7",
       "level": "architecture/system",
       "name": "TestWorkspace_CommandRunsOnlyInsideWorkspaceNotControlPlaneHost",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspace/service_tdd_test.go",
       "test_name": "TestWorkspace_CommandRunsOnlyInsideWorkspaceNotControlPlaneHost",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_CommandRunsOnlyInsideWorkspaceNotControlPlaneHost"
+      "test_ref": "internal/workspace/service_tdd_test.go::TestWorkspace_CommandRunsOnlyInsideWorkspaceNotControlPlaneHost"
     },
     {
       "family": "G",
       "id": "G8",
       "level": "policy",
       "name": "TestWorkspace_CommandPolicyRejectsForbiddenExecutableAndFlags",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspace/service_tdd_test.go",
       "test_name": "TestWorkspace_CommandPolicyRejectsForbiddenExecutableAndFlags",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_CommandPolicyRejectsForbiddenExecutableAndFlags"
+      "test_ref": "internal/workspace/service_tdd_test.go::TestWorkspace_CommandPolicyRejectsForbiddenExecutableAndFlags"
     },
     {
       "family": "G",
       "id": "G9",
       "level": "system/network",
       "name": "TestWorkspace_NetworkProfileAllowsRequiredAndDeniesSensitiveDestinations",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspace/service_tdd_test.go",
       "test_name": "TestWorkspace_NetworkProfileAllowsRequiredAndDeniesSensitiveDestinations",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_NetworkProfileAllowsRequiredAndDeniesSensitiveDestinations"
+      "test_ref": "internal/workspace/service_tdd_test.go::TestWorkspace_NetworkProfileAllowsRequiredAndDeniesSensitiveDestinations"
     },
     {
       "family": "G",
@@ -1258,30 +1258,30 @@
       "id": "G11",
       "level": "system",
       "name": "TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspace/service_tdd_test.go",
       "test_name": "TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage"
+      "test_ref": "internal/workspace/service_tdd_test.go::TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage"
     },
     {
       "family": "G",
       "id": "G12",
       "level": "chaos",
       "name": "TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspace/service_tdd_test.go",
       "test_name": "TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply"
+      "test_ref": "internal/workspace/service_tdd_test.go::TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply"
     },
     {
       "family": "G",
       "id": "G13",
       "level": "concurrency",
       "name": "TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspace/service_tdd_test.go",
       "test_name": "TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations"
+      "test_ref": "internal/workspace/service_tdd_test.go::TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations"
     },
     {
       "family": "G",
@@ -1589,9 +1589,9 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 84,
-      "NEW": 55,
-      "REUSED": 18
+      "LIVE_ONLY": 78,
+      "NEW": 53,
+      "REUSED": 26
     },
     "unmapped": 0
   }

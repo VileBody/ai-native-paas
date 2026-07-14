@@ -10,7 +10,12 @@ import (
 
 const APIVersion = "workspace.platform.example.com/v1"
 
-var digest = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+var (
+	digest            = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	credentialLeaseID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$`)
+	environmentName   = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,127}$`)
+	environmentRef    = regexp.MustCompile(`^(credential|secret|input|state|registry)://[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$`)
+)
 
 type WorkspaceState string
 
@@ -37,6 +42,14 @@ type WorkspaceSpec struct {
 func (s WorkspaceSpec) Validate() error {
 	if strings.TrimSpace(s.ProjectID) == "" || strings.TrimSpace(s.TaskID) == "" || !digest.MatchString(s.ImageDigest) || s.CPUMillis < 250 || s.CPUMillis > 64000 || s.MemoryMiB < 256 || s.MemoryMiB > 262144 || s.TTLSeconds < 60 || s.TTLSeconds > 86400 || s.NetworkProfile != "isolated-governed" {
 		return errors.New("invalid workspace specification")
+	}
+	if len(s.CredentialLeases) > 64 {
+		return errors.New("invalid workspace credential lease references")
+	}
+	for _, leaseID := range s.CredentialLeases {
+		if !credentialLeaseID.MatchString(leaseID) {
+			return errors.New("invalid workspace credential lease references")
+		}
 	}
 	return nil
 }
@@ -75,6 +88,14 @@ func (s CommandSpec) Validate() error {
 	for _, arg := range s.Argv {
 		if len(arg) > 4096 || strings.ContainsRune(arg, '\x00') {
 			return errors.New("invalid command argument")
+		}
+	}
+	if len(s.EnvironmentRefs) > 128 {
+		return errors.New("invalid workspace environment references")
+	}
+	for name, reference := range s.EnvironmentRefs {
+		if !environmentName.MatchString(name) || !environmentRef.MatchString(reference) {
+			return errors.New("invalid workspace environment references")
 		}
 	}
 	return nil

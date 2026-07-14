@@ -9,6 +9,7 @@ on:
       - 'Dockerfile.test'
       - '.dockerignore'
       - 'migrations/attachments/**'
+      - 'internal/workspace/postgres/migrations/**'
       - 'deploy/iteration5/**'
       - 'scripts/verify-iteration-5-tdd.py'
       - '.github/workflows/iteration-5-ci.yml'
