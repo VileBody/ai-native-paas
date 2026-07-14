@@ -309,6 +309,75 @@ func (s *Store) ReleaseSerialization(ctx context.Context, projectID, key, comman
 	return nil
 }
 
+// ClaimOutbox leases unpublished intents to one worker. The row locks exist
+// only for the duration of this statement; the durable lease protects the
+// external effect after the transaction has committed.
+func (s *Store) ClaimOutbox(ctx context.Context, owner string, now, until time.Time, limit int) ([]workspace.OutboxRecord, error) {
+	if s == nil || s.DB == nil || strings.TrimSpace(owner) == "" || !until.After(now) || limit < 1 || limit > 1000 {
+		return nil, errors.New("workspace outbox claim is invalid")
+	}
+	rows, err := s.DB.QueryContext(ctx, `
+WITH candidates AS (
+    SELECT event_id
+    FROM workspace.outbox
+    WHERE published_at IS NULL
+      AND (delivery_lease_until IS NULL OR delivery_lease_until <= $2)
+    ORDER BY event_id
+    FOR UPDATE SKIP LOCKED
+    LIMIT $4
+)
+UPDATE workspace.outbox AS events
+SET delivery_owner=$1,
+    delivery_lease_until=$3,
+    delivery_attempts=events.delivery_attempts+1
+FROM candidates
+WHERE events.event_id=candidates.event_id
+RETURNING events.event_id,events.aggregate_type,events.aggregate_id,events.aggregate_version,events.event_type,events.delivery_attempts`, owner, now, until, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	records := make([]workspace.OutboxRecord, 0)
+	for rows.Next() {
+		var record workspace.OutboxRecord
+		if err := rows.Scan(&record.EventID, &record.AggregateType, &record.AggregateID, &record.AggregateVersion, &record.EventType, &record.DeliveryAttempts); err != nil {
+			return nil, err
+		}
+		records = append(records, record)
+	}
+	return records, rows.Err()
+}
+
+// DeferOutbox keeps ownership while moving a readiness check to a near-future
+// attempt. It never acknowledges the intent.
+func (s *Store) DeferOutbox(ctx context.Context, eventID int64, owner string, until time.Time) error {
+	if strings.TrimSpace(owner) == "" || eventID < 1 || until.IsZero() {
+		return errors.New("workspace outbox deferral is invalid")
+	}
+	result, err := s.DB.ExecContext(ctx, `UPDATE workspace.outbox SET delivery_lease_until=$3 WHERE event_id=$1 AND delivery_owner=$2 AND published_at IS NULL`, eventID, owner, until)
+	return affected(result, err)
+}
+
+func (s *Store) MarkOutboxPublished(ctx context.Context, eventID int64, owner string, now time.Time) error {
+	if strings.TrimSpace(owner) == "" || eventID < 1 || now.IsZero() {
+		return errors.New("workspace outbox acknowledgement is invalid")
+	}
+	result, err := s.DB.ExecContext(ctx, `UPDATE workspace.outbox SET published_at=$3,delivery_owner='',delivery_lease_until=NULL WHERE event_id=$1 AND delivery_owner=$2 AND published_at IS NULL`, eventID, owner, now)
+	return affected(result, err)
+}
+
+// GetCommandForWorker is intentionally unscoped at the SQL boundary. It is
+// available only to the trusted outbox worker, which derives the verified
+// tenant/project/actor scope from this immutable stored command rather than
+// from the event payload.
+func (s *Store) GetCommandForWorker(ctx context.Context, commandID string) (workspace.Command, error) {
+	if strings.TrimSpace(commandID) == "" {
+		return workspace.Command{}, workspace.ErrNotFound
+	}
+	value, err := scanCommand(s.DB.QueryRowContext(ctx, `SELECT `+commandColumns+` FROM workspace.commands WHERE id=$1`, commandID))
+	return value, mapNotFound(err)
+}
+
 type scanner interface{ Scan(...any) error }
 
 func scanWorkspace(row scanner) (workspace.Workspace, error) {

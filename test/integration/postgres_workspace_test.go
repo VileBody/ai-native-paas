@@ -90,6 +90,73 @@ func TestPostgres_WorkspaceIntentIsIdempotentDurableAndOutboxed(t *testing.T) {
 	}
 }
 
+func TestPostgres_WorkspaceOutboxLeaseHasOneWinnerAndCrashTakeover(t *testing.T) {
+	db, store := migratedWorkspaceStore(t)
+	now := time.Date(2026, 7, 14, 7, 10, 0, 0, time.UTC)
+	candidate := postgresWorkspace(now)
+	if _, _, err := store.CreateWorkspace(context.Background(), candidate); err != nil {
+		t.Fatal(err)
+	}
+
+	const workers = 12
+	start := make(chan struct{})
+	type claimResult struct {
+		owner   string
+		records []workspace.OutboxRecord
+		err     error
+	}
+	results := make(chan claimResult, workers)
+	for index := 0; index < workers; index++ {
+		owner := fmt.Sprintf("outbox-worker-%02d", index)
+		go func() {
+			<-start
+			records, err := store.ClaimOutbox(context.Background(), owner, now, now.Add(time.Minute), 1)
+			results <- claimResult{owner: owner, records: records, err: err}
+		}()
+	}
+	close(start)
+	var winner claimResult
+	claimed := 0
+	for index := 0; index < workers; index++ {
+		result := <-results
+		if result.err != nil {
+			t.Fatal(result.err)
+		}
+		claimed += len(result.records)
+		if len(result.records) == 1 {
+			winner = result
+		}
+	}
+	if claimed != 1 || winner.records[0].AggregateID != candidate.ID || winner.records[0].DeliveryAttempts != 1 {
+		t.Fatalf("concurrent claims=%d winner=%#v", claimed, winner)
+	}
+	if _, err := db.Exec(`UPDATE workspace.outbox SET payload='{"tampered":true}' WHERE event_id=$1`, winner.records[0].EventID); err == nil {
+		t.Fatal("leased outbox payload mutation was accepted")
+	}
+
+	retryAt := now.Add(10 * time.Second)
+	if err := store.DeferOutbox(context.Background(), winner.records[0].EventID, winner.owner, retryAt); err != nil {
+		t.Fatal(err)
+	}
+	before, err := store.ClaimOutbox(context.Background(), "takeover-worker", retryAt.Add(-time.Nanosecond), retryAt.Add(time.Minute), 1)
+	if err != nil || len(before) != 0 {
+		t.Fatalf("unexpired lease takeover records=%#v err=%v", before, err)
+	}
+	after, err := store.ClaimOutbox(context.Background(), "takeover-worker", retryAt, retryAt.Add(time.Minute), 1)
+	if err != nil || len(after) != 1 || after[0].DeliveryAttempts != 2 {
+		t.Fatalf("expired lease takeover records=%#v err=%v", after, err)
+	}
+	if err := store.MarkOutboxPublished(context.Background(), after[0].EventID, winner.owner, retryAt); !errors.Is(err, workspace.ErrConflict) {
+		t.Fatalf("stale owner acknowledged event: %v", err)
+	}
+	if err := store.MarkOutboxPublished(context.Background(), after[0].EventID, "takeover-worker", retryAt); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkOutboxPublished(context.Background(), after[0].EventID, "takeover-worker", retryAt); !errors.Is(err, workspace.ErrConflict) {
+		t.Fatalf("duplicate acknowledgement accepted: %v", err)
+	}
+}
+
 func TestPostgres_WorkspaceStatefulCommandLockHasOneWinner(t *testing.T) {
 	_, store := migratedWorkspaceStore(t)
 	now := time.Date(2026, 7, 14, 7, 15, 0, 0, time.UTC)
