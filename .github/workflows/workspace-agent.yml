@@ -78,7 +78,15 @@ jobs:
           go-version: '1.25.x'
           cache: true
       - run: sudo apt-get update && sudo apt-get install -y libguestfs-tools qemu-utils xz-utils jq unzip
+      - name: Verify libguestfs appliance
+        env:
+          LIBGUESTFS_BACKEND: direct
+        run: |
+          sudo chmod 0644 /boot/vmlinuz-*
+          libguestfs-test-tool
       - run: ./scripts/build-workspace-image.sh
+        env:
+          LIBGUESTFS_BACKEND: direct
       - name: Sign disk image and manifest
         env:
           COSIGN_YES: 'true'
