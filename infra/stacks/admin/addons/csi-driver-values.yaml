@@ -1,0 +1,35 @@
+provisionerName: network-drives.csi.timeweb.cloud
+
+# Injected by the Timeweb managed-addon API; never commit the provider token.
+TW_API_SECRET:
+TW_CLUSTER_ID: "1099941"
+
+image:
+  repository: cr-internal.twcstorage.ru/network-drives-csi/driver
+  tag: 2
+  pullPolicy: Always
+
+node:
+  logLevel: debug
+  logJson: true
+
+controller:
+  replicas: 1
+  nodeSelector:
+    ai-native-paas.io/pool: system
+  tolerations:
+    - key: ai-native-paas.io/system
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+rbac:
+  createRoles: true
+  createServiceAccounts: true
+
+metrics:
+  podMonitor:
+    enabled: false
+    port: metrics
+    path: /metrics
+    interval: 60s

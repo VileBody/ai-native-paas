@@ -6,11 +6,11 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 : "${KUBECONFIG:?KUBECONFIG must point to the dedicated test cluster}"
 
 namespace="ai-native-paas-system"
-host="$(terraform -chdir=infra/timeweb output -json control_plane_database_networks | jq -r '.[] | select(.type == "local") | .ips[0].ip')"
-port="$(terraform -chdir=infra/timeweb output -raw control_plane_database_port)"
-user="$(terraform -chdir=infra/timeweb output -raw control_plane_database_login)"
-database="$(terraform -chdir=infra/timeweb output -raw control_plane_database_name)"
-password="$(terraform -chdir=infra/timeweb output -raw control_plane_database_password)"
+host="$(tofu -chdir=infra/stacks/admin output -json control_plane_database_networks | jq -r '.[] | select(.type == "local") | .ips[0].ip')"
+port="$(tofu -chdir=infra/stacks/admin output -raw control_plane_database_port)"
+user="$(tofu -chdir=infra/stacks/admin output -raw control_plane_database_login)"
+database="$(tofu -chdir=infra/stacks/admin output -raw control_plane_database_name)"
+password="$(tofu -chdir=infra/stacks/admin output -raw control_plane_database_password)"
 
 test -n "$host"
 test -n "$password"
@@ -25,3 +25,12 @@ kubectl -n "$namespace" create secret generic control-plane-postgres \
   --from-literal=PGDATABASE="$database" \
   --from-literal=PGSSLMODE=disable \
   --dry-run=client -o yaml | kubectl apply -f -
+
+database_url="host=$host port=$port user=$user password=$password dbname=$database sslmode=disable"
+jq -nc --arg database_url "$database_url" \
+  '{stringData:{DATABASE_URL:$database_url}}' \
+  | kubectl -n "$namespace" patch secret state-service-secrets \
+      --type merge --patch-file /dev/stdin >/dev/null
+
+kubectl -n "$namespace" rollout restart deployment/state-service >/dev/null
+kubectl -n "$namespace" rollout status deployment/state-service --timeout=180s

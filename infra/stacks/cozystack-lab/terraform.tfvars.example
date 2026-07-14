@@ -1,0 +1,9 @@
+project_id = 1234567
+management_cidrs = [
+  "203.0.113.10/32",
+]
+
+# The default installer is the digest-pinned Cozystack v1.5 Talos build.
+# Override only when deliberately upgrading the release lock.
+
+# Supply state_passphrase through TF_VAR_state_passphrase.

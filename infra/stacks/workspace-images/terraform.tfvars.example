@@ -1,0 +1,7 @@
+project_id = 1234567
+
+# Set both only after the pinned workspace image is built, signed and uploaded.
+workspace_image_id     = ""
+workspace_image_digest = ""
+
+# Supply state_passphrase through TF_VAR_state_passphrase.

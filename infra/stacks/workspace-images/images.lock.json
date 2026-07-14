@@ -1,0 +1,19 @@
+{
+  "schema": "ai-native-paas.io/workspace-images-lock/v1",
+  "cozystack_talos": {
+    "cozystack_version": "v1.5.0",
+    "talos_version": "v1.13.0",
+    "asset": "nocloud-amd64.raw.xz",
+    "url": "https://github.com/cozystack/cozystack/releases/download/v1.5.0/nocloud-amd64.raw.xz",
+    "sha256": "92b0caa5d5cc5f802d042671ccbb4b097c5133dfa9a86c101420761f7e2a0df8",
+    "raw_size_bytes": 4453302272,
+    "raw_sha256": "8b33667aa31957df641e832d5fa4c344f48dbd0c64e784fa98a1dc698d524ecb",
+    "timeweb_moscow_import": "UNSUPPORTED_USE_VERIFIED_IN_PLACE_BOOTSTRAP",
+    "installer": "ghcr.io/cozystack/cozystack/talos:v1.13.0@sha256:37caed57ac67316af15ecf55f05b04864527bed9f4b379abd681ea6ece9a64a4"
+  },
+  "workspace": {
+    "status": "PENDING_BUILD",
+    "timeweb_image_id": null,
+    "digest": null
+  }
+}

@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: state-service
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: state-service
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: state-service
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: state-service
+    ai-native-paas.io/owner: control-plane
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: state-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: state-service
+        ai-native-paas.io/owner: control-plane
+    spec:
+      serviceAccountName: state-service
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: craas-ai-native-paas-registry
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: ai-native-paas.io/pool
+                    operator: In
+                    values: [system]
+      tolerations:
+        - key: ai-native-paas.io/system
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      containers:
+        - name: state-service
+          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-state-service@sha256:9c0afa1c07e8dadedd660cfefa6919278561860cb7ee1e30393533b2cccad381
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PLATFORM_PROFILE
+              value: production
+            - name: STATE_HTTP_ADDR
+              value: :8080
+            - name: STATE_LOCK_TTL
+              value: 2h
+            - name: STATE_S3_ENDPOINT
+              value: https://s3.twcstorage.ru
+            - name: STATE_S3_REGION
+              value: ru-1
+            - name: STATE_S3_PREFIX
+              value: platform-http-state
+            - name: STATE_BOOTSTRAP_NAMESPACE
+              value: admin
+            - name: STATE_BOOTSTRAP_TENANT_ID
+              value: platform
+            - name: STATE_BOOTSTRAP_PROJECT_ID
+              value: admin
+            - name: STATE_BOOTSTRAP_USERNAME
+              value: admin-migration
+            - name: STATE_BOOTSTRAP_ACTOR
+              value: operator:ergin
+          envFrom:
+            - secretRef:
+                name: state-service-secrets
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+      terminationGracePeriodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: state-service
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: state-service
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: state-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

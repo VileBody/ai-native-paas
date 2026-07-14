@@ -1,0 +1,4 @@
+project_id        = 1234567
+state_bucket_name = "ai-native-paas-state"
+
+# Supply the passphrase through TF_VAR_state_passphrase; never commit it here.

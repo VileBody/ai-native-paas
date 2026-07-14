@@ -1,0 +1,68 @@
+#cloud-config
+package_update: true
+packages:
+  - busybox-static
+  - curl
+  - file
+  - xz-utils
+
+write_files:
+  - path: /usr/local/sbin/bootstrap-talos-from-raw
+    owner: root:root
+    permissions: "0700"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      exec 9>/run/talos-bootstrap.lock
+      flock -n 9 || exit 0
+
+      readonly work=/dev/shm/talos-bootstrap
+      readonly archive="$work/nocloud-amd64.raw.xz"
+      readonly raw="$work/nocloud-amd64.raw"
+      readonly expected_compressed_sha="${talos_compressed_sha256}"
+      readonly expected_raw_sha="${talos_raw_sha256}"
+      readonly expected_raw_size="${talos_raw_size_bytes}"
+      readonly timeout_seconds="${talos_bootstrap_timeout_seconds}"
+
+      install -d -m 0700 "$work"
+      available=$(df -B1 --output=avail /dev/shm | tail -1 | tr -d ' ')
+      test "$available" -gt $((expected_raw_size + 1073741824))
+
+      timeout "$timeout_seconds" curl \
+        --fail --location --silent --show-error \
+        --retry 10 --retry-all-errors --retry-delay 5 \
+        --output "$archive" \
+        "${talos_asset_url}"
+      printf '%s  %s\n' "$expected_compressed_sha" "$archive" | sha256sum --check --strict
+
+      indexed_raw_size=$(xz --robot --list "$archive" | awk '$1 == "totals" { print $5 }')
+      test "$indexed_raw_size" = "$expected_raw_size"
+      timeout "$timeout_seconds" xz --decompress --stdout "$archive" > "$raw"
+      test "$(stat -c '%s' "$raw")" = "$expected_raw_size"
+      printf '%s  %s\n' "$expected_raw_sha" "$raw" | sha256sum --check --strict
+
+      root_source=$(findmnt --noheadings --output SOURCE /)
+      root_parent=$(lsblk --noheadings --output PKNAME "$root_source" | head -1 | tr -d ' ')
+      test -n "$root_parent"
+      target="/dev/$root_parent"
+      case "$target" in
+        /dev/sda|/dev/vda|/dev/nvme0n1) ;;
+        *) echo "refusing unexpected system disk $target" >&2; exit 1 ;;
+      esac
+      test "$(blockdev --getsize64 "$target")" -ge "$expected_raw_size"
+
+      install -m 0755 /bin/busybox /dev/shm/busybox
+      file /dev/shm/busybox | grep -q 'statically linked'
+      sync
+      exec /dev/shm/busybox sh -c '
+        set -e
+        /dev/shm/busybox dd if="$1" of="$2" bs=16M conv=fsync
+        /dev/shm/busybox sync
+        /dev/shm/busybox reboot -f
+      ' bootstrap "$raw" "$target"
+
+runcmd:
+  - [bash, -lc, "/usr/local/sbin/bootstrap-talos-from-raw >> /var/log/talos-bootstrap.log 2>&1"]
+
+final_message: "Talos disk bootstrap handed off to reboot"

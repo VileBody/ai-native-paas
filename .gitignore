@@ -11,6 +11,7 @@ __pycache__/
 
 # Local Terraform state and cloud access material.
 **/.terraform/
+.state-backend/
 *.tfstate
 *.tfstate.*
 *.tfplan
@@ -18,6 +19,10 @@ __pycache__/
 !*.tfvars.example
 *.kubeconfig
 crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
 
 /coverage-commerce.html
 /coverage-commerce-postgres.html

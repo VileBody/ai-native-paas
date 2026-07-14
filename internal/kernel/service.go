@@ -973,7 +973,7 @@ func replayError(stored storedCommandResponse, fallback error) error {
 
 func validateMeta(meta kernelv1.CommandMeta) error {
 	if err := meta.Validate(); err != nil {
-		return invalidArgument(err.Error())
+		return invalidArgument("%s", err.Error())
 	}
 	return nil
 }

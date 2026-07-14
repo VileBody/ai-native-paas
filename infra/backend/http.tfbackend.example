@@ -1,0 +1,10 @@
+address        = "https://api.example.com/api/v1/state/REPLACE_PROJECT_ID"
+lock_address   = "https://api.example.com/api/v1/state/REPLACE_PROJECT_ID/lock"
+unlock_address = "https://api.example.com/api/v1/state/REPLACE_PROJECT_ID/lock"
+lock_method    = "LOCK"
+unlock_method  = "UNLOCK"
+retry_wait_min = 1
+retry_wait_max = 10
+
+# Supply TF_HTTP_USERNAME and TF_HTTP_PASSWORD through short-lived credentials.
+# This is the predetermined fallback if Timeweb S3 rejects conditional locking.
