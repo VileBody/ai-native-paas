@@ -72,9 +72,11 @@ func TestStatus_PaaSAppReadyMarksDeploymentReady(t *testing.T) {
 	}
 }
 
-func TestStatus_ArgoSyncedButAppNotReadyStaysDeploying(t *testing.T) {
+func TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady(t *testing.T) {
 	f := newStatusFixture(t)
-	f.put(runtimev1.PaaSAppStatus{ObservedGeneration: f.object.Metadata.Generation, Phase: "Deploying", CandidateReleaseID: f.deployment.ReleaseID})
+	// The immutable runtime object exists at the expected generation (Argo has
+	// synced it), but its workload status has no healthy/ready replicas.
+	f.put(runtimev1.PaaSAppStatus{ObservedGeneration: f.object.Metadata.Generation, Phase: "Deploying", CandidateReleaseID: f.deployment.ReleaseID, ReadyReplicas: 0})
 	if err := f.service.ReconcileDeploymentStatus(context.Background(), f.deployment.DeploymentID); err != nil {
 		t.Fatal(err)
 	}
@@ -82,8 +84,12 @@ func TestStatus_ArgoSyncedButAppNotReadyStaysDeploying(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.Phase != runtimev1.DeploymentRollingOut || status.ActiveRelease != "" {
+	if status.Phase != runtimev1.DeploymentRollingOut || status.ActiveRelease != "" || status.ReadyReplicas != 0 || status.URL != "" {
 		t.Fatalf("status=%+v", status)
+	}
+	snapshot := f.store.Snapshot()
+	if snapshot.Releases[f.deployment.ReleaseID].State != runtimev1.ReleaseDeploying || snapshot.Environments[f.env.ID].ActiveReleaseID != "" {
+		t.Fatalf("synced but unhealthy release was activated: release=%+v env=%+v", snapshot.Releases[f.deployment.ReleaseID], snapshot.Environments[f.env.ID])
 	}
 }
 

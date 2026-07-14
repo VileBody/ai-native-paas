@@ -538,10 +538,10 @@
       "id": "R7",
       "level": "application/system",
       "name": "TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/runtime_gitops_test.go",
+      "status": "REUSED",
+      "test_file": "internal/runtime/application/status_test.go",
       "test_name": "TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady",
-      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady"
+      "test_ref": "internal/runtime/application/status_test.go::TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady"
     },
     {
       "family": "R",
@@ -1589,8 +1589,8 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 57,
-      "REUSED": 100
+      "LIVE_ONLY": 56,
+      "REUSED": 101
     },
     "unmapped": 0
   }

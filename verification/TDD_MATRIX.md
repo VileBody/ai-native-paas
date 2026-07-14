@@ -4,9 +4,9 @@ Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
 - Discovered Go tests/fuzz targets: **989**
-- Reused now: **100**
+- Reused now: **101**
 - New local/contract tests required: **0**
-- Live/provider/system tests required: **57**
+- Live/provider/system tests required: **56**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -67,7 +67,7 @@ A release gate may become green only after every referenced test exists and pass
 | `R4` | REUSED | policy | `internal/runtime/gitops/policy_test.go::TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit` |
 | `R5` | REUSED | policy | `internal/runtime/gitops/policy_test.go::TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource` |
 | `R6` | LIVE_ONLY | manifest contract + real Argo | `test/pivot/runtime_gitops_test.go::TestArgoProject_AllowsOnlyExpectedRepositoryClusterAndNamespaces` |
-| `R7` | LIVE_ONLY | application/system | `test/pivot/runtime_gitops_test.go::TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady` |
+| `R7` | REUSED | application/system | `internal/runtime/application/status_test.go::TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady` |
 | `R8` | REUSED | application + Git | `internal/runtime/application/gitops_saga_test.go::TestRuntime_RollbackCreatesAuditableGitRevision` |
 | `R9` | LIVE_ONLY | system | `test/pivot/runtime_gitops_test.go::TestRuntime_DriftIsReportedAndSelfHealFollowsPolicy` |
 | `R10` | LIVE_ONLY | Kubernetes system | `test/pivot/runtime_gitops_test.go::TestRuntime_NamespaceAndServiceAccountIsolation` |
