@@ -33,4 +33,6 @@ while application outbox/inbox and failover drills remain pending.
 Generic runtime, disposable workspace, initialized OpenBao, Cozystack,
 GitLab.com, capability-provider, security and disaster-recovery gates remain
 explicit pending dimensions in `verification/status.yaml`; none is inferred
-from fake adapters or rendered manifests.
+from fake adapters or rendered manifests. The partial Cozystack provider lab was
+destroyed on 2026-07-15 after encrypted recovery verification and now defaults
+to a zero-resource cost-standby plan until a scheduled live gate.

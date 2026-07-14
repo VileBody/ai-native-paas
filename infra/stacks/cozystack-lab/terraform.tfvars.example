@@ -1,9 +1,15 @@
-project_id = 1234567
+project_id                     = 1234567
+lab_enabled                    = false
+cost_guard_acknowledgement     = ""
 management_cidrs = [
   "203.0.113.10/32",
 ]
 
 # The default installer is the digest-pinned Cozystack v1.5 Talos build.
 # Override only when deliberately upgrading the release lock.
+# Set lab_enabled=true only for a scheduled live gate and destroy the stack
+# after evidence and recovery artifacts have been retained.
+# The runbook supplies the separate exact cost acknowledgement required by the
+# resource precondition.
 
 # Supply state_passphrase through TF_VAR_state_passphrase.

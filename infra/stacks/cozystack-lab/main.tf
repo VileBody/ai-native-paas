@@ -6,7 +6,7 @@ locals {
   }
   nodes = {
     for name, ip in local.all_nodes : name => ip
-    if contains(var.enabled_nodes, name)
+    if var.lab_enabled && contains(var.enabled_nodes, name)
   }
 
   management_rules = {
@@ -20,10 +20,26 @@ locals {
 }
 
 resource "twc_vpc" "runtime" {
+  count = var.lab_enabled ? 1 : 0
+
   name        = "ai-native-paas-cozystack-bgp"
   description = "Dedicated Moscow VPC for the self-managed Talos/Cozystack runtime cell."
   location    = var.location
   subnet_v4   = "192.168.74.0/24"
+
+  lifecycle {
+    precondition {
+      condition = (
+        length(var.enabled_nodes) == 3 &&
+        alltrue([for node in ["cp-1", "cp-2", "cp-3"] : contains(var.enabled_nodes, node)])
+      )
+      error_message = "A scheduled Cozystack live gate must create the complete three-node cell."
+    }
+    precondition {
+      condition     = var.cost_guard_acknowledgement == "CREATE-3X-DEDICATED-CPU-COZYSTACK-LAB"
+      error_message = "Set the exact cost_guard_acknowledgement only for an approved live-gate budget window."
+    }
+  }
 }
 
 resource "twc_server" "node" {
@@ -45,7 +61,7 @@ resource "twc_server" "node" {
   })
 
   local_network {
-    id   = twc_vpc.runtime.id
+    id   = twc_vpc.runtime[0].id
     ip   = each.value
     mode = "dnat_and_snat"
   }
@@ -61,6 +77,8 @@ resource "twc_server_disk" "data" {
 }
 
 resource "twc_floating_ip" "kubernetes_api" {
+  count = var.lab_enabled ? 1 : 0
+
   availability_zone = var.availability_zone
   comment           = "Stable Talos/Kubernetes API endpoint for the Cozystack lab."
 
@@ -124,6 +142,8 @@ resource "twc_firewall_rule" "node_icmp" {
 }
 
 resource "talos_machine_secrets" "cluster" {
+  count = var.lab_enabled ? 1 : 0
+
   talos_version = var.talos_version
 }
 
@@ -132,8 +152,8 @@ data "talos_machine_configuration" "controlplane" {
 
   cluster_name       = "ai-native-paas-cozystack"
   machine_type       = "controlplane"
-  cluster_endpoint   = "https://${twc_floating_ip.kubernetes_api.ip}:6443"
-  machine_secrets    = talos_machine_secrets.cluster.machine_secrets
+  cluster_endpoint   = "https://${twc_floating_ip.kubernetes_api[0].ip}:6443"
+  machine_secrets    = talos_machine_secrets.cluster[0].machine_secrets
   talos_version      = var.talos_version
   kubernetes_version = var.kubernetes_version
 
@@ -171,7 +191,7 @@ data "talos_machine_configuration" "controlplane" {
 resource "talos_machine_configuration_apply" "controlplane" {
   for_each = local.nodes
 
-  client_configuration        = talos_machine_secrets.cluster.client_configuration
+  client_configuration        = talos_machine_secrets.cluster[0].client_configuration
   machine_configuration_input = data.talos_machine_configuration.controlplane[each.key].machine_configuration
   node                        = twc_server.node[each.key].main_ipv4
 
@@ -185,14 +205,18 @@ resource "talos_machine_configuration_apply" "controlplane" {
 }
 
 resource "talos_machine_bootstrap" "cluster" {
-  client_configuration = talos_machine_secrets.cluster.client_configuration
+  count = var.lab_enabled ? 1 : 0
+
+  client_configuration = talos_machine_secrets.cluster[0].client_configuration
   node                 = twc_server.node["cp-1"].main_ipv4
 
   depends_on = [talos_machine_configuration_apply.controlplane]
 }
 
 resource "talos_cluster_kubeconfig" "cluster" {
-  client_configuration = talos_machine_secrets.cluster.client_configuration
+  count = var.lab_enabled ? 1 : 0
+
+  client_configuration = talos_machine_secrets.cluster[0].client_configuration
   node                 = twc_server.node["cp-1"].main_ipv4
 
   depends_on = [talos_machine_bootstrap.cluster]

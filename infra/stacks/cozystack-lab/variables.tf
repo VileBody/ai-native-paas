@@ -14,6 +14,18 @@ variable "state_passphrase" {
   }
 }
 
+variable "lab_enabled" {
+  description = "Explicit cost guard. The Cozystack lab creates no provider resources unless enabled for a live gate."
+  type        = bool
+  default     = false
+}
+
+variable "cost_guard_acknowledgement" {
+  description = "Exact acknowledgement required together with lab_enabled for the three-node dedicated-CPU spend."
+  type        = string
+  default     = ""
+}
+
 variable "location" {
   description = "Moscow Timeweb location."
   type        = string

@@ -1,5 +1,5 @@
 output "vpc_id" {
-  value = twc_vpc.runtime.id
+  value = try(twc_vpc.runtime[0].id, null)
 }
 
 output "cozystack_version" {
@@ -19,15 +19,15 @@ output "node_public_ips" {
 }
 
 output "kubernetes_api_ip" {
-  value = twc_floating_ip.kubernetes_api.ip
+  value = try(twc_floating_ip.kubernetes_api[0].ip, null)
 }
 
 output "kubeconfig" {
-  value     = talos_cluster_kubeconfig.cluster.kubeconfig_raw
+  value     = try(talos_cluster_kubeconfig.cluster[0].kubeconfig_raw, null)
   sensitive = true
 }
 
 output "talosconfig" {
-  value     = talos_machine_secrets.cluster.client_configuration
+  value     = try(talos_machine_secrets.cluster[0].client_configuration, null)
   sensitive = true
 }

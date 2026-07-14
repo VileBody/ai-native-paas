@@ -13,6 +13,14 @@ All three nodes are control-plane plus schedulable workers for this beta lab.
 KubeVirt and nested tenant clusters are intentionally disabled. Cozystack owns
 CNI, ingress and storage in this cluster.
 
+The stack is cost-guarded and creates no provider resources by default. Set
+`TF_VAR_lab_enabled=true` only for a scheduled live gate. A normal development
+plan must keep it `false`; after the gate, preserve the encrypted state/evidence
+bundle and destroy the complete stack rather than leaving dedicated-CPU nodes
+idle. Enabling the lab also requires the exact acknowledgement
+`CREATE-3X-DEDICATED-CPU-COZYSTACK-LAB`; the plan fails closed without the
+second signal or when fewer than all three nodes are selected.
+
 Timeweb's custom-image API does not expose the Moscow `ru-3` location. Nodes
 therefore start once from Ubuntu 24.04 and use cloud-init to download the pinned
 Cozystack asset into RAM, verify both compressed and decompressed SHA-256 values,
