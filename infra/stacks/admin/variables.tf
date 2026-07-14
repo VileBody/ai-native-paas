@@ -66,3 +66,15 @@ variable "postgres_preset_id" {
   type        = number
   default     = 1175
 }
+
+variable "workspace_log_bucket_name" {
+  description = "Private S3 bucket for client-encrypted workspace command logs."
+  type        = string
+  default     = "ai-native-paas-workspace-logs"
+}
+
+variable "workspace_log_bucket_preset_id" {
+  description = "Timeweb S3 Hot 10 GiB preset in ru-1."
+  type        = number
+  default     = 2669
+}

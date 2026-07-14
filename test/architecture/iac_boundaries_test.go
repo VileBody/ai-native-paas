@@ -59,6 +59,25 @@ func TestArchitecture_StateBootstrapIsAlsoEncryptedAndRemote(t *testing.T) {
 	}
 }
 
+func TestArchitecture_WorkspaceLogsUseDedicatedProtectedAdminBucket(t *testing.T) {
+	root := repositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "infra", "stacks", "admin", "main.tf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	for _, required := range []string{`resource "twc_s3_bucket" "workspace_logs"`, `type        = "private"`, "prevent_destroy = true"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("admin workspace log bucket missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{"image_staging.access_key", "twc_s3_bucket.state.access_key"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("workspace logs reuse another security domain: %q", forbidden)
+		}
+	}
+}
+
 func TestArchitecture_AdminAndUserInfrastructureHaveDisjointNetworks(t *testing.T) {
 	files := map[string]string{
 		"admin":      readRepositoryFile(t, "infra", "stacks", "admin", "main.tf"),

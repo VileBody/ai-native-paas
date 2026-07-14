@@ -146,3 +146,15 @@ resource "twc_database_user" "control_plane" {
     ]
   }
 }
+
+resource "twc_s3_bucket" "workspace_logs" {
+  name        = var.workspace_log_bucket_name
+  description = "Private encrypted stdout/stderr artifacts from disposable workspace commands."
+  type        = "private"
+  preset_id   = var.workspace_log_bucket_preset_id
+  project_id  = var.project_id
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}

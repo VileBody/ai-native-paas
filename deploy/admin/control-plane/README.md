@@ -19,6 +19,14 @@ The GitLab token must be the bot for the dedicated private beta group, not a
 personal or group-wide human token. `MCP_BASE_URL` must be the final HTTPS API
 origin. OIDC memberships are seeded separately and remain invite-only.
 
+The non-OpenBao provider inputs for `workspace-manager` are synchronized from
+the encrypted admin state without printing them. The 32-byte client-side log
+encryption key is generated once and preserved on subsequent runs:
+
+```bash
+./scripts/sync-workspace-manager-secrets.sh
+```
+
 Apply only after those inputs exist:
 
 ```bash
