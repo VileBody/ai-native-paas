@@ -8,6 +8,7 @@
 __pycache__/
 *.pyc
 /.verification/
+/.operator/
 
 # Local Terraform state and cloud access material.
 **/.terraform/

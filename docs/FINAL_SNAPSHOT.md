@@ -21,8 +21,13 @@ contracts are introduced.
 
 ## Current pivot qualification
 
-Local and database baselines are green. Generic runtime, disposable workspace,
-OpenBao, Cozystack, GitLab.com, capability-provider, security and disaster
-recovery gates remain explicit pending dimensions in
-`verification/status.yaml`; none is inferred from fake adapters or rendered
-manifests.
+Local and database baselines are green. Phase 1 added encrypted HTTP-backed
+OpenTofu state, three admin system workers and a live NVMe CSI gate. The admin
+cluster now has a TLS-only, three-server OpenBao Raft release with immutable
+images and retained data/audit PVCs; it remains deliberately uninitialized and
+sealed until the 5/3 holder ceremony, so `PROVIDER_GREEN` is still pending.
+
+Generic runtime, disposable workspace, initialized OpenBao, Cozystack,
+GitLab.com, capability-provider, security and disaster-recovery gates remain
+explicit pending dimensions in `verification/status.yaml`; none is inferred
+from fake adapters or rendered manifests.

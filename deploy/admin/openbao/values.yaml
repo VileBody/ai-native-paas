@@ -1,0 +1,180 @@
+global:
+  tlsDisable: false
+
+injector:
+  enabled: true
+  replicas: 2
+  image:
+    registry: docker.io
+    repository: hashicorp/vault-k8s
+    tag: 1.7.2@sha256:ae3d307658b72a1cf35dab9bdf92c995d45cdc7183af0516857714b5bd0ba84d
+    pullPolicy: IfNotPresent
+  agentImage:
+    registry: quay.io
+    repository: openbao/openbao
+    tag: 2.5.5@sha256:6150c4a6b62067db6141c8da7a6a6b5763f4f47c315343d0c848b40fecdfd452
+    pullPolicy: IfNotPresent
+  webhook:
+    failurePolicy: Fail
+    matchPolicy: Exact
+    timeoutSeconds: 10
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  nodeSelector:
+    ai-native-paas.io/pool: system
+  tolerations:
+    - key: ai-native-paas.io/system
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  podDisruptionBudget:
+    maxUnavailable: 1
+
+server:
+  image:
+    registry: quay.io
+    repository: openbao/openbao
+    tag: 2.5.5@sha256:6150c4a6b62067db6141c8da7a6a6b5763f4f47c315343d0c848b40fecdfd452
+    pullPolicy: IfNotPresent
+  logLevel: info
+  logFormat: json
+  updateStrategyType: OnDelete
+  podManagementPolicy: Parallel
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  nodeSelector:
+    ai-native-paas.io/pool: system
+  tolerations:
+    - key: ai-native-paas.io/system
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  priorityClassName: system-cluster-critical
+  dataStorage:
+    enabled: true
+    size: 20Gi
+    storageClass: nvme.network-drives.csi.timeweb.cloud
+    accessMode: ReadWriteOnce
+  auditStorage:
+    enabled: true
+    size: 10Gi
+    storageClass: nvme.network-drives.csi.timeweb.cloud
+    accessMode: ReadWriteOnce
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  standalone:
+    enabled: false
+  ha:
+    enabled: true
+    replicas: 3
+    disruptionBudget:
+      enabled: true
+      maxUnavailable: 1
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        ui = false
+        disable_mlock = true
+
+        listener "tcp" {
+          address            = "[::]:8200"
+          cluster_address    = "[::]:8201"
+          tls_disable        = 0
+          tls_cert_file      = "/openbao/tls/tls.crt"
+          tls_key_file       = "/openbao/tls/tls.key"
+          tls_client_ca_file = "/openbao/tls/ca.crt"
+          tls_min_version    = "tls12"
+
+          telemetry {
+            unauthenticated_metrics_access = "true"
+          }
+        }
+
+        storage "raft" {
+          path = "/openbao/data"
+
+          retry_join {
+            leader_api_addr         = "https://openbao-0.openbao-internal.openbao.svc:8200"
+            leader_ca_cert_file     = "/openbao/tls/ca.crt"
+            leader_tls_servername   = "openbao.openbao.svc"
+          }
+        }
+
+        service_registration "kubernetes" {}
+
+        telemetry {
+          prometheus_retention_time = "30s"
+          disable_hostname          = true
+        }
+  volumes:
+    - name: openbao-server-tls
+      secret:
+        secretName: openbao-server-tls
+        defaultMode: 288
+  volumeMounts:
+    - name: openbao-server-tls
+      mountPath: /openbao/tls
+      readOnly: true
+  readinessProbe:
+    enabled: true
+    path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+    port: 8200
+    scheme: HTTPS
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 4
+  livenessProbe:
+    enabled: true
+    path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+    port: 8200
+    scheme: HTTPS
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 6
+  service:
+    enabled: true
+    type: ClusterIP
+    active:
+      enabled: true
+    standby:
+      enabled: true
+  statefulSet:
+    securityContext:
+      pod:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      container:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+
+ui:
+  enabled: false
+
+csi:
+  enabled: false
+
+serverTelemetry:
+  serviceMonitor:
+    enabled: false
+  prometheusRules:
+    enabled: false

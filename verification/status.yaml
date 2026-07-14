@@ -10,10 +10,10 @@ statuses:
     evidence: "Iteration 5 CI plus user and managed PostgreSQL cloud gates"
   PROVIDER_GREEN:
     state: PENDING
-    evidence: "OpenBao, Cozystack, GitLab and capability live suites not complete"
+    evidence: "OpenBao HA is deployed TLS-only but intentionally sealed/uninitialized; Cozystack, GitLab and capability live suites are not complete"
   K8S_GREEN:
     state: PENDING
-    evidence: "database harness only; generic runtime cell gate not complete"
+    evidence: "admin system workers, CSI and sealed OpenBao HA are live; generic runtime cell gate is not complete"
   SECURITY_GREEN:
     state: PENDING
     evidence: "pivot cross-surface and workspace compromise suites not complete"
