@@ -38,6 +38,7 @@ func TestCommerceV2UnknownPriceRequiresApproval(t *testing.T) {
 	digest := "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	estimate := commercev2.CostEstimate{
 		EstimateID: "estimate-1", Version: "price-1", PlanHash: digest, RateCardID: "beta-1",
+		RateCardVersion: "2026-07-14", PriceSnapshotID: "provider-2026-07-14", MarkupBasisPoints: 5000,
 		Lines:   []commercev2.EstimateLine{{Meter: "vm.second", Quantity: 60, Unit: "second", ProviderCost: commercev2.Money{Currency: "RUB", MinorUnit: 100}, CustomerCost: commercev2.Money{Currency: "RUB", MinorUnit: 150}, PriceKnown: false}},
 		Minimum: commercev2.Money{Currency: "RUB", MinorUnit: 100}, Maximum: commercev2.Money{Currency: "RUB", MinorUnit: 200}, ExpiresAt: now.Add(time.Hour),
 	}

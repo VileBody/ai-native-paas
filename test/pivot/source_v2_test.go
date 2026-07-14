@@ -372,6 +372,7 @@ func TestSource_MergeRequestPublishesPlanSummaryWithoutSecrets(t *testing.T) {
 	}
 	estimate := commercev2.CostEstimate{
 		EstimateID: "estimate-1", Version: plan.EstimateVersion, PlanHash: planHash, RateCardID: "beta-25",
+		RateCardVersion: "2026-07-14", PriceSnapshotID: "timeweb-msk-2026-07-14", MarkupBasisPoints: 2500,
 		Lines:   []commercev2.EstimateLine{{Meter: secretSentinel, Quantity: 1, Unit: "resource-month", ProviderCost: commercev2.Money{Currency: "RUB", MinorUnit: 100}, CustomerCost: commercev2.Money{Currency: "RUB", MinorUnit: 125}, PriceKnown: true}},
 		Minimum: commercev2.Money{Currency: "RUB", MinorUnit: 125}, Maximum: commercev2.Money{Currency: "RUB", MinorUnit: 750},
 		ApprovalRequired: true, ExpiresAt: fixture.clock.Now().Add(30 * time.Minute),

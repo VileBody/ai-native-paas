@@ -57,23 +57,26 @@ type EstimateLine struct {
 }
 
 type CostEstimate struct {
-	EstimateID       string         `json:"estimate_id"`
-	Version          string         `json:"version"`
-	PlanHash         string         `json:"plan_hash"`
-	RateCardID       string         `json:"rate_card_id"`
-	Lines            []EstimateLine `json:"lines"`
-	Minimum          Money          `json:"minimum"`
-	Maximum          Money          `json:"maximum"`
-	ApprovalRequired bool           `json:"approval_required"`
-	ExpiresAt        time.Time      `json:"expires_at"`
+	EstimateID        string         `json:"estimate_id"`
+	Version           string         `json:"version"`
+	PlanHash          string         `json:"plan_hash"`
+	RateCardID        string         `json:"rate_card_id"`
+	RateCardVersion   string         `json:"rate_card_version"`
+	PriceSnapshotID   string         `json:"price_snapshot_id"`
+	MarkupBasisPoints int64          `json:"markup_basis_points"`
+	Lines             []EstimateLine `json:"lines"`
+	Minimum           Money          `json:"minimum"`
+	Maximum           Money          `json:"maximum"`
+	ApprovalRequired  bool           `json:"approval_required"`
+	ExpiresAt         time.Time      `json:"expires_at"`
 }
 
 func (e CostEstimate) Validate(now time.Time) error {
-	if e.EstimateID == "" || e.Version == "" || !digest.MatchString(e.PlanHash) || e.RateCardID == "" || len(e.Lines) == 0 || !e.ExpiresAt.After(now) || e.Minimum.Validate() != nil || e.Maximum.Validate() != nil || e.Minimum.Currency != e.Maximum.Currency || e.Minimum.MinorUnit > e.Maximum.MinorUnit {
+	if e.EstimateID == "" || e.Version == "" || !digest.MatchString(e.PlanHash) || e.RateCardID == "" || e.RateCardVersion == "" || e.PriceSnapshotID == "" || e.MarkupBasisPoints < 1000 || e.MarkupBasisPoints > 5000 || len(e.Lines) == 0 || !e.ExpiresAt.After(now) || e.Minimum.Validate() != nil || e.Maximum.Validate() != nil || e.Minimum.Currency != e.Maximum.Currency || e.Minimum.MinorUnit > e.Maximum.MinorUnit {
 		return errors.New("invalid cost estimate")
 	}
 	for _, line := range e.Lines {
-		if strings.TrimSpace(line.Meter) == "" || line.Quantity < 0 || line.ProviderCost.Validate() != nil || line.CustomerCost.Validate() != nil {
+		if strings.TrimSpace(line.Meter) == "" || line.Quantity < 0 || line.ProviderCost.Validate() != nil || line.CustomerCost.Validate() != nil || line.ProviderCost.Currency != e.Minimum.Currency || line.CustomerCost.Currency != e.Minimum.Currency {
 			return errors.New("invalid estimate line")
 		}
 		if !line.PriceKnown && !e.ApprovalRequired {

@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 989,
-  "discovered_unique_test_name_count": 987,
+  "discovered_go_test_count": 990,
+  "discovered_unique_test_name_count": 988,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -988,7 +988,7 @@
       "id": "C2",
       "level": "domain",
       "name": "TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement",
-      "status": "LIVE_ONLY",
+      "status": "REUSED",
       "test_file": "test/pivot/commerce_v2_test.go",
       "test_name": "TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement",
       "test_ref": "test/pivot/commerce_v2_test.go::TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement"
@@ -1589,8 +1589,8 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 56,
-      "REUSED": 101
+      "LIVE_ONLY": 55,
+      "REUSED": 102
     },
     "unmapped": 0
   }

@@ -20,6 +20,7 @@ func planSummaryFixture(projectID, head, planHash, sentinel string, now time.Tim
 	}
 	estimate := commercev2.CostEstimate{
 		EstimateID: "estimate-1", Version: plan.EstimateVersion, PlanHash: planHash, RateCardID: "beta",
+		RateCardVersion: "2026-07-14", PriceSnapshotID: "provider-2026-07-14", MarkupBasisPoints: 2500,
 		Lines:   []commercev2.EstimateLine{{Meter: sentinel, Quantity: 1, Unit: "month", ProviderCost: commercev2.Money{Currency: "RUB", MinorUnit: 100}, CustomerCost: commercev2.Money{Currency: "RUB", MinorUnit: 125}, PriceKnown: true}},
 		Minimum: commercev2.Money{Currency: "RUB", MinorUnit: 125}, Maximum: commercev2.Money{Currency: "RUB", MinorUnit: 250}, ApprovalRequired: true, ExpiresAt: now.Add(time.Hour),
 	}

@@ -155,13 +155,16 @@ func (s *Service) Plan(ctx context.Context, command PlanCommand) (PlanResult, er
 		return PlanResult{}, err
 	}
 	fingerprint, err := hashJSON(struct {
-		TenantID        string `json:"tenant_id"`
-		ActorID         string `json:"actor_id"`
-		IdempotencyKey  string `json:"idempotency_key"`
-		PlanHash        string `json:"plan_hash"`
-		RateCardID      string `json:"rate_card_id"`
-		RateCardVersion string `json:"rate_card_version"`
-	}{command.TenantID, command.ActorID, command.IdempotencyKey, planHash, s.Prices.RateCard.RateCardID, s.Prices.RateCard.Version})
+		TenantID          string `json:"tenant_id"`
+		ActorID           string `json:"actor_id"`
+		IdempotencyKey    string `json:"idempotency_key"`
+		PlanHash          string `json:"plan_hash"`
+		RateCardID        string `json:"rate_card_id"`
+		RateCardVersion   string `json:"rate_card_version"`
+		PriceSnapshotID   string `json:"price_snapshot_id"`
+		MarkupBasisPoints int64  `json:"markup_basis_points"`
+		Currency          string `json:"currency"`
+	}{command.TenantID, command.ActorID, command.IdempotencyKey, planHash, s.Prices.RateCard.RateCardID, s.Prices.RateCard.Version, s.Prices.RateCard.PriceSnapshotID, s.Prices.RateCard.MarkupBasisPoints, s.Prices.RateCard.Currency})
 	if err != nil {
 		return PlanResult{}, err
 	}
@@ -563,17 +566,21 @@ func (s *Service) estimate(planHash string, changes []infrastructurev1.ResourceC
 	}
 	ttl := durationOr(s.EstimateTTL, 30*time.Minute)
 	versionHash, err := hashJSON(struct {
-		RateCardID      string `json:"rate_card_id"`
-		Version         string `json:"version"`
-		PriceSnapshotID string `json:"price_snapshot_id"`
-		PlanHash        string `json:"plan_hash"`
-	}{s.Prices.RateCard.RateCardID, s.Prices.RateCard.Version, s.Prices.RateCard.PriceSnapshotID, planHash})
+		RateCardID        string `json:"rate_card_id"`
+		Version           string `json:"version"`
+		PriceSnapshotID   string `json:"price_snapshot_id"`
+		MarkupBasisPoints int64  `json:"markup_basis_points"`
+		Currency          string `json:"currency"`
+		PlanHash          string `json:"plan_hash"`
+	}{s.Prices.RateCard.RateCardID, s.Prices.RateCard.Version, s.Prices.RateCard.PriceSnapshotID, s.Prices.RateCard.MarkupBasisPoints, s.Prices.RateCard.Currency, planHash})
 	if err != nil {
 		return commercev2.CostEstimate{}, err
 	}
 	return commercev2.CostEstimate{
 		EstimateID: s.IDs.New("estimate"), Version: versionHash,
-		PlanHash: planHash, RateCardID: s.Prices.RateCard.RateCardID, Lines: lines,
+		PlanHash: planHash, RateCardID: s.Prices.RateCard.RateCardID,
+		RateCardVersion: s.Prices.RateCard.Version, PriceSnapshotID: s.Prices.RateCard.PriceSnapshotID,
+		MarkupBasisPoints: s.Prices.RateCard.MarkupBasisPoints, Lines: lines,
 		Minimum:          commercev2.Money{Currency: s.Prices.RateCard.Currency, MinorUnit: minimum},
 		Maximum:          commercev2.Money{Currency: s.Prices.RateCard.Currency, MinorUnit: maximum},
 		ApprovalRequired: unknown, ExpiresAt: now.Add(ttl),

@@ -78,6 +78,34 @@ func TestCost_TofuPlanProducesDeterministicNormalizedEstimate(t *testing.T) {
 	}
 }
 
+func TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement(t *testing.T) {
+	service, _, now := infrastructureFixture()
+	unknownPlan := `{"resource_changes":[{"address":"unknown_cache.app","provider_name":"example/unknown","type":"unknown_cache","change":{"actions":["create"]}}]}`
+	result, err := service.Plan(context.Background(), planCommand("unknown-price", "staging", unknownPlan))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Estimate.Lines) != 1 || result.Estimate.Lines[0].PriceKnown || result.Estimate.Lines[0].ProviderCost.MinorUnit != 0 {
+		t.Fatalf("unknown provider price was represented as exact: %#v", result.Estimate.Lines)
+	}
+	if result.Estimate.Minimum.MinorUnit != 0 || result.Estimate.Maximum.MinorUnit != 1_250_000 || !result.Estimate.ApprovalRequired || !result.Summary.RequiresApproval {
+		t.Fatalf("unknown provider price did not produce conservative approval range: estimate=%#v summary=%#v", result.Estimate, result.Summary)
+	}
+	if result.Estimate.RateCardVersion != "2026-07-14" || result.Estimate.PriceSnapshotID != "timeweb-msk-2026-07-14" || result.Estimate.MarkupBasisPoints != 2500 {
+		t.Fatalf("estimate lost immutable pricing inputs: %#v", result.Estimate)
+	}
+	authorization := infrastructurev1.ApplyAuthorization{
+		PlanID: result.Summary.PlanID, PlanHash: result.Summary.PlanHash,
+		EstimateVersion: result.Estimate.Version, ReservationID: result.Reservation.ReservationID,
+		Target: "staging", ActorID: "agent-1", ExpiresAt: now.Add(10 * time.Minute),
+	}
+	if _, err := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{
+		TenantID: "tenant-1", ProjectID: "project-1", IdempotencyKey: "unknown-price-apply", Authorization: authorization,
+	}); !errors.Is(err, infraapp.ErrApprovalRequired) {
+		t.Fatalf("unknown-price apply proceeded without exact-plan approval: %v", err)
+	}
+}
+
 func TestCost_ApprovalInvalidatedWhenPlanHashChanges(t *testing.T) {
 	service, _, now := infrastructureFixture()
 	planA, err := service.Plan(context.Background(), planCommand("approval-plan-a", "production", knownResourcePlan))
