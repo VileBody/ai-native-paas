@@ -1,0 +1,10 @@
+{
+  "schema": "ai-native-paas.io/admin-images-lock/v1",
+  "workspace_egress_gateway": {
+    "git_revision": "be8de999d1ae3d26b3d63b4c40c80bb5d92d8b51",
+    "github_actions_run": 29320382016,
+    "image": "ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-workspace-egress-gateway@sha256:950e8823de28656bf8112bcfe5905242443c858b82b307693501189ed9996609",
+    "provenance": "mode=max",
+    "sbom": true
+  }
+}
