@@ -213,6 +213,23 @@ func (s *Service) GetRepository(ctx context.Context, tenantID, repositoryID stri
 	return out, err
 }
 
+func (s *Service) GetRepositoryForProject(ctx context.Context, tenantID, projectID string) (domain.Repository, error) {
+	var out domain.Repository
+	err := s.Store.Transact(ctx, func(tx Tx) error {
+		project, ok := tx.GetProject(projectID)
+		if !ok || project.TenantID != tenantID {
+			return domain.NewError(domain.CodeNotFound, "project not found")
+		}
+		repository, ok := tx.FindRepositoryByProject(projectID)
+		if !ok || repository.TenantID != tenantID {
+			return domain.NewError(domain.CodeNotFound, "repository not found")
+		}
+		out = repository
+		return nil
+	})
+	return out, err
+}
+
 func hashJSON(v any) string {
 	b, _ := json.Marshal(v)
 	h := sha256.Sum256(b)

@@ -24,6 +24,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 	projectapp "github.com/keir-research/ai-native-paas/internal/project/application"
 	projecthttp "github.com/keir-research/ai-native-paas/internal/project/httpapi"
+	projectmcp "github.com/keir-research/ai-native-paas/internal/project/mcp"
 	sourceapp "github.com/keir-research/ai-native-paas/internal/source/application"
 	"github.com/keir-research/ai-native-paas/internal/source/gitlab"
 	sourcepostgres "github.com/keir-research/ai-native-paas/internal/source/postgres"
@@ -113,17 +114,20 @@ func main() {
 
 	projectHandler := projecthttp.Handler{Projects: projects, MaxBodyBytes: 64 << 10}
 	enrollmentHandler := enrollmenthttp.Handler{Enrollment: enrollmentService, MaxBodyBytes: 64 << 10}
-	router := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/v2/agent/") {
-			enrollmentHandler.ServeHTTP(w, r)
-			return
-		}
-		projectHandler.ServeHTTP(w, r)
-	})
-	handler := (httpauth.Middleware{
+	mcpHandler := projectmcp.Handler{Enrollment: enrollmentService, Projects: source, MaxBodyBytes: 1 << 20}
+	humanHandler := (httpauth.Middleware{
 		Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}},
-		PublicPrefixes: []string{"/api/v2/agent/"},
-	}).Wrap(router)
+	}).Wrap(projectHandler)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/v2/agent/"):
+			enrollmentHandler.ServeHTTP(w, r)
+		case strings.HasPrefix(r.URL.Path, "/projects/") && strings.Contains(r.URL.Path, "/mcp/v2/"):
+			mcpHandler.ServeHTTP(w, r)
+		default:
+			humanHandler.ServeHTTP(w, r)
+		}
+	})
 
 	server := &http.Server{
 		Addr: env("PROJECT_API_ADDR", ":8088"), Handler: handler,

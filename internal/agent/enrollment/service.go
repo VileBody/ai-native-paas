@@ -216,6 +216,25 @@ func (s *Service) VerifyAccess(token string, expected Binding) (AccessClaims, er
 	return claims, nil
 }
 
+// AuthenticateAccess verifies a signed access credential and binds it to the
+// project selected by the trusted HTTP route. Tenant, user, agent, and scopes
+// are accepted only from the signed claims, never from request arguments.
+func (s *Service) AuthenticateAccess(token, projectID string) (AccessClaims, error) {
+	if s == nil || s.Clock == nil || s.Signer == nil || strings.TrimSpace(token) == "" || strings.TrimSpace(projectID) == "" {
+		return AccessClaims{}, errors.New("access credential verification is unavailable")
+	}
+	claims, err := s.Signer.Verify(token)
+	if err != nil {
+		return AccessClaims{}, err
+	}
+	now := s.Clock.Now().UTC()
+	binding := Binding{TenantID: claims.TenantID, ProjectID: claims.ProjectID, UserID: claims.UserID, AgentID: claims.AgentID, Scopes: claims.Scopes}
+	if err := binding.Validate(); err != nil || claims.Issuer != "ai-native-devops-platform" || claims.Audience != "project-mcp" || claims.Subject != claims.AgentID || claims.ProjectID != projectID || claims.CredentialID == "" || claims.JWTID == "" || claims.ExpiresAt <= now.Unix() || claims.IssuedAt > now.Unix() || claims.ExpiresAt-claims.IssuedAt > int64(AccessTTL/time.Second) {
+		return AccessClaims{}, errors.New("access credential is invalid, expired, or bound to another project")
+	}
+	return claims, nil
+}
+
 func (s *Service) Revoke(ctx context.Context, refreshToken string) error {
 	return s.Store.RevokeRefresh(ctx, tokenHash(refreshToken), s.Clock.Now().UTC())
 }

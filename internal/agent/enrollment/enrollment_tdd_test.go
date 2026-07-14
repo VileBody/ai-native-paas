@@ -80,6 +80,12 @@ func TestAgent_ProjectMCPTokenIsBoundToAgentUserTenantAndProject(t *testing.T) {
 	if _, err := service.VerifyAccess(access, binding); err != nil {
 		t.Fatalf("bound access token rejected: %v", err)
 	}
+	if claims, err := service.AuthenticateAccess(access, binding.ProjectID); err != nil || claims.AgentID != binding.AgentID {
+		t.Fatalf("project route rejected signed access token: claims=%#v err=%v", claims, err)
+	}
+	if _, err := service.AuthenticateAccess(access, "project-2"); err == nil {
+		t.Fatal("access token crossed project route binding")
+	}
 	mutations := []Binding{
 		{TenantID: "tenant-2", ProjectID: "project-1", UserID: "user-1", AgentID: "agent-1", Scopes: binding.Scopes},
 		{TenantID: "tenant-1", ProjectID: "project-2", UserID: "user-1", AgentID: "agent-1", Scopes: binding.Scopes},
