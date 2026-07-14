@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 733,
-  "discovered_unique_test_name_count": 731,
+  "discovered_go_test_count": 749,
+  "discovered_unique_test_name_count": 747,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -128,10 +128,10 @@
       "id": "K13",
       "level": "live PostgreSQL",
       "name": "TestPostgres_ConcurrentMigrationStartupUsesOneOwner",
-      "status": "NEW",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "test/integration/postgres_migration_lock_test.go",
       "test_name": "TestPostgres_ConcurrentMigrationStartupUsesOneOwner",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestPostgres_ConcurrentMigrationStartupUsesOneOwner"
+      "test_ref": "test/integration/postgres_migration_lock_test.go::TestPostgres_ConcurrentMigrationStartupUsesOneOwner"
     },
     {
       "family": "K",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 84,
-      "NEW": 56,
-      "REUSED": 17
+      "NEW": 55,
+      "REUSED": 18
     },
     "unmapped": 0
   }

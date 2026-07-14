@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **733**
-- Reused now: **17**
-- New local/contract tests required: **56**
+- Discovered Go tests/fuzz targets: **749**
+- Reused now: **18**
+- New local/contract tests required: **55**
 - Live/provider/system tests required: **84**
 - Unmapped: **0**
 
@@ -26,7 +26,7 @@ A release gate may become green only after every referenced test exists and pass
 | `K10` | REUSED | domain | `internal/kernel/execution/execution_tdd_test.go::TestKernel_ServicePrincipalCannotApproveHumanAction` |
 | `K11` | REUSED | HTTP integration | `internal/identity/httpauth/middleware_test.go::TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders` |
 | `K12` | REUSED | identity provider integration | `internal/identity/httpauth/middleware_test.go::TestKernel_OIDCAndMTLSIdentityCannotBeConfused` |
-| `K13` | NEW | live PostgreSQL | `test/pivot/kernel_v2_test.go::TestPostgres_ConcurrentMigrationStartupUsesOneOwner` |
+| `K13` | REUSED | live PostgreSQL | `test/integration/postgres_migration_lock_test.go::TestPostgres_ConcurrentMigrationStartupUsesOneOwner` |
 | `K14` | LIVE_ONLY | chaos + PostgreSQL | `test/pivot/kernel_v2_test.go::TestKernel_OperationCheckpointSurvivesDatabaseFailover` |
 | `S1` | LIVE_ONLY | application + GitLab contract | `test/pivot/source_v2_test.go::TestSource_CreateProjectBootstrapsV2RepositoryLayout` |
 | `S2` | LIVE_ONLY | real local Git integration | `test/pivot/source_v2_test.go::TestSource_CheckoutUsesExactCommitNotMutableBranchHead` |

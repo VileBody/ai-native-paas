@@ -221,7 +221,11 @@ func (a *txAdapter) UpdatePrincipal(v domain.AgentPrincipal, expected int64) err
 	return affected(res, err, "principal")
 }
 func (a *txAdapter) GetTask(id string) (domain.AgentTask, bool) {
-	v, err := scanPayload[domain.AgentTask](a.tx.QueryRow(`SELECT payload FROM agent.tasks WHERE id=$1`, id))
+	// Agent tasks are intentional contention points: budget reservations,
+	// approval consumption and cancellation all mutate one aggregate. Lock the
+	// row when loading it so valid reservations queue instead of exhausting the
+	// serializable retry budget under a burst of concurrent tool calls.
+	v, err := scanPayload[domain.AgentTask](a.tx.QueryRow(`SELECT payload FROM agent.tasks WHERE id=$1 FOR UPDATE`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return v, false
 	}

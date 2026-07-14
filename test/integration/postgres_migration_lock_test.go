@@ -12,16 +12,17 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 )
 
-func TestPostgres_MigrationAdvisoryLockChoosesOneMigratorAtATime(t *testing.T) {
+func TestPostgres_ConcurrentMigrationStartupUsesOneOwner(t *testing.T) {
 	db := openPostgres(t)
+	const replicas = 5
 	var active atomic.Int32
 	var maximum atomic.Int32
 	start := make(chan struct{})
-	errors := make(chan error, 2)
+	errors := make(chan error, replicas)
 	var ready sync.WaitGroup
-	ready.Add(2)
+	ready.Add(replicas)
 
-	for range 2 {
+	for range replicas {
 		go func() {
 			ready.Done()
 			<-start
@@ -41,7 +42,7 @@ func TestPostgres_MigrationAdvisoryLockChoosesOneMigratorAtATime(t *testing.T) {
 	}
 	ready.Wait()
 	close(start)
-	for range 2 {
+	for range replicas {
 		if err := <-errors; err != nil {
 			t.Fatal(err)
 		}
