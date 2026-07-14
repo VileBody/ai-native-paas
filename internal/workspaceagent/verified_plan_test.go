@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	projectv2 "github.com/keir-research/ai-native-paas/pkg/contracts/project/v2"
 )
 
 func TestVerifiedTofuApply_RequiresExactDigestAndCanonicalRelativePath(t *testing.T) {
@@ -15,6 +17,17 @@ func TestVerifiedTofuApply_RequiresExactDigestAndCanonicalRelativePath(t *testin
 		if _, _, err := validateVerifiedApplyArguments(arguments); err == nil {
 			t.Fatalf("unsafe arguments accepted: %#v", arguments)
 		}
+	}
+}
+
+func TestVerifiedTofuPlanReceipt_RetentionComesFromStrictPlatformContract(t *testing.T) {
+	contract := projectv2.Contract{Infrastructure: projectv2.InfrastructureSpec{Retention: []projectv2.RetentionRule{{
+		Address: "cozystack_postgres.primary", Provider: "cozystack", ResourceType: "cozystack_postgres",
+		ExternalID: "postgres-primary", Policy: "retain", Reason: "production data retention policy",
+	}}}}
+	retained := retainedResourcesFromContract(contract)
+	if len(retained) != 1 || retained[0].Address != "cozystack_postgres.primary" || retained[0].Policy != "platform.yaml/v2:retain" || retained[0].Validate() != nil {
+		t.Fatalf("retained=%+v", retained)
 	}
 }
 

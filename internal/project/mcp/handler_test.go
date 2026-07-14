@@ -178,7 +178,12 @@ func TestProjectMCP_ExactPlanApprovalGatesVerifiedWorkspaceApply(t *testing.T) {
 	}, infrastructurev1.AgentPlanReceipt{
 		SessionID: "session-1", ExecutionSessionID: "session-1", CommandID: "command-1",
 		ArtifactDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-		PlanJSON:       json.RawMessage(`{"resource_changes":[{"address":"twc_server.app","provider_name":"timeweb","type":"twc_server","change":{"actions":["create"]}}]}`), CapturedAt: now,
+		PlanJSON:       json.RawMessage(`{"resource_changes":[{"address":"twc_server.app","provider_name":"timeweb","type":"twc_server","change":{"actions":["create"]}}]}`),
+		RetainedResources: []infrastructurev1.RetainedResource{{
+			Address: "cozystack_postgres.primary", Provider: "cozystack", ResourceType: "cozystack_postgres",
+			ExternalID: "postgres-primary", Policy: "platform.yaml/v2:retain", Reason: "production data retention policy",
+		}},
+		CapturedAt: now,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +196,7 @@ func TestProjectMCP_ExactPlanApprovalGatesVerifiedWorkspaceApply(t *testing.T) {
 		t.Fatal(err)
 	}
 	var plan infraapp.PlanResult
-	if err := json.Unmarshal(plannedEnvelope.Result, &plan); err != nil || !plan.Summary.RequiresApproval {
+	if err := json.Unmarshal(plannedEnvelope.Result, &plan); err != nil || !plan.Summary.RequiresApproval || len(plan.Summary.RetainedResources) != 1 || plan.Summary.RetainedResources[0].Address != "cozystack_postgres.primary" {
 		t.Fatalf("plan=%#v err=%v", plan, err)
 	}
 

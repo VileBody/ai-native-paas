@@ -21,16 +21,17 @@ import (
 var sourceRevision = regexp.MustCompile(`^[0-9a-f]{40,64}$`)
 
 type PlanCommand struct {
-	TenantID        string
-	ProjectID       string
-	ActorID         string
-	WorkspaceID     string
-	Target          string
-	SourceSHA       string
-	IdempotencyKey  string
-	ArtifactDigest  string
-	StateGeneration int64
-	PlanJSON        []byte
+	TenantID          string
+	ProjectID         string
+	ActorID           string
+	WorkspaceID       string
+	Target            string
+	SourceSHA         string
+	IdempotencyKey    string
+	ArtifactDigest    string
+	StateGeneration   int64
+	PlanJSON          []byte
+	RetainedResources []infrastructurev1.RetainedResource
 }
 
 type PlanResult struct {
@@ -70,6 +71,7 @@ func (s *Service) PlanFromReceipt(ctx context.Context, command ReceiptPlanComman
 		WorkspaceID: command.WorkspaceID, Target: command.Target, SourceSHA: command.SourceSHA,
 		IdempotencyKey: command.IdempotencyKey, ArtifactDigest: receipt.ArtifactDigest,
 		StateGeneration: command.StateGeneration, PlanJSON: append([]byte(nil), receipt.PlanJSON...),
+		RetainedResources: append([]infrastructurev1.RetainedResource(nil), receipt.RetainedResources...),
 	})
 }
 
@@ -99,15 +101,20 @@ func (s *Service) Plan(ctx context.Context, command PlanCommand) (PlanResult, er
 	if err != nil {
 		return PlanResult{}, err
 	}
+	retained, err := normalizeRetainedResources(command.RetainedResources, changes)
+	if err != nil {
+		return PlanResult{}, err
+	}
 	planHash, err := hashJSON(struct {
-		ProjectID       string                            `json:"project_id"`
-		WorkspaceID     string                            `json:"workspace_id"`
-		Target          string                            `json:"target"`
-		SourceSHA       string                            `json:"source_sha"`
-		ArtifactDigest  string                            `json:"artifact_digest"`
-		StateGeneration int64                             `json:"state_generation"`
-		Changes         []infrastructurev1.ResourceChange `json:"changes"`
-	}{command.ProjectID, command.WorkspaceID, command.Target, command.SourceSHA, command.ArtifactDigest, command.StateGeneration, changes})
+		ProjectID       string                              `json:"project_id"`
+		WorkspaceID     string                              `json:"workspace_id"`
+		Target          string                              `json:"target"`
+		SourceSHA       string                              `json:"source_sha"`
+		ArtifactDigest  string                              `json:"artifact_digest"`
+		StateGeneration int64                               `json:"state_generation"`
+		Changes         []infrastructurev1.ResourceChange   `json:"changes"`
+		Retained        []infrastructurev1.RetainedResource `json:"retained_resources"`
+	}{command.ProjectID, command.WorkspaceID, command.Target, command.SourceSHA, command.ArtifactDigest, command.StateGeneration, changes, retained})
 	if err != nil {
 		return PlanResult{}, err
 	}
@@ -141,7 +148,7 @@ func (s *Service) Plan(ctx context.Context, command PlanCommand) (PlanResult, er
 			SourceSHA: command.SourceSHA, PlanHash: planHash,
 			StateGeneration: command.StateGeneration, CreatedAt: now,
 		},
-		Changes: changes, Destructive: destructive, RequiresApproval: requiresApproval,
+		Changes: changes, RetainedResources: retained, Destructive: destructive, RequiresApproval: requiresApproval,
 		EstimateVersion: estimate.Version, EstimateFingerprint: estimateFingerprint,
 	}
 	if err := summary.PlanRef.Validate(); err != nil {
@@ -320,10 +327,12 @@ func (s *Service) approvalSummary(plan PlanRecord) (infrastructurev1.ApprovalSum
 		}
 	}
 	sort.Strings(unknowns)
+	counts.Retain = len(plan.Summary.RetainedResources)
 	return infrastructurev1.ApprovalSummary{
 		PlanID: plan.Summary.PlanID, ProjectID: plan.Summary.ProjectID, Target: plan.Target,
 		PlanHash: plan.Summary.PlanHash, Counts: counts, DestructionRisks: risks,
-		MonthlyDelta: monthly, OneTimeDelta: oneTime, Unknowns: unknowns,
+		RetainedResources: append([]infrastructurev1.RetainedResource(nil), plan.Summary.RetainedResources...),
+		MonthlyDelta:      monthly, OneTimeDelta: oneTime, Unknowns: unknowns,
 		EstimateVersion: plan.Estimate.Version, ReservationID: plan.Reservation.ReservationID,
 		ApprovalExpiresAt: plan.Reservation.ExpiresAt,
 	}, nil
@@ -453,6 +462,44 @@ func normalizeChanges(raw []byte) ([]infrastructurev1.ResourceChange, bool, erro
 		return a.Address+"\x00"+a.Provider+"\x00"+a.ResourceType+"\x00"+string(a.Action) < b.Address+"\x00"+b.Provider+"\x00"+b.ResourceType+"\x00"+string(b.Action)
 	})
 	return changes, destructive, nil
+}
+
+func normalizeRetainedResources(values []infrastructurev1.RetainedResource, changes []infrastructurev1.ResourceChange) ([]infrastructurev1.RetainedResource, error) {
+	if len(values) > 1024 {
+		return nil, errors.New("too many retained infrastructure resources")
+	}
+	destructive := make(map[string]struct{}, len(changes))
+	for _, change := range changes {
+		if change.Action == infrastructurev1.ActionDelete || change.Action == infrastructurev1.ActionReplace {
+			destructive[change.Address] = struct{}{}
+		}
+	}
+	result := append([]infrastructurev1.RetainedResource(nil), values...)
+	seen := make(map[string]struct{}, len(result))
+	for index := range result {
+		value := &result[index]
+		value.Address = strings.TrimSpace(value.Address)
+		value.Provider = strings.TrimSpace(value.Provider)
+		value.ResourceType = strings.TrimSpace(value.ResourceType)
+		value.ExternalID = strings.TrimSpace(value.ExternalID)
+		value.Policy = strings.TrimSpace(value.Policy)
+		value.Reason = strings.TrimSpace(value.Reason)
+		if value.Validate() != nil || len(value.Address) > 512 || len(value.Provider) > 512 || len(value.ResourceType) > 256 || len(value.ExternalID) > 512 || len(value.Policy) > 128 || len(value.Reason) > 1024 {
+			return nil, errors.New("invalid retained infrastructure resource")
+		}
+		if _, exists := seen[value.Address]; exists {
+			return nil, errors.New("duplicate retained infrastructure resource")
+		}
+		if _, conflicts := destructive[value.Address]; conflicts {
+			return nil, errors.New("infrastructure resource cannot be deleted and retained")
+		}
+		seen[value.Address] = struct{}{}
+	}
+	sort.Slice(result, func(i, j int) bool {
+		left, right := result[i], result[j]
+		return left.Address+"\x00"+left.Provider+"\x00"+left.ResourceType+"\x00"+left.Policy < right.Address+"\x00"+right.Provider+"\x00"+right.ResourceType+"\x00"+right.Policy
+	})
+	return result, nil
 }
 
 func normalizeAction(actions []string) (infrastructurev1.ChangeAction, bool, error) {

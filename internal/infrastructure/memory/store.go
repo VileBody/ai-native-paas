@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"reflect"
 	"sync"
 	"time"
 
@@ -32,10 +33,11 @@ func (s *Store) PutPlanReceipt(_ context.Context, scope workspace.PlanReceiptSco
 		TenantID: scope.TenantID, ProjectID: scope.ProjectID, WorkspaceID: scope.WorkspaceID,
 		TaskID: scope.TaskID, CommandID: scope.CommandID, ActorID: scope.ActorID,
 		ArtifactDigest: receipt.ArtifactDigest, PlanJSON: append([]byte(nil), receipt.PlanJSON...),
-		CapturedAt: receipt.CapturedAt, ReceivedAt: receipt.CapturedAt,
+		RetainedResources: append([]infrastructurev1.RetainedResource(nil), receipt.RetainedResources...),
+		CapturedAt:        receipt.CapturedAt, ReceivedAt: receipt.CapturedAt,
 	}
 	if stored, ok := s.receipts[scope.CommandID]; ok {
-		if stored.TenantID != candidate.TenantID || stored.ProjectID != candidate.ProjectID || stored.WorkspaceID != candidate.WorkspaceID || stored.ActorID != candidate.ActorID || stored.ArtifactDigest != candidate.ArtifactDigest || string(stored.PlanJSON) != string(candidate.PlanJSON) {
+		if stored.TenantID != candidate.TenantID || stored.ProjectID != candidate.ProjectID || stored.WorkspaceID != candidate.WorkspaceID || stored.ActorID != candidate.ActorID || stored.ArtifactDigest != candidate.ArtifactDigest || string(stored.PlanJSON) != string(candidate.PlanJSON) || !reflect.DeepEqual(stored.RetainedResources, candidate.RetainedResources) {
 			return infraapp.ErrConflict
 		}
 		return nil
@@ -52,6 +54,7 @@ func (s *Store) GetPlanReceipt(_ context.Context, tenantID, projectID, commandID
 		return infraapp.PlanReceiptRecord{}, infraapp.ErrNotFound
 	}
 	receipt.PlanJSON = append([]byte(nil), receipt.PlanJSON...)
+	receipt.RetainedResources = append([]infrastructurev1.RetainedResource(nil), receipt.RetainedResources...)
 	return receipt, nil
 }
 

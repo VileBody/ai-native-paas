@@ -76,16 +76,17 @@ type ApprovalGrant struct {
 }
 
 type PlanReceiptRecord struct {
-	TenantID       string
-	ProjectID      string
-	WorkspaceID    string
-	TaskID         string
-	CommandID      string
-	ActorID        string
-	ArtifactDigest string
-	PlanJSON       []byte
-	CapturedAt     time.Time
-	ReceivedAt     time.Time
+	TenantID          string
+	ProjectID         string
+	WorkspaceID       string
+	TaskID            string
+	CommandID         string
+	ActorID           string
+	ArtifactDigest    string
+	PlanJSON          []byte
+	RetainedResources []infrastructurev1.RetainedResource
+	CapturedAt        time.Time
+	ReceivedAt        time.Time
 }
 
 type ApplyMatch struct {

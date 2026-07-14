@@ -79,17 +79,21 @@ func (s *Store) Migrate(ctx context.Context) error {
 	return nil
 }
 
-const planColumns = `id,tenant_id,requested_by_actor_id,project_id,workspace_id,source_sha,plan_hash,state_generation,changes,destructive,requires_approval,estimate_version,estimate_fingerprint,artifact_digest,target,idempotency_key,idempotency_fingerprint,estimate,reservation,apply_started_at,apply_idempotency_key,apply_authorization_fingerprint,created_at,version`
+const planColumns = `id,tenant_id,requested_by_actor_id,project_id,workspace_id,source_sha,plan_hash,state_generation,changes,retained_resources,destructive,requires_approval,estimate_version,estimate_fingerprint,artifact_digest,target,idempotency_key,idempotency_fingerprint,estimate,reservation,apply_started_at,apply_idempotency_key,apply_authorization_fingerprint,created_at,version`
 
 func (s *Store) PutPlanReceipt(ctx context.Context, scope workspace.PlanReceiptScope, receipt infrastructurev1.AgentPlanReceipt) error {
 	if s == nil || s.DB == nil || receipt.Validate() != nil || scope.TenantID == "" || scope.ProjectID == "" || scope.WorkspaceID == "" || scope.TaskID == "" || scope.CommandID != receipt.CommandID || scope.ActorID == "" {
 		return infraapp.ErrPermissionDenied
 	}
+	retained, err := marshalRetainedResources(receipt.RetainedResources)
+	if err != nil {
+		return infraapp.ErrPermissionDenied
+	}
 	result, err := s.DB.ExecContext(ctx, `
-		INSERT INTO infrastructure.plan_receipts(command_id,tenant_id,project_id,workspace_id,task_id,actor_id,artifact_digest,plan_json,captured_at)
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(command_id) DO NOTHING`,
+		INSERT INTO infrastructure.plan_receipts(command_id,tenant_id,project_id,workspace_id,task_id,actor_id,artifact_digest,plan_json,retained_resources,captured_at)
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(command_id) DO NOTHING`,
 		scope.CommandID, scope.TenantID, scope.ProjectID, scope.WorkspaceID, scope.TaskID, scope.ActorID,
-		receipt.ArtifactDigest, []byte(receipt.PlanJSON), receipt.CapturedAt)
+		receipt.ArtifactDigest, []byte(receipt.PlanJSON), retained, receipt.CapturedAt)
 	if err != nil {
 		return err
 	}
@@ -101,7 +105,7 @@ func (s *Store) PutPlanReceipt(ctx context.Context, scope workspace.PlanReceiptS
 	if err != nil {
 		return err
 	}
-	if stored.WorkspaceID != scope.WorkspaceID || stored.TaskID != scope.TaskID || stored.ActorID != scope.ActorID || stored.ArtifactDigest != receipt.ArtifactDigest || !sameJSON(stored.PlanJSON, receipt.PlanJSON) || stored.CapturedAt.Sub(receipt.CapturedAt).Abs() > time.Microsecond {
+	if stored.WorkspaceID != scope.WorkspaceID || stored.TaskID != scope.TaskID || stored.ActorID != scope.ActorID || stored.ArtifactDigest != receipt.ArtifactDigest || !sameJSON(stored.PlanJSON, receipt.PlanJSON) || !reflect.DeepEqual(stored.RetainedResources, receipt.RetainedResources) || stored.CapturedAt.Sub(receipt.CapturedAt).Abs() > time.Microsecond {
 		return infraapp.ErrConflict
 	}
 	return nil
@@ -114,17 +118,21 @@ func sameJSON(left, right []byte) bool {
 
 func (s *Store) GetPlanReceipt(ctx context.Context, tenantID, projectID, commandID string) (infraapp.PlanReceiptRecord, error) {
 	var receipt infraapp.PlanReceiptRecord
+	var retainedRaw []byte
 	err := s.DB.QueryRowContext(ctx, `
-		SELECT tenant_id,project_id,workspace_id,task_id,command_id,actor_id,artifact_digest,plan_json,captured_at,received_at
+		SELECT tenant_id,project_id,workspace_id,task_id,command_id,actor_id,artifact_digest,plan_json,retained_resources,captured_at,received_at
 		FROM infrastructure.plan_receipts WHERE tenant_id=$1 AND project_id=$2 AND command_id=$3`, tenantID, projectID, commandID).Scan(
 		&receipt.TenantID, &receipt.ProjectID, &receipt.WorkspaceID, &receipt.TaskID, &receipt.CommandID,
-		&receipt.ActorID, &receipt.ArtifactDigest, &receipt.PlanJSON, &receipt.CapturedAt, &receipt.ReceivedAt,
+		&receipt.ActorID, &receipt.ArtifactDigest, &receipt.PlanJSON, &retainedRaw, &receipt.CapturedAt, &receipt.ReceivedAt,
 	)
+	if err == nil {
+		err = json.Unmarshal(retainedRaw, &receipt.RetainedResources)
+	}
 	return receipt, mapNotFound(err)
 }
 
 func (s *Store) CreatePlan(ctx context.Context, record infraapp.PlanRecord) (infraapp.PlanRecord, error) {
-	changes, estimate, reservation, err := marshalPlan(record)
+	changes, retained, estimate, reservation, err := marshalPlan(record)
 	if err != nil {
 		return infraapp.PlanRecord{}, err
 	}
@@ -133,9 +141,9 @@ func (s *Store) CreatePlan(ctx context.Context, record infraapp.PlanRecord) (inf
 		return infraapp.PlanRecord{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	result, err := tx.ExecContext(ctx, `INSERT INTO infrastructure.plans (`+planColumns+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) ON CONFLICT DO NOTHING`,
+	result, err := tx.ExecContext(ctx, `INSERT INTO infrastructure.plans (`+planColumns+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25) ON CONFLICT DO NOTHING`,
 		record.Summary.PlanID, record.TenantID, record.RequestedByActorID, record.Summary.ProjectID, record.Summary.WorkspaceID,
-		record.Summary.SourceSHA, record.Summary.PlanHash, record.Summary.StateGeneration, changes,
+		record.Summary.SourceSHA, record.Summary.PlanHash, record.Summary.StateGeneration, changes, retained,
 		record.Summary.Destructive, record.Summary.RequiresApproval, record.Summary.EstimateVersion,
 		record.Summary.EstimateFingerprint, record.ArtifactDigest, record.Target, record.IdempotencyKey,
 		record.IdempotencyFingerprint, estimate, reservation, nullableTime(record.ApplyStartedAt),
@@ -276,12 +284,12 @@ type rowScanner interface{ Scan(...any) error }
 
 func scanPlan(row rowScanner) (infraapp.PlanRecord, error) {
 	var record infraapp.PlanRecord
-	var changesRaw, estimateRaw, reservationRaw []byte
+	var changesRaw, retainedRaw, estimateRaw, reservationRaw []byte
 	var applyStarted sql.NullTime
 	var applyIdempotencyKey, applyAuthorizationFingerprint sql.NullString
 	err := row.Scan(
 		&record.Summary.PlanID, &record.TenantID, &record.RequestedByActorID, &record.Summary.ProjectID, &record.Summary.WorkspaceID,
-		&record.Summary.SourceSHA, &record.Summary.PlanHash, &record.Summary.StateGeneration, &changesRaw,
+		&record.Summary.SourceSHA, &record.Summary.PlanHash, &record.Summary.StateGeneration, &changesRaw, &retainedRaw,
 		&record.Summary.Destructive, &record.Summary.RequiresApproval, &record.Summary.EstimateVersion,
 		&record.Summary.EstimateFingerprint, &record.ArtifactDigest, &record.Target, &record.IdempotencyKey,
 		&record.IdempotencyFingerprint, &estimateRaw, &reservationRaw, &applyStarted, &applyIdempotencyKey, &applyAuthorizationFingerprint,
@@ -291,6 +299,9 @@ func scanPlan(row rowScanner) (infraapp.PlanRecord, error) {
 		return infraapp.PlanRecord{}, err
 	}
 	if err = json.Unmarshal(changesRaw, &record.Summary.Changes); err != nil {
+		return infraapp.PlanRecord{}, err
+	}
+	if err = json.Unmarshal(retainedRaw, &record.Summary.RetainedResources); err != nil {
 		return infraapp.PlanRecord{}, err
 	}
 	if err = json.Unmarshal(estimateRaw, &record.Estimate); err != nil {
@@ -326,17 +337,28 @@ func (s nullableTimeScan) Scan(value any) error {
 	return nil
 }
 
-func marshalPlan(record infraapp.PlanRecord) ([]byte, []byte, []byte, error) {
+func marshalPlan(record infraapp.PlanRecord) ([]byte, []byte, []byte, []byte, error) {
 	changes, err := json.Marshal(record.Summary.Changes)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+	retained, err := marshalRetainedResources(record.Summary.RetainedResources)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 	estimate, err := json.Marshal(record.Estimate)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	reservation, err := json.Marshal(record.Reservation)
-	return changes, estimate, reservation, err
+	return changes, retained, estimate, reservation, err
+}
+
+func marshalRetainedResources(resources []infrastructurev1.RetainedResource) ([]byte, error) {
+	if len(resources) == 0 {
+		return []byte("[]"), nil
+	}
+	return json.Marshal(resources)
 }
 
 func audit(ctx context.Context, tx *sql.Tx, tenantID, projectID, actorID, action, resourceID string, metadata any, at time.Time) error {

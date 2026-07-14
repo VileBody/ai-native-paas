@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 957,
-  "discovered_unique_test_name_count": 955,
+  "discovered_go_test_count": 962,
+  "discovered_unique_test_name_count": 960,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1348,7 +1348,7 @@
       "id": "G20",
       "level": "application",
       "name": "TestAgent_DestroyWorkflowShowsPlanAndRetainsResourcesByPolicy",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/agent_workspace_test.go",
       "test_name": "TestAgent_DestroyWorkflowShowsPlanAndRetainsResourcesByPolicy",
       "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_DestroyWorkflowShowsPlanAndRetainsResourcesByPolicy"
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 4,
-      "REUSED": 87
+      "NEW": 3,
+      "REUSED": 88
     },
     "unmapped": 0
   }

@@ -6,6 +6,9 @@ import (
 	"errors"
 	"io"
 	"strings"
+
+	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
+	projectv2 "github.com/keir-research/ai-native-paas/pkg/contracts/project/v2"
 )
 
 type receiptPlan struct {
@@ -17,6 +20,17 @@ type receiptPlan struct {
 			Actions []string `json:"actions"`
 		} `json:"change"`
 	} `json:"resource_changes"`
+}
+
+func retainedResourcesFromContract(contract projectv2.Contract) []infrastructurev1.RetainedResource {
+	result := make([]infrastructurev1.RetainedResource, 0, len(contract.Infrastructure.Retention))
+	for _, rule := range contract.Infrastructure.Retention {
+		result = append(result, infrastructurev1.RetainedResource{
+			Address: strings.TrimSpace(rule.Address), Provider: strings.TrimSpace(rule.Provider), ResourceType: strings.TrimSpace(rule.ResourceType),
+			ExternalID: strings.TrimSpace(rule.ExternalID), Policy: "platform.yaml/v2:" + strings.TrimSpace(rule.Policy), Reason: strings.TrimSpace(rule.Reason),
+		})
+	}
+	return result
 }
 
 func normalizePlanReceipt(raw []byte) ([]byte, error) {

@@ -65,11 +65,22 @@ func TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan(t *testing.T) {
 		SessionID: "session-pg", ExecutionSessionID: "session-pg", CommandID: "command-pg",
 		ArtifactDigest: "sha256:" + strings.Repeat("b", 64), CapturedAt: now,
 		PlanJSON: []byte(`{"resource_changes":[{"address":"twc_server.app","provider_name":"timeweb","type":"twc_server","change":{"actions":["create"]}}]}`),
+		RetainedResources: []infrastructurev1.RetainedResource{{
+			Address: "cozystack_postgres.primary", Provider: "cozystack", ResourceType: "cozystack_postgres",
+			ExternalID: "postgres-primary", Policy: "platform.yaml/v2:retain", Reason: "production data retention policy",
+		}},
 	}
-	if err := store.PutPlanReceipt(context.Background(), workspace.PlanReceiptScope{
+	scope := workspace.PlanReceiptScope{
 		TenantID: "tenant-pg", ProjectID: "project-pg", WorkspaceID: "workspace-pg", TaskID: "task-pg", CommandID: "command-pg", ActorID: "agent-pg",
-	}, receipt); err != nil {
+	}
+	if err := store.PutPlanReceipt(context.Background(), scope, receipt); err != nil {
 		t.Fatal(err)
+	}
+	changedReceipt := receipt
+	changedReceipt.RetainedResources = append([]infrastructurev1.RetainedResource(nil), receipt.RetainedResources...)
+	changedReceipt.RetainedResources[0].Reason = "changed retention basis"
+	if err := store.PutPlanReceipt(context.Background(), scope, changedReceipt); !errors.Is(err, infraapp.ErrConflict) {
+		t.Fatalf("PostgreSQL receipt replay changed retention decision: %v", err)
 	}
 	command := infraapp.ReceiptPlanCommand{
 		TenantID: "tenant-pg", ProjectID: "project-pg", ActorID: "agent-pg", WorkspaceID: "workspace-pg", CommandID: "command-pg", Target: "production",
@@ -78,6 +89,15 @@ func TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan(t *testing.T) {
 	plan, err := service.PlanFromReceipt(context.Background(), command)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(plan.Summary.RetainedResources) != 1 || plan.Summary.RetainedResources[0].ExternalID != "postgres-primary" {
+		t.Fatalf("retention was not durable through PostgreSQL: %+v", plan.Summary.RetainedResources)
+	}
+	if _, err = db.Exec(`UPDATE infrastructure.plans SET retained_resources='[]'::jsonb WHERE id=$1`, plan.Summary.PlanID); err == nil {
+		t.Fatal("durable plan retention was mutable")
+	}
+	if _, err = db.Exec(`UPDATE infrastructure.plan_receipts SET retained_resources='[]'::jsonb WHERE command_id=$1`, receipt.CommandID); err == nil {
+		t.Fatal("authenticated receipt retention was mutable")
 	}
 	replayed, err := service.PlanFromReceipt(context.Background(), command)
 	if err != nil || replayed.Summary.PlanID != plan.Summary.PlanID {
@@ -163,6 +183,64 @@ func TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan(t *testing.T) {
 	}
 	if _, err := db.Exec(`UPDATE infrastructure.approval_grants SET actor_id='attacker' WHERE id=$1`, grant.GrantID); err == nil {
 		t.Fatal("approval identity mutation was accepted")
+	}
+}
+
+func TestPostgres_InfrastructureMigration005BackfillsRetentionArrays(t *testing.T) {
+	db, store := migratedInfrastructureStore(t)
+	now := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	service := &infraapp.Service{
+		Store: store, Clock: infrastructureClock{now: now}, IDs: &infrastructureIDs{},
+		Prices: infraapp.PriceBook{
+			RateCard: commercev2.RateCard{RateCardID: "beta-retention-upgrade", Version: "1", MarkupBasisPoints: 1000, Currency: "RUB", PriceSnapshotID: "prices-retention-upgrade"},
+			Prices:   map[string]infraapp.UnitPrice{"twc_server": {Meter: "server.month", Unit: "server-month", ProviderMinorPerQuantity: 1000, Known: true}},
+		},
+	}
+	receipt := infrastructurev1.AgentPlanReceipt{
+		SessionID: "session-retention-upgrade", ExecutionSessionID: "session-retention-upgrade", CommandID: "command-retention-upgrade",
+		ArtifactDigest: "sha256:" + strings.Repeat("f", 64), CapturedAt: now,
+		PlanJSON: []byte(`{"resource_changes":[{"address":"twc_server.legacy","provider_name":"timeweb","type":"twc_server","change":{"actions":["create"]}}]}`),
+	}
+	if err := store.PutPlanReceipt(context.Background(), workspace.PlanReceiptScope{
+		TenantID: "tenant-retention-upgrade", ProjectID: "project-retention-upgrade", WorkspaceID: "workspace-retention-upgrade",
+		TaskID: "task-retention-upgrade", CommandID: receipt.CommandID, ActorID: "agent-retention-upgrade",
+	}, receipt); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := service.PlanFromReceipt(context.Background(), infraapp.ReceiptPlanCommand{
+		TenantID: "tenant-retention-upgrade", ProjectID: "project-retention-upgrade", ActorID: "agent-retention-upgrade",
+		WorkspaceID: "workspace-retention-upgrade", CommandID: receipt.CommandID, Target: "staging",
+		SourceSHA: strings.Repeat("a", 40), IdempotencyKey: "plan-retention-upgrade", StateGeneration: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(`
+		ALTER TABLE infrastructure.plans DROP COLUMN retained_resources;
+		ALTER TABLE infrastructure.plan_receipts DROP COLUMN retained_resources;
+		DELETE FROM infrastructure.schema_migrations WHERE version='005_retained_resources.sql';
+	`); err != nil {
+		t.Fatal(err)
+	}
+	if err = store.Migrate(context.Background()); err != nil {
+		t.Fatalf("migrate schema 004 with existing plan and receipt to 005: %v", err)
+	}
+	var planType, receiptType string
+	var planCount, receiptCount int
+	if err = db.QueryRow(`SELECT jsonb_typeof(retained_resources),jsonb_array_length(retained_resources) FROM infrastructure.plans WHERE id=$1`, plan.Summary.PlanID).Scan(&planType, &planCount); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.QueryRow(`SELECT jsonb_typeof(retained_resources),jsonb_array_length(retained_resources) FROM infrastructure.plan_receipts WHERE command_id=$1`, receipt.CommandID).Scan(&receiptType, &receiptCount); err != nil {
+		t.Fatal(err)
+	}
+	if planType != "array" || receiptType != "array" || planCount != 0 || receiptCount != 0 {
+		t.Fatalf("migration 005 backfill plan=%s/%d receipt=%s/%d", planType, planCount, receiptType, receiptCount)
+	}
+	if _, err = store.GetPlan(context.Background(), "tenant-retention-upgrade", "project-retention-upgrade", plan.Summary.PlanID); err != nil {
+		t.Fatalf("read plan after migration 005: %v", err)
+	}
+	if _, err = store.GetPlanReceipt(context.Background(), "tenant-retention-upgrade", "project-retention-upgrade", receipt.CommandID); err != nil {
+		t.Fatalf("read receipt after migration 005: %v", err)
 	}
 }
 

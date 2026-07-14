@@ -56,9 +56,19 @@ type WorkspacePolicy struct {
 }
 
 type InfrastructureSpec struct {
-	Engine       string `json:"engine" yaml:"engine"`
-	Root         string `json:"root" yaml:"root"`
-	StateBackend string `json:"stateBackend" yaml:"stateBackend"`
+	Engine       string          `json:"engine" yaml:"engine"`
+	Root         string          `json:"root" yaml:"root"`
+	StateBackend string          `json:"stateBackend" yaml:"stateBackend"`
+	Retention    []RetentionRule `json:"retention,omitempty" yaml:"retention,omitempty"`
+}
+
+type RetentionRule struct {
+	Address      string `json:"address" yaml:"address"`
+	Provider     string `json:"provider" yaml:"provider"`
+	ResourceType string `json:"resourceType" yaml:"resourceType"`
+	ExternalID   string `json:"externalId,omitempty" yaml:"externalId,omitempty"`
+	Policy       string `json:"policy" yaml:"policy"`
+	Reason       string `json:"reason" yaml:"reason"`
 }
 
 type BuildPolicy struct {
@@ -129,6 +139,26 @@ func (c Contract) Validate() error {
 	}
 	if c.Infrastructure.Engine != "opentofu" || c.Infrastructure.StateBackend != "platform" || !safeRelativePath(c.Infrastructure.Root) {
 		return errors.New("invalid infrastructure policy")
+	}
+	if len(c.Infrastructure.Retention) > 1024 {
+		return errors.New("too many infrastructure retention rules")
+	}
+	retained := make(map[string]struct{}, len(c.Infrastructure.Retention))
+	for _, rule := range c.Infrastructure.Retention {
+		rule.Address, rule.Provider, rule.ResourceType = strings.TrimSpace(rule.Address), strings.TrimSpace(rule.Provider), strings.TrimSpace(rule.ResourceType)
+		rule.ExternalID, rule.Policy, rule.Reason = strings.TrimSpace(rule.ExternalID), strings.TrimSpace(rule.Policy), strings.TrimSpace(rule.Reason)
+		if rule.Address == "" || len(rule.Address) > 512 || rule.Provider == "" || len(rule.Provider) > 512 ||
+			rule.ResourceType == "" || len(rule.ResourceType) > 256 || len(rule.ExternalID) > 512 ||
+			rule.Policy != "retain" || rule.Reason == "" || len(rule.Reason) > 1024 ||
+			strings.ContainsRune(rule.Address, '\x00') || strings.ContainsRune(rule.Provider, '\x00') ||
+			strings.ContainsRune(rule.ResourceType, '\x00') || strings.ContainsRune(rule.ExternalID, '\x00') ||
+			strings.ContainsRune(rule.Policy, '\x00') || strings.ContainsRune(rule.Reason, '\x00') {
+			return errors.New("invalid infrastructure retention rule")
+		}
+		if _, exists := retained[rule.Address]; exists {
+			return errors.New("duplicate infrastructure retention rule")
+		}
+		retained[rule.Address] = struct{}{}
 	}
 	if c.GitOps.Engine != "argocd" || !safeRelativePath(c.GitOps.Root) {
 		return errors.New("invalid GitOps policy")

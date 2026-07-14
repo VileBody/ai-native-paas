@@ -58,6 +58,33 @@ func TestPlatformYAMLV2_StrictAndSafe(t *testing.T) {
 	}
 }
 
+func TestPlatformYAMLV2_RetentionRulesAreStrictAndExplicit(t *testing.T) {
+	withRetention := stringsReplace(validContract, "  stateBackend: platform\n", `  stateBackend: platform
+  retention:
+    - address: cozystack_postgres.primary
+      provider: cozystack
+      resourceType: cozystack_postgres
+      externalId: postgres-primary
+      policy: retain
+      reason: production data retention policy
+`)
+	contract, err := Parse([]byte(withRetention))
+	if err != nil || len(contract.Infrastructure.Retention) != 1 || contract.Infrastructure.Retention[0].Policy != "retain" {
+		t.Fatalf("retention=%+v error=%v", contract.Infrastructure.Retention, err)
+	}
+	for _, invalid := range []string{
+		stringsReplace(withRetention, "policy: retain", "policy: destroy"),
+		stringsReplace(withRetention, "cozystack_postgres.primary", ""),
+		stringsReplace(withRetention, "provider: cozystack", "provider: ''"),
+		stringsReplace(withRetention, "production data retention policy", ""),
+		stringsReplace(withRetention, "      reason: production data retention policy\n", "      reason: production data retention policy\n    - address: cozystack_postgres.primary\n      provider: cozystack\n      resourceType: cozystack_postgres\n      policy: retain\n      reason: duplicate\n"),
+	} {
+		if _, err := Parse([]byte(invalid)); err == nil {
+			t.Fatal("invalid retention rule accepted")
+		}
+	}
+}
+
 func stringsReplace(value, old, replacement string) string {
 	for i := 0; i+len(old) <= len(value); i++ {
 		if value[i:i+len(old)] == old {

@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **957**
-- Reused now: **87**
-- New local/contract tests required: **4**
+- Discovered Go tests/fuzz targets: **962**
+- Reused now: **88**
+- New local/contract tests required: **3**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -148,7 +148,7 @@ A release gate may become green only after every referenced test exists and pass
 | `G17` | REUSED | live state backend/concurrency | `test/integration/postgres_remotestate_test.go::TestInfraState_RemoteLockPreventsConcurrentMutation` |
 | `G18` | LIVE_ONLY | orchestration | `test/pivot/agent_workspace_test.go::TestAgent_GitOpsCommitOccursOnlyAfterInfraDependenciesReady` |
 | `G19` | NEW | acceptance | `test/pivot/agent_workspace_test.go::TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix` |
-| `G20` | NEW | application | `test/pivot/agent_workspace_test.go::TestAgent_DestroyWorkflowShowsPlanAndRetainsResourcesByPolicy` |
+| `G20` | REUSED | application | `test/pivot/agent_workspace_test.go::TestAgent_DestroyWorkflowShowsPlanAndRetainsResourcesByPolicy` |
 | `G21` | LIVE_ONLY | security acceptance | `test/pivot/agent_workspace_test.go::TestAgent_NeverReceivesPlatformOrProviderMasterCredential` |
 | `G22` | NEW | cross-domain | `test/pivot/agent_workspace_test.go::TestAgent_SecretSetIsWriteOnlyAcrossMCPAndWorkspace` |
 | `G23` | LIVE_ONLY | application | `test/pivot/agent_workspace_test.go::TestAgent_CostThresholdPausesBeforeApplyAndNotifiesHuman` |

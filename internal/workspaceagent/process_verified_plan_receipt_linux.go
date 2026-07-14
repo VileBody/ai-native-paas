@@ -13,11 +13,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
+	projectv2 "github.com/keir-research/ai-native-paas/pkg/contracts/project/v2"
 )
 
 func ExecuteVerifiedTofuPlan(arguments []string) error {
@@ -26,6 +28,10 @@ func ExecuteVerifiedTofuPlan(arguments []string) error {
 		return err
 	}
 	if err := verifyWorkspaceSource(expectedSourceSHA, planPath); err != nil {
+		return err
+	}
+	retained, err := loadRetainedResources()
+	if err != nil {
 		return err
 	}
 	configFile := os.Getenv("WORKSPACE_AGENT_CONFIG_FILE")
@@ -99,7 +105,8 @@ func ExecuteVerifiedTofuPlan(arguments []string) error {
 	}
 	receipt := infrastructurev1.AgentPlanReceipt{
 		SessionID: sessionID, ExecutionSessionID: sessionID, CommandID: commandID,
-		ArtifactDigest: "sha256:" + hex.EncodeToString(hash.Sum(nil)), PlanJSON: normalized, CapturedAt: time.Now().UTC(),
+		ArtifactDigest: "sha256:" + hex.EncodeToString(hash.Sum(nil)), PlanJSON: normalized,
+		RetainedResources: retained, CapturedAt: time.Now().UTC(),
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
@@ -107,6 +114,44 @@ func ExecuteVerifiedTofuPlan(arguments []string) error {
 		return fmt.Errorf("submit authenticated OpenTofu plan receipt: %w", err)
 	}
 	return nil
+}
+
+func loadRetainedResources() ([]infrastructurev1.RetainedResource, error) {
+	git, err := exec.LookPath("git")
+	if err != nil {
+		return nil, errors.New("Git executable is unavailable")
+	}
+	rawRoot, err := exec.Command(git, "rev-parse", "--show-toplevel").Output()
+	root := strings.TrimSpace(string(rawRoot))
+	if err != nil || !filepath.IsAbs(root) || filepath.Clean(root) != root {
+		return nil, errors.New("workspace repository root is unavailable")
+	}
+	fd, err := syscall.Open(filepath.Join(root, "platform.yaml"), syscall.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, errors.New("open platform contract")
+	}
+	file := os.NewFile(uintptr(fd), "platform.yaml")
+	if file == nil {
+		_ = syscall.Close(fd)
+		return nil, errors.New("open platform contract")
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > 1<<20 {
+		return nil, errors.New("platform contract is not a bounded regular file")
+	}
+	raw, err := io.ReadAll(io.LimitReader(file, (1<<20)+1))
+	if err != nil || len(raw) > 1<<20 {
+		return nil, errors.New("read platform contract")
+	}
+	contract, err := projectv2.Parse(raw)
+	for index := range raw {
+		raw[index] = 0
+	}
+	if err != nil {
+		return nil, errors.New("validate platform contract")
+	}
+	return retainedResourcesFromContract(contract), nil
 }
 
 func verifyWorkspaceSource(expected, planPath string) error {
