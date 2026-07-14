@@ -67,7 +67,9 @@ def load_json(path: Path) -> object:
 
 def discover_tests(root: Path) -> dict[str, list[str]]:
     tests: dict[str, list[str]] = {}
-    ignored = {"vendor", ".git", ".terraform"}
+    # Product evidence must be reproducible from product tests. Local Codex/app
+    # tooling can contain its own Go tests and must not change release counts.
+    ignored = {"vendor", "tools", ".topology", ".git", ".terraform"}
     for path in sorted(root.rglob("*_test.go")):
         if ignored.intersection(path.parts):
             continue

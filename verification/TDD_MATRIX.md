@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **942**
-- Reused now: **76**
-- New local/contract tests required: **15**
+- Discovered Go tests/fuzz targets: **943**
+- Reused now: **77**
+- New local/contract tests required: **14**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -110,7 +110,7 @@ A release gate may become green only after every referenced test exists and pass
 | `A5.29` | REUSED | cross-domain | `internal/runtime/application/gitops_saga_test.go::TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs` |
 | `A5.30` | LIVE_ONLY | DNS provider integration | `test/pivot/attachments_v2_test.go::TestDomain_OwnershipProofRequiresIndependentDNSObservations` |
 | `A5.31` | LIVE_ONLY | provider/runtime integration | `test/pivot/attachments_v2_test.go::TestDomain_RouteActivatesOnlyAfterOwnershipAndTLSReady` |
-| `A5.32` | NEW | domain + fake clock | `test/pivot/attachments_v2_test.go::TestDomain_ReleaseEntersQuarantineBeforeAnotherTenantCanClaim` |
+| `A5.32` | REUSED | domain + fake clock | `test/pivot/attachments_v2_test.go::TestDomain_ReleaseEntersQuarantineBeforeAnotherTenantCanClaim` |
 | `C1` | REUSED | application/golden | `test/pivot/commerce_v2_test.go::TestCost_TofuPlanProducesDeterministicNormalizedEstimate` |
 | `C2` | LIVE_ONLY | domain | `test/pivot/commerce_v2_test.go::TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement` |
 | `C3` | LIVE_ONLY | application | `test/pivot/commerce_v2_test.go::TestCost_HelmResourcesContributeRequestedRuntimeAllocation` |

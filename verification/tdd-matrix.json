@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 942,
-  "discovered_unique_test_name_count": 940,
+  "discovered_go_test_count": 943,
+  "discovered_unique_test_name_count": 941,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -968,7 +968,7 @@
       "id": "A5.32",
       "level": "domain + fake clock",
       "name": "TestDomain_ReleaseEntersQuarantineBeforeAnotherTenantCanClaim",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/attachments_v2_test.go",
       "test_name": "TestDomain_ReleaseEntersQuarantineBeforeAnotherTenantCanClaim",
       "test_ref": "test/pivot/attachments_v2_test.go::TestDomain_ReleaseEntersQuarantineBeforeAnotherTenantCanClaim"
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 15,
-      "REUSED": 76
+      "NEW": 14,
+      "REUSED": 77
     },
     "unmapped": 0
   }
