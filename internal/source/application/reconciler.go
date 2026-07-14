@@ -78,6 +78,9 @@ func (r *Reconciler) reconcileOne(ctx context.Context, repo domain.Repository, r
 				return err
 			}
 			result.BranchChanges++
+			if err = appendRevisionObserved(tx, r.IDs, current, remote.DefaultBranch, head, "reconciliation", "", r.Clock.Now()); err != nil {
+				return err
+			}
 			payload, _ := json.Marshal(map[string]any{"repository_id": repo.ID, "branch": remote.DefaultBranch, "commit_sha": head, "reason": "reconciliation"})
 			if err = tx.AppendOutbox(OutboxRecord{ID: r.IDs.NewID("evt"), Topic: "source.push.v1", AggregateID: repo.ID, Payload: payload, CreatedAt: r.Clock.Now()}); err != nil {
 				return err

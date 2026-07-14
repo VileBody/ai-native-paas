@@ -4,6 +4,7 @@ package postgres_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,7 +14,16 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/keir-research/ai-native-paas/internal/source/application"
+	"github.com/keir-research/ai-native-paas/internal/source/domain"
+	sourcepostgres "github.com/keir-research/ai-native-paas/internal/source/postgres"
 )
+
+func init() {
+	sql.Register("source_test_pgx", stdlib.GetDefaultDriver())
+}
 
 var liveMu sync.Mutex
 
@@ -64,13 +74,17 @@ func reset(t *testing.T) {
 	if _, err := psql(t, "DROP SCHEMA IF EXISTS source CASCADE;"); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"001_source.sql", "002_audit_immutability.sql", "003_provider_identity.sql"} {
-		raw, err := os.ReadFile(filepath.Join(rootDir(t), "migrations", "source", name))
+	names, err := filepath.Glob(filepath.Join(rootDir(t), "migrations", "source", "*.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range names {
+		raw, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if _, err = psql(t, string(raw)); err != nil {
-			t.Fatalf("migration %s: %v", name, err)
+			t.Fatalf("migration %s: %v", filepath.Base(path), err)
 		}
 	}
 }
@@ -87,11 +101,67 @@ func TestPostgres_SourceMigrationsCleanInstallAndUpgrade(t *testing.T) {
 	if n < 10 {
 		t.Fatalf("tables=%d", n)
 	}
-	for _, name := range []string{"001_source.sql", "002_audit_immutability.sql", "003_provider_identity.sql"} {
-		raw, _ := os.ReadFile(filepath.Join(rootDir(t), "migrations", "source", name))
+	names, err := filepath.Glob(filepath.Join(rootDir(t), "migrations", "source", "*.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range names {
+		raw, _ := os.ReadFile(path)
 		if _, err = psql(t, string(raw)); err != nil {
-			t.Fatalf("idempotent rerun %s: %v", name, err)
+			t.Fatalf("idempotent rerun %s: %v", filepath.Base(path), err)
 		}
+	}
+}
+
+func TestPostgres_BranchEnvironmentBindingAndDeletionPersist(t *testing.T) {
+	reset(t)
+	if _, err := psql(t, seedSQL()+" INSERT INTO source.branch_heads(repository_id,name,commit_sha,environment_id,deleted_at,version) VALUES('r','preview/7',repeat('a',40),'env-7',now(),2);"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := psql(t, "SELECT environment_id || ':' || (deleted_at IS NOT NULL)::text FROM source.branch_heads WHERE repository_id='r' AND name='preview/7';")
+	if err != nil || out != "env-7:true" {
+		t.Fatalf("out=%q err=%v", out, err)
+	}
+}
+
+func TestPostgres_BranchEnvironmentStateRoundTripsThroughStore(t *testing.T) {
+	reset(t)
+	if _, err := psql(t, seedSQL()); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("source_test_pgx", dsn(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := &sourcepostgres.Store{DB: db}
+	observedAt := time.Date(2026, 7, 14, 14, 0, 0, 0, time.UTC)
+	branch, err := domain.NewBranchHead("r", "preview/store")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = branch.BindPreviewEnvironment("env-store"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = branch.ObserveDeletion("delete-store", observedAt, observedAt); err != nil {
+		t.Fatal(err)
+	}
+	if err = store.Transact(context.Background(), func(tx application.Tx) error { return tx.UpsertBranch(branch, 0) }); err != nil {
+		t.Fatal(err)
+	}
+	var restored domain.BranchHead
+	if err = store.Transact(context.Background(), func(tx application.Tx) error {
+		var ok bool
+		restored, ok = tx.GetBranch("r", "preview/store")
+		if !ok {
+			return fmt.Errorf("branch missing")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if restored.EnvironmentID != "env-store" || restored.LastEventID != "delete-store" || !restored.DeletedAt.Equal(observedAt) {
+		t.Fatalf("restored=%+v", restored)
 	}
 }
 func TestPostgres_ProjectRepositoryOutboxAtomic(t *testing.T) {

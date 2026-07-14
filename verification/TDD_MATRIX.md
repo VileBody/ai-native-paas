@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **881**
-- Reused now: **38**
-- New local/contract tests required: **46**
-- Live/provider/system tests required: **73**
+- Discovered Go tests/fuzz targets: **890**
+- Reused now: **41**
+- New local/contract tests required: **44**
+- Live/provider/system tests required: **72**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -36,11 +36,11 @@ A release gate may become green only after every referenced test exists and pass
 | `S6` | REUSED | Git integration + concurrency | `internal/workspaceagent/source_v2_test.go::TestSource_ConcurrentPushUsesExpectedBaseSHA` |
 | `S7` | REUSED | application | `internal/workspaceagent/source_v2_test.go::TestSource_SecretScannerBlocksCredentialBeforeCommit` |
 | `S8` | LIVE_ONLY | real GitLab provider | `test/pivot/source_v2_test.go::TestSource_ProjectTokenCannotReadSiblingRepository` |
-| `S9` | LIVE_ONLY | application + provider fake | `test/pivot/source_v2_test.go::TestSource_MissedWebhookRecoveredByBranchReconciler` |
-| `S10` | NEW | application | `test/pivot/source_v2_test.go::TestSource_OutOfOrderWebhookCannotRegressObservedHead` |
+| `S9` | REUSED | application + provider fake | `test/pivot/source_v2_test.go::TestSource_MissedWebhookRecoveredByBranchReconciler` |
+| `S10` | REUSED | application | `test/pivot/source_v2_test.go::TestSource_OutOfOrderWebhookCannotRegressObservedHead` |
 | `S11` | LIVE_ONLY | real GitLab provider | `test/pivot/source_v2_test.go::TestSource_RenameKeepsNumericProviderIdentity` |
 | `S12` | LIVE_ONLY | GitLab contract | `test/pivot/source_v2_test.go::TestSource_MergeRequestPublishesPlanSummaryWithoutSecrets` |
-| `S13` | NEW | application | `test/pivot/source_v2_test.go::TestSource_DeletedBranchProducesEnvironmentCleanupIntent` |
+| `S13` | REUSED | application | `test/pivot/source_v2_test.go::TestSource_DeletedBranchProducesEnvironmentCleanupIntent` |
 | `S14` | REUSED | integration | `internal/workspaceagent/source_v2_test.go::TestSource_SubmoduleAndLFSFollowExplicitPolicy` |
 | `S15` | LIVE_ONLY | provider contract | `test/pivot/source_v2_test.go::TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency` |
 | `S16` | LIVE_ONLY | application + provider | `test/pivot/source_v2_test.go::TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge` |

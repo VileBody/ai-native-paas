@@ -43,3 +43,12 @@ func TestMigrations_WebhookAndIdempotencyHaveCompositePrimaryKeys(t *testing.T) 
 		t.Fatal("dedupe keys missing")
 	}
 }
+
+func TestMigrations_PreviewEnvironmentBindingAndDeletionAreDurable(t *testing.T) {
+	sql := migration(t, "004_branch_environment_cleanup.sql")
+	for _, required := range []string{"environment_id", "deleted_at", "source_branch_environment_identity_idx"} {
+		if !strings.Contains(sql, required) {
+			t.Fatalf("missing %s", required)
+		}
+	}
+}

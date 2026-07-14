@@ -15,6 +15,11 @@ import (
 
 const APIVersion = "source.platform.example.com/v2"
 
+const (
+	EventRevisionObserved            = "source.revision_observed.v2"
+	EventEnvironmentCleanupRequested = "source.environment_cleanup_requested.v2"
+)
+
 var (
 	fullSHA = regexp.MustCompile(`^[0-9a-f]{40,64}$`)
 	digest  = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
@@ -27,6 +32,48 @@ type RepositoryRef struct {
 	CloneURL      string `json:"clone_url"`
 	WebURL        string `json:"web_url"`
 	DefaultBranch string `json:"default_branch"`
+}
+
+// RevisionObservedEvent is the canonical source-to-build/runtime notification.
+// Reason is deliberately bounded so consumers never need to interpret provider
+// webhook payloads.
+type RevisionObservedEvent struct {
+	TenantID        string    `json:"tenant_id"`
+	ProjectID       string    `json:"project_id"`
+	RepositoryID    string    `json:"repository_id"`
+	Branch          string    `json:"branch"`
+	CommitSHA       string    `json:"commit_sha"`
+	Reason          string    `json:"reason"`
+	ProviderEventID string    `json:"provider_event_id,omitempty"`
+	ObservedAt      time.Time `json:"observed_at"`
+}
+
+func (e RevisionObservedEvent) Validate() error {
+	if strings.TrimSpace(e.TenantID) == "" || strings.TrimSpace(e.ProjectID) == "" || strings.TrimSpace(e.RepositoryID) == "" || !safeBranch(e.Branch) || !fullSHA.MatchString(e.CommitSHA) || (e.Reason != "webhook" && e.Reason != "reconciliation") || e.ObservedAt.IsZero() {
+		return errors.New("invalid revision observed event")
+	}
+	return nil
+}
+
+// EnvironmentCleanupRequestedEvent is an intent only. Source control emits it
+// after a mapped preview branch disappears; a governed runtime consumer owns
+// any eventual cleanup side effect.
+type EnvironmentCleanupRequestedEvent struct {
+	TenantID        string    `json:"tenant_id"`
+	ProjectID       string    `json:"project_id"`
+	RepositoryID    string    `json:"repository_id"`
+	Branch          string    `json:"branch"`
+	EnvironmentID   string    `json:"environment_id"`
+	Reason          string    `json:"reason"`
+	ProviderEventID string    `json:"provider_event_id"`
+	RequestedAt     time.Time `json:"requested_at"`
+}
+
+func (e EnvironmentCleanupRequestedEvent) Validate() error {
+	if strings.TrimSpace(e.TenantID) == "" || strings.TrimSpace(e.ProjectID) == "" || strings.TrimSpace(e.RepositoryID) == "" || !safeBranch(e.Branch) || strings.TrimSpace(e.EnvironmentID) == "" || e.Reason != "branch_deleted" || strings.TrimSpace(e.ProviderEventID) == "" || e.RequestedAt.IsZero() {
+		return errors.New("invalid environment cleanup request")
+	}
+	return nil
 }
 
 type SourceRevision struct {

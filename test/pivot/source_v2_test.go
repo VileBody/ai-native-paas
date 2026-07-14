@@ -1,0 +1,199 @@
+package pivot_test
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"testing"
+	"time"
+
+	sourceapp "github.com/keir-research/ai-native-paas/internal/source/application"
+	"github.com/keir-research/ai-native-paas/internal/source/domain"
+	"github.com/keir-research/ai-native-paas/internal/source/memory"
+	"github.com/keir-research/ai-native-paas/internal/source/testkit"
+	sourcehook "github.com/keir-research/ai-native-paas/internal/source/webhook"
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
+)
+
+type sourceV2Fixture struct {
+	service    *sourceapp.Service
+	hooks      *sourceapp.WebhookService
+	store      *memory.Store
+	provider   *testkit.Provider
+	clock      *testkit.Clock
+	ids        *testkit.IDs
+	project    domain.Project
+	repository domain.Repository
+}
+
+func newSourceV2Fixture(t *testing.T) sourceV2Fixture {
+	t.Helper()
+	store := memory.New()
+	provider := testkit.NewProvider()
+	clock := &testkit.Clock{T: time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)}
+	ids := &testkit.IDs{}
+	service := &sourceapp.Service{Store: store, Provider: provider, Clock: clock, IDs: ids}
+	created, err := service.CreateProject(context.Background(), sourceapp.CreateProjectCommand{
+		TenantID: "tenant-1", ActorID: "user-1", Name: "Source recovery", ProviderNamespaceID: 10, IdempotencyKey: "project-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository, err := service.ProvisionRepository(context.Background(), sourceapp.ProvisionRepositoryCommand{TenantID: "tenant-1", ActorID: "user-1", RepositoryID: created.Repository.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hooks := &sourceapp.WebhookService{
+		Store: store, Provider: provider, Verifier: sourcehook.Verifier{Secret: []byte("source-v2-webhook-secret")},
+		Normalizer: sourcehook.Normalizer{Provider: "gitlab"}, Clock: clock, IDs: ids,
+	}
+	return sourceV2Fixture{service: service, hooks: hooks, store: store, provider: provider, clock: clock, ids: ids, project: created.Project, repository: repository}
+}
+
+func sourceV2PushBody(projectID int64, before, after, branch string, occurredAt time.Time) []byte {
+	return []byte(fmt.Sprintf(`{"object_kind":"push","before":"%s","after":"%s","ref":"refs/heads/%s","project":{"id":%d},"event_created_at":"%s"}`, before, after, branch, projectID, occurredAt.Format(time.RFC3339Nano)))
+}
+
+func sourceV2Headers(body []byte, eventID string, signedAt time.Time) map[string][]string {
+	timestamp, signature := sourcehook.Sign([]byte("source-v2-webhook-secret"), eventID, signedAt, body)
+	return map[string][]string{"webhook-id": {eventID}, "webhook-timestamp": {timestamp}, "webhook-signature": {signature}}
+}
+
+func sourceV2Outbox(store *memory.Store, topic string) []sourceapp.OutboxRecord {
+	_, _, outbox, _ := store.Snapshot()
+	var result []sourceapp.OutboxRecord
+	for _, record := range outbox {
+		if record.Topic == topic {
+			result = append(result, record)
+		}
+	}
+	return result
+}
+
+func TestSource_MissedWebhookRecoveredByBranchReconciler(t *testing.T) {
+	fixture := newSourceV2Fixture(t)
+	observedA := strings.Repeat("a", 40)
+	providerB := strings.Repeat("b", 40)
+	if err := fixture.store.Transact(context.Background(), func(tx sourceapp.Tx) error {
+		branch, err := domain.NewBranchHead(fixture.repository.ID, fixture.repository.DefaultBranch)
+		if err != nil {
+			return err
+		}
+		if _, err = branch.SetAuthoritative(observedA, fixture.clock.Now()); err != nil {
+			return err
+		}
+		return tx.UpsertBranch(branch, 0)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fixture.provider.SetHead(fixture.repository.ProviderProjectID, fixture.repository.DefaultBranch, providerB)
+	reconciler := sourceapp.Reconciler{Store: fixture.store, Provider: fixture.provider, Clock: fixture.clock, IDs: fixture.ids}
+	first, err := reconciler.ReconcileAll(context.Background())
+	if err != nil || first.BranchChanges != 1 {
+		t.Fatalf("first reconcile=%+v err=%v", first, err)
+	}
+	second, err := reconciler.ReconcileAll(context.Background())
+	if err != nil || second.BranchChanges != 0 {
+		t.Fatalf("second reconcile=%+v err=%v", second, err)
+	}
+	events := sourceV2Outbox(fixture.store, sourcev2.EventRevisionObserved)
+	if len(events) != 1 {
+		t.Fatalf("revision events=%d", len(events))
+	}
+	var event sourcev2.RevisionObservedEvent
+	if err := json.Unmarshal(events[0].Payload, &event); err != nil || event.Validate() != nil || event.CommitSHA != providerB || event.Reason != "reconciliation" {
+		t.Fatalf("event=%+v err=%v", event, err)
+	}
+}
+
+func TestSource_OutOfOrderWebhookCannotRegressObservedHead(t *testing.T) {
+	fixture := newSourceV2Fixture(t)
+	shaA := strings.Repeat("a", 40)
+	shaB := strings.Repeat("b", 40)
+	fixture.provider.SetHead(fixture.repository.ProviderProjectID, "main", shaB)
+	newer := sourceV2PushBody(fixture.repository.ProviderProjectID, shaA, shaB, "main", fixture.clock.Now())
+	if result, err := fixture.hooks.Handle(context.Background(), "tenant-1", sourceV2Headers(newer, "event-b", fixture.clock.Now()), newer); err != nil || result.Stale {
+		t.Fatalf("newer result=%+v err=%v", result, err)
+	}
+	olderAt := fixture.clock.Now().Add(-time.Minute)
+	older := sourceV2PushBody(fixture.repository.ProviderProjectID, strings.Repeat("0", 40), shaA, "main", olderAt)
+	result, err := fixture.hooks.Handle(context.Background(), "tenant-1", sourceV2Headers(older, "event-a", fixture.clock.Now()), older)
+	if err != nil || !result.Stale || result.Duplicate {
+		t.Fatalf("older result=%+v err=%v", result, err)
+	}
+	replay, err := fixture.hooks.Handle(context.Background(), "tenant-1", sourceV2Headers(older, "event-a", fixture.clock.Now()), older)
+	if err != nil || !replay.Duplicate {
+		t.Fatalf("stale receipt was not durable: result=%+v err=%v", replay, err)
+	}
+	var branch domain.BranchHead
+	if err := fixture.store.Transact(context.Background(), func(tx sourceapp.Tx) error {
+		var ok bool
+		branch, ok = tx.GetBranch(fixture.repository.ID, "main")
+		if !ok {
+			return fmt.Errorf("branch missing")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if branch.CommitSHA != shaB || branch.LastEventID != "event-b" {
+		t.Fatalf("branch regressed: %+v", branch)
+	}
+	if events := sourceV2Outbox(fixture.store, sourcev2.EventRevisionObserved); len(events) != 1 {
+		t.Fatalf("revision events=%d", len(events))
+	}
+	_, _, _, audit := fixture.store.Snapshot()
+	if audit[len(audit)-1].Action != "source.push.stale" {
+		t.Fatalf("old delivery not classified as stale: %+v", audit[len(audit)-1])
+	}
+}
+
+func TestSource_DeletedBranchProducesEnvironmentCleanupIntent(t *testing.T) {
+	fixture := newSourceV2Fixture(t)
+	branchName := "preview/mr-7"
+	environmentID := "env-preview-7"
+	if _, err := fixture.service.BindPreviewEnvironment(context.Background(), sourceapp.BindPreviewEnvironmentCommand{
+		TenantID: "tenant-1", ActorID: "gitops-controller", RepositoryID: fixture.repository.ID, Branch: branchName, EnvironmentID: environmentID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	before := strings.Repeat("c", 40)
+	deleted := strings.Repeat("0", 40)
+	body := sourceV2PushBody(fixture.repository.ProviderProjectID, before, deleted, branchName, fixture.clock.Now())
+	result, err := fixture.hooks.Handle(context.Background(), "tenant-1", sourceV2Headers(body, "delete-preview-7", fixture.clock.Now()), body)
+	if err != nil || result.Stale || result.Duplicate {
+		t.Fatalf("delete result=%+v err=%v", result, err)
+	}
+	if _, err = fixture.hooks.Handle(context.Background(), "tenant-1", sourceV2Headers(body, "delete-preview-7", fixture.clock.Now()), body); err != nil {
+		t.Fatal(err)
+	}
+	events := sourceV2Outbox(fixture.store, sourcev2.EventEnvironmentCleanupRequested)
+	if len(events) != 1 {
+		t.Fatalf("cleanup intents=%d", len(events))
+	}
+	var event sourcev2.EnvironmentCleanupRequestedEvent
+	if err := json.Unmarshal(events[0].Payload, &event); err != nil || event.Validate() != nil || event.EnvironmentID != environmentID || event.Branch != branchName {
+		t.Fatalf("event=%+v err=%v", event, err)
+	}
+	var branch domain.BranchHead
+	if err := fixture.store.Transact(context.Background(), func(tx sourceapp.Tx) error {
+		var ok bool
+		branch, ok = tx.GetBranch(fixture.repository.ID, branchName)
+		if !ok {
+			return fmt.Errorf("branch missing")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if branch.EnvironmentID != environmentID || branch.DeletedAt.IsZero() {
+		t.Fatalf("deletion state not durable: %+v", branch)
+	}
+	_, _, outbox, _ := fixture.store.Snapshot()
+	for _, record := range outbox {
+		if strings.Contains(record.Topic, "runtime.delete") || strings.Contains(record.Topic, "purge") {
+			t.Fatalf("source attempted direct runtime deletion: %s", record.Topic)
+		}
+	}
+}

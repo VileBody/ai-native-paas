@@ -230,13 +230,16 @@ func (a *txAdapter) ListRepositories() []domain.Repository {
 }
 func (a *txAdapter) GetBranch(repo, name string) (domain.BranchHead, bool) {
 	var b domain.BranchHead
-	var eventAt, observedAt sql.NullTime
-	err := a.tx.QueryRow("SELECT repository_id,name,commit_sha,last_event_id,last_event_at,observed_at,version FROM source.branch_heads WHERE repository_id=$1 AND name=$2", repo, name).Scan(&b.RepositoryID, &b.Name, &b.CommitSHA, &b.LastEventID, &eventAt, &observedAt, &b.Version)
+	var eventAt, observedAt, deletedAt sql.NullTime
+	err := a.tx.QueryRow("SELECT repository_id,name,commit_sha,environment_id,last_event_id,last_event_at,observed_at,deleted_at,version FROM source.branch_heads WHERE repository_id=$1 AND name=$2", repo, name).Scan(&b.RepositoryID, &b.Name, &b.CommitSHA, &b.EnvironmentID, &b.LastEventID, &eventAt, &observedAt, &deletedAt, &b.Version)
 	if eventAt.Valid {
 		b.LastEventAt = eventAt.Time
 	}
 	if observedAt.Valid {
 		b.ObservedAt = observedAt.Time
+	}
+	if deletedAt.Valid {
+		b.DeletedAt = deletedAt.Time
 	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, false
@@ -246,10 +249,10 @@ func (a *txAdapter) GetBranch(repo, name string) (domain.BranchHead, bool) {
 }
 func (a *txAdapter) UpsertBranch(b domain.BranchHead, expected int64) error {
 	if expected == 0 {
-		_, err := a.tx.Exec("INSERT INTO source.branch_heads(repository_id,name,commit_sha,last_event_id,last_event_at,observed_at,version) VALUES($1,$2,$3,$4,$5,$6,$7)", b.RepositoryID, b.Name, b.CommitSHA, b.LastEventID, nullTime(b.LastEventAt), nullTime(b.ObservedAt), b.Version)
+		_, err := a.tx.Exec("INSERT INTO source.branch_heads(repository_id,name,commit_sha,environment_id,last_event_id,last_event_at,observed_at,deleted_at,version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)", b.RepositoryID, b.Name, b.CommitSHA, b.EnvironmentID, b.LastEventID, nullTime(b.LastEventAt), nullTime(b.ObservedAt), nullTime(b.DeletedAt), b.Version)
 		return mapDB(err)
 	}
-	res, err := a.tx.Exec("UPDATE source.branch_heads SET commit_sha=$1,last_event_id=$2,last_event_at=$3,observed_at=$4,version=$5 WHERE repository_id=$6 AND name=$7 AND version=$8", b.CommitSHA, b.LastEventID, nullTime(b.LastEventAt), nullTime(b.ObservedAt), b.Version, b.RepositoryID, b.Name, expected)
+	res, err := a.tx.Exec("UPDATE source.branch_heads SET commit_sha=$1,environment_id=$2,last_event_id=$3,last_event_at=$4,observed_at=$5,deleted_at=$6,version=$7 WHERE repository_id=$8 AND name=$9 AND version=$10", b.CommitSHA, b.EnvironmentID, b.LastEventID, nullTime(b.LastEventAt), nullTime(b.ObservedAt), nullTime(b.DeletedAt), b.Version, b.RepositoryID, b.Name, expected)
 	return affected(res, err, "branch")
 }
 func (a *txAdapter) GetMergeRequest(repo string, iid int64) (domain.MergeRequest, bool) {

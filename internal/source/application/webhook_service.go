@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
@@ -21,6 +22,7 @@ type WebhookService struct {
 type WebhookResult struct {
 	EventID      string
 	Duplicate    bool
+	Stale        bool
 	RepositoryID string
 	Kind         string
 }
@@ -60,12 +62,17 @@ func (s *WebhookService) handlePush(ctx context.Context, tenantID string, event 
 	}); err != nil {
 		return WebhookResult{}, err
 	}
-	authoritative, err := s.Provider.GetBranchHead(ctx, event.ProviderProjectID, event.Branch)
-	if err != nil {
-		return WebhookResult{}, domain.Wrap(domain.CodeExternal, "cannot resolve authoritative branch head", err)
+	deletion := isZeroCommitSHA(event.AfterSHA)
+	authoritative := ""
+	if !deletion {
+		var err error
+		authoritative, err = s.Provider.GetBranchHead(ctx, event.ProviderProjectID, event.Branch)
+		if err != nil {
+			return WebhookResult{}, domain.Wrap(domain.CodeExternal, "cannot resolve authoritative branch head", err)
+		}
 	}
 	result := WebhookResult{EventID: event.EventID, RepositoryID: repo.ID, Kind: "push"}
-	err = s.Store.Transact(ctx, func(tx Tx) error {
+	err := s.Store.Transact(ctx, func(tx Tx) error {
 		fresh, err := tx.ReceiveWebhook(WebhookReceipt{Provider: event.Provider, EventID: event.EventID, BodyHash: bodyHash, ReceivedAt: s.Clock.Now()})
 		if err != nil {
 			return err
@@ -81,22 +88,65 @@ func (s *WebhookService) handlePush(ctx context.Context, tenantID string, event 
 		} else {
 			expected = branch.Version
 		}
-		changed, err := branch.SetAuthoritative(authoritative, s.Clock.Now())
-		if err != nil {
-			return err
+		now := s.Clock.Now()
+		var observed domain.AuthoritativePushResult
+		var observeErr error
+		if deletion {
+			observed, observeErr = branch.ObserveDeletion(event.EventID, event.OccurredAt, now)
+		} else {
+			observed, observeErr = branch.ObserveAuthoritativePush(authoritative, event.EventID, event.OccurredAt, now)
 		}
-		if changed {
+		if observeErr != nil {
+			return observeErr
+		}
+		if observed.Stale {
+			result.Stale = true
+			data, marshalErr := json.Marshal(map[string]string{"branch": event.Branch, "provider_event_id": event.EventID})
+			if marshalErr != nil {
+				return marshalErr
+			}
+			return tx.AppendAudit(AuditRecord{ID: s.IDs.NewID("aud"), TenantID: tenantID, ActorID: "gitlab-webhook", Action: "source.push.stale", ResourceType: "repository", ResourceID: repo.ID, Data: data, CreatedAt: now})
+		}
+		if observed.StateChanged {
 			if err = tx.UpsertBranch(branch, expected); err != nil {
 				return err
 			}
 		}
-		payload, _ := json.Marshal(map[string]any{"repository_id": repo.ID, "branch": event.Branch, "commit_sha": authoritative, "provider_event_id": event.EventID})
-		if err := tx.AppendOutbox(OutboxRecord{ID: s.IDs.NewID("evt"), Topic: "source.push.v1", AggregateID: repo.ID, Payload: payload, CreatedAt: s.Clock.Now()}); err != nil {
-			return err
+		if deletion {
+			if observed.StateChanged && branch.EnvironmentID != "" {
+				if err := appendEnvironmentCleanupRequested(tx, s.IDs, repo, event.Branch, branch.EnvironmentID, event.EventID, now); err != nil {
+					return err
+				}
+			}
+		} else {
+			if observed.HeadChanged {
+				if err := appendRevisionObserved(tx, s.IDs, repo, event.Branch, authoritative, "webhook", event.EventID, now); err != nil {
+					return err
+				}
+			}
+			payload, marshalErr := json.Marshal(map[string]any{"repository_id": repo.ID, "branch": event.Branch, "commit_sha": authoritative, "provider_event_id": event.EventID})
+			if marshalErr != nil {
+				return marshalErr
+			}
+			if err := tx.AppendOutbox(OutboxRecord{ID: s.IDs.NewID("evt"), Topic: "source.push.v1", AggregateID: repo.ID, Payload: payload, CreatedAt: now}); err != nil {
+				return err
+			}
 		}
-		return tx.AppendAudit(AuditRecord{ID: s.IDs.NewID("aud"), TenantID: tenantID, ActorID: "gitlab-webhook", Action: "source.push.observe", ResourceType: "repository", ResourceID: repo.ID, Data: []byte(`{}`), CreatedAt: s.Clock.Now()})
+		action := "source.push.observe"
+		if deletion {
+			action = "source.push.delete.observe"
+		}
+		return tx.AppendAudit(AuditRecord{ID: s.IDs.NewID("aud"), TenantID: tenantID, ActorID: "gitlab-webhook", Action: action, ResourceType: "repository", ResourceID: repo.ID, Data: []byte(`{}`), CreatedAt: now})
 	})
 	return result, err
+}
+
+func isZeroCommitSHA(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) != 40 && len(value) != 64 {
+		return false
+	}
+	return strings.Trim(value, "0") == ""
 }
 func (s *WebhookService) handleMR(ctx context.Context, tenantID string, event MergeRequestEvent, bodyHash string) (WebhookResult, error) {
 	result := WebhookResult{EventID: event.EventID, Kind: "merge_request"}

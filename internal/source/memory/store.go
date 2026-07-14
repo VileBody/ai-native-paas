@@ -172,6 +172,13 @@ func (t *tx) UpsertBranch(v domain.BranchHead, expected int64) error {
 	if !ok && expected != 0 {
 		return domain.NewError(domain.CodeStaleVersion, "branch does not exist")
 	}
+	if v.EnvironmentID != "" {
+		for otherKey, other := range t.branches {
+			if otherKey != k && other.RepositoryID == v.RepositoryID && other.EnvironmentID == v.EnvironmentID {
+				return domain.NewError(domain.CodeConflict, "environment is already bound to another branch")
+			}
+		}
+	}
 	t.branches[k] = v
 	return nil
 }

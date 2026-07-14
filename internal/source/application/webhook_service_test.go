@@ -153,6 +153,29 @@ func TestPushDomain_OutOfOrderSignalsReconciliation(t *testing.T) {
 		t.Fatalf("unexpected duplicate error: %v", err)
 	}
 }
+
+func TestPreviewEnvironmentBindingIsTenantScopedAndUnique(t *testing.T) {
+	_, service, _, _, _, _, created := setupWebhook(t)
+	command := application.BindPreviewEnvironmentCommand{TenantID: "t1", ActorID: "runtime-controller", RepositoryID: created.Repository.ID, Branch: "preview/one", EnvironmentID: "env-1"}
+	first, err := service.BindPreviewEnvironment(context.Background(), command)
+	if err != nil || first.EnvironmentID != "env-1" {
+		t.Fatalf("first=%+v err=%v", first, err)
+	}
+	second, err := service.BindPreviewEnvironment(context.Background(), command)
+	if err != nil || second.Version != first.Version {
+		t.Fatalf("idempotent bind changed state: first=%+v second=%+v err=%v", first, second, err)
+	}
+	command.Branch = "preview/two"
+	if _, err = service.BindPreviewEnvironment(context.Background(), command); !domain.HasCode(err, domain.CodeConflict) {
+		t.Fatalf("duplicate environment binding err=%v", err)
+	}
+	command.TenantID = "other"
+	command.EnvironmentID = "env-2"
+	if _, err = service.BindPreviewEnvironment(context.Background(), command); !domain.HasCode(err, domain.CodeNotFound) {
+		t.Fatalf("cross-tenant bind err=%v", err)
+	}
+}
+
 func shaX(c string) string {
 	v := ""
 	for len(v) < 40 {

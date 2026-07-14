@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 881,
-  "discovered_unique_test_name_count": 879,
+  "discovered_go_test_count": 890,
+  "discovered_unique_test_name_count": 888,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -228,7 +228,7 @@
       "id": "S9",
       "level": "application + provider fake",
       "name": "TestSource_MissedWebhookRecoveredByBranchReconciler",
-      "status": "LIVE_ONLY",
+      "status": "REUSED",
       "test_file": "test/pivot/source_v2_test.go",
       "test_name": "TestSource_MissedWebhookRecoveredByBranchReconciler",
       "test_ref": "test/pivot/source_v2_test.go::TestSource_MissedWebhookRecoveredByBranchReconciler"
@@ -238,7 +238,7 @@
       "id": "S10",
       "level": "application",
       "name": "TestSource_OutOfOrderWebhookCannotRegressObservedHead",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/source_v2_test.go",
       "test_name": "TestSource_OutOfOrderWebhookCannotRegressObservedHead",
       "test_ref": "test/pivot/source_v2_test.go::TestSource_OutOfOrderWebhookCannotRegressObservedHead"
@@ -268,7 +268,7 @@
       "id": "S13",
       "level": "application",
       "name": "TestSource_DeletedBranchProducesEnvironmentCleanupIntent",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/source_v2_test.go",
       "test_name": "TestSource_DeletedBranchProducesEnvironmentCleanupIntent",
       "test_ref": "test/pivot/source_v2_test.go::TestSource_DeletedBranchProducesEnvironmentCleanupIntent"
@@ -1589,9 +1589,9 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 73,
-      "NEW": 46,
-      "REUSED": 38
+      "LIVE_ONLY": 72,
+      "NEW": 44,
+      "REUSED": 41
     },
     "unmapped": 0
   }
