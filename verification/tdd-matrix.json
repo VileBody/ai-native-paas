@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 815,
-  "discovered_unique_test_name_count": 813,
+  "discovered_go_test_count": 828,
+  "discovered_unique_test_name_count": 826,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -978,7 +978,7 @@
       "id": "C1",
       "level": "application/golden",
       "name": "TestCost_TofuPlanProducesDeterministicNormalizedEstimate",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/commerce_v2_test.go",
       "test_name": "TestCost_TofuPlanProducesDeterministicNormalizedEstimate",
       "test_ref": "test/pivot/commerce_v2_test.go::TestCost_TofuPlanProducesDeterministicNormalizedEstimate"
@@ -1298,7 +1298,7 @@
       "id": "G15",
       "level": "application/OpenTofu integration",
       "name": "TestInfraPlan_IsPureIdempotentAndStoresCanonicalPlanHash",
-      "status": "LIVE_ONLY",
+      "status": "REUSED",
       "test_file": "test/pivot/agent_workspace_test.go",
       "test_name": "TestInfraPlan_IsPureIdempotentAndStoresCanonicalPlanHash",
       "test_ref": "test/pivot/agent_workspace_test.go::TestInfraPlan_IsPureIdempotentAndStoresCanonicalPlanHash"
@@ -1308,7 +1308,7 @@
       "id": "G16",
       "level": "cross-domain",
       "name": "TestInfraApply_RequiresMatchingPlanReservationAndApproval",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/agent_workspace_test.go",
       "test_name": "TestInfraApply_RequiresMatchingPlanReservationAndApproval",
       "test_ref": "test/pivot/agent_workspace_test.go::TestInfraApply_RequiresMatchingPlanReservationAndApproval"
@@ -1589,9 +1589,9 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 78,
-      "NEW": 53,
-      "REUSED": 26
+      "LIVE_ONLY": 77,
+      "NEW": 51,
+      "REUSED": 29
     },
     "unmapped": 0
   }

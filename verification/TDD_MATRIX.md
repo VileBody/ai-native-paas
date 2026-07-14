@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **815**
-- Reused now: **26**
-- New local/contract tests required: **53**
-- Live/provider/system tests required: **78**
+- Discovered Go tests/fuzz targets: **828**
+- Reused now: **29**
+- New local/contract tests required: **51**
+- Live/provider/system tests required: **77**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -111,7 +111,7 @@ A release gate may become green only after every referenced test exists and pass
 | `A5.30` | LIVE_ONLY | DNS provider integration | `test/pivot/attachments_v2_test.go::TestDomain_OwnershipProofRequiresIndependentDNSObservations` |
 | `A5.31` | LIVE_ONLY | provider/runtime integration | `test/pivot/attachments_v2_test.go::TestDomain_RouteActivatesOnlyAfterOwnershipAndTLSReady` |
 | `A5.32` | NEW | domain + fake clock | `test/pivot/attachments_v2_test.go::TestDomain_ReleaseEntersQuarantineBeforeAnotherTenantCanClaim` |
-| `C1` | NEW | application/golden | `test/pivot/commerce_v2_test.go::TestCost_TofuPlanProducesDeterministicNormalizedEstimate` |
+| `C1` | REUSED | application/golden | `test/pivot/commerce_v2_test.go::TestCost_TofuPlanProducesDeterministicNormalizedEstimate` |
 | `C2` | LIVE_ONLY | domain | `test/pivot/commerce_v2_test.go::TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement` |
 | `C3` | LIVE_ONLY | application | `test/pivot/commerce_v2_test.go::TestCost_HelmResourcesContributeRequestedRuntimeAllocation` |
 | `C4` | NEW | domain | `test/pivot/commerce_v2_test.go::TestCost_ApprovalInvalidatedWhenPlanHashChanges` |
@@ -143,8 +143,8 @@ A release gate may become green only after every referenced test exists and pass
 | `G12` | REUSED | chaos | `internal/workspace/service_tdd_test.go::TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply` |
 | `G13` | REUSED | concurrency | `internal/workspace/service_tdd_test.go::TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations` |
 | `G14` | NEW | application | `test/pivot/agent_workspace_test.go::TestAgent_DeployWorkflowStartsFromExactRepositoryRevision` |
-| `G15` | LIVE_ONLY | application/OpenTofu integration | `test/pivot/agent_workspace_test.go::TestInfraPlan_IsPureIdempotentAndStoresCanonicalPlanHash` |
-| `G16` | NEW | cross-domain | `test/pivot/agent_workspace_test.go::TestInfraApply_RequiresMatchingPlanReservationAndApproval` |
+| `G15` | REUSED | application/OpenTofu integration | `test/pivot/agent_workspace_test.go::TestInfraPlan_IsPureIdempotentAndStoresCanonicalPlanHash` |
+| `G16` | REUSED | cross-domain | `test/pivot/agent_workspace_test.go::TestInfraApply_RequiresMatchingPlanReservationAndApproval` |
 | `G17` | NEW | live state backend/concurrency | `test/pivot/agent_workspace_test.go::TestInfraState_RemoteLockPreventsConcurrentMutation` |
 | `G18` | LIVE_ONLY | orchestration | `test/pivot/agent_workspace_test.go::TestAgent_GitOpsCommitOccursOnlyAfterInfraDependenciesReady` |
 | `G19` | NEW | acceptance | `test/pivot/agent_workspace_test.go::TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix` |
