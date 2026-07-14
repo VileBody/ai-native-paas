@@ -39,15 +39,13 @@ func (r Reconciler) Reconcile(ctx context.Context, app runtimev1.PaaSApp) error 
 	if !ok {
 		return domain.NewError(domain.CodeInvalidArgument, "unknown runtime unit")
 	}
+	standard, err := RenderStandardResources(app, resources)
+	if err != nil {
+		return err
+	}
 	labels := baseLabels(app)
 	owner := ownerReference(app)
-	policy := kube.NetworkPolicy{
-		Metadata:       kube.Metadata{Name: "platform-default-deny", Namespace: app.Metadata.Namespace, Labels: labels, OwnerReferences: []runtimev1.OwnerReference{owner}},
-		DefaultDeny:    true,
-		AllowedIngress: []string{"platform-gateway"},
-		AllowedEgress:  []string{app.Spec.Network.EgressProfile},
-	}
-	if err := r.Client.UpsertNetworkPolicy(ctx, policy); err != nil {
+	if err := r.Client.UpsertNetworkPolicy(ctx, standard.NetworkPolicy); err != nil {
 		return err
 	}
 
@@ -57,10 +55,7 @@ func (r Reconciler) Reconcile(ctx context.Context, app runtimev1.PaaSApp) error 
 		return err
 	}
 	if !routeExists {
-		route = kube.HTTPRoute{
-			Metadata: kube.Metadata{Name: routeName, Namespace: app.Metadata.Namespace, Labels: labels, OwnerReferences: []runtimev1.OwnerReference{owner}},
-			Hostname: app.Spec.Route.GeneratedHostname,
-		}
+		route = standard.HTTPRoute
 	}
 	route.Hostname = app.Spec.Route.GeneratedHostname
 	status := app.Status
@@ -148,8 +143,7 @@ func (r Reconciler) Reconcile(ctx context.Context, app runtimev1.PaaSApp) error 
 	failed := false
 	failureMessage := ""
 	for _, name := range app.SortedProcessNames() {
-		process := app.Spec.Processes[name]
-		deployment := desiredDeployment(app, name, process, resources, labels, owner)
+		deployment := standard.Deployments[name]
 		if err := r.Client.UpsertDeployment(ctx, deployment); err != nil {
 			return err
 		}
@@ -162,23 +156,12 @@ func (r Reconciler) Reconcile(ctx context.Context, app runtimev1.PaaSApp) error 
 			failed = true
 			failureMessage = observed.Status.Message
 		}
-		if process.Port > 0 {
-			service := kube.Service{
-				Metadata: kube.Metadata{Name: serviceName(app.Metadata.Name, name, app.Spec.Identity.ReleaseID), Namespace: app.Metadata.Namespace, Labels: labels, OwnerReferences: []runtimev1.OwnerReference{owner}},
-				Port:     process.Port,
-				Selector: map[string]string{"platform.example.com/release-id": app.Spec.Identity.ReleaseID, "platform.example.com/process": name},
-			}
+		if service, exists := standard.Services[name]; exists {
 			if err := r.Client.UpsertService(ctx, service); err != nil {
 				return err
 			}
 		}
-		if process.MaxReplicas > process.MinReplicas {
-			hpa := kube.HPA{
-				Metadata:    kube.Metadata{Name: deployment.Metadata.Name, Namespace: app.Metadata.Namespace, Labels: cloneLabels(deployment.Metadata.Labels), OwnerReferences: []runtimev1.OwnerReference{owner}},
-				TargetName:  deployment.Metadata.Name,
-				MinReplicas: process.MinReplicas,
-				MaxReplicas: process.MaxReplicas,
-			}
+		if hpa, exists := standard.HPAs[name]; exists {
 			if err := r.Client.UpsertHPA(ctx, hpa); err != nil {
 				return err
 			}

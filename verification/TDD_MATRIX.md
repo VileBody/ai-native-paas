@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **945**
-- Reused now: **80**
-- New local/contract tests required: **11**
+- Discovered Go tests/fuzz targets: **946**
+- Reused now: **81**
+- New local/contract tests required: **10**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -73,7 +73,7 @@ A release gate may become green only after every referenced test exists and pass
 | `R10` | LIVE_ONLY | Kubernetes system | `test/pivot/runtime_gitops_test.go::TestRuntime_NamespaceAndServiceAccountIsolation` |
 | `R11` | LIVE_ONLY | system | `test/pivot/runtime_gitops_test.go::TestRuntime_HPAAndGitOpsDoNotFightOverReplicas` |
 | `R12` | REUSED | policy | `internal/attachments/recipe/registry_test.go::TestRuntime_ProductOperatorCRAllowedOnlyByRecipePolicy` |
-| `R13` | NEW | operator contract | `test/pivot/runtime_gitops_test.go::TestRuntime_PaaSAppFastPathProducesEquivalentStandardResources` |
+| `R13` | REUSED | operator contract | `test/pivot/runtime_gitops_test.go::TestRuntime_PaaSAppFastPathProducesEquivalentStandardResources` |
 | `R14` | LIVE_ONLY | real Argo/ApplicationSet | `test/pivot/runtime_gitops_test.go::TestRuntime_PreviewApplicationSetCreatedAndRemovedFromBranchLifecycle` |
 | `R15` | LIVE_ONLY | Kubernetes/Gateway system | `test/pivot/runtime_gitops_test.go::TestRuntime_FailedNewRevisionKeepsPreviousTrafficWhereStrategySupportsIt` |
 | `R16` | REUSED | reconciliation | `internal/runtime/application/status_test.go::TestRuntime_UnknownObservedObjectIsQuarantined` |

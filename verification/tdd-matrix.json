@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 945,
-  "discovered_unique_test_name_count": 943,
+  "discovered_go_test_count": 946,
+  "discovered_unique_test_name_count": 944,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -598,7 +598,7 @@
       "id": "R13",
       "level": "operator contract",
       "name": "TestRuntime_PaaSAppFastPathProducesEquivalentStandardResources",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/runtime_gitops_test.go",
       "test_name": "TestRuntime_PaaSAppFastPathProducesEquivalentStandardResources",
       "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_PaaSAppFastPathProducesEquivalentStandardResources"
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 11,
-      "REUSED": 80
+      "NEW": 10,
+      "REUSED": 81
     },
     "unmapped": 0
   }
