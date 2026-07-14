@@ -1,4 +1,12 @@
 .git
+.operator
+.state-backend
+.env
+.env.*
+**/.env
+**/.env.*
+*.key
+*.pem
 .terraform
 **/.terraform
 *.tfstate

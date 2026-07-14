@@ -3,12 +3,14 @@ package gitlab
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	pathpkg "path"
 	"strconv"
 	"strings"
 	"time"
@@ -205,6 +207,86 @@ func (c *Client) CreateMergeRequest(ctx context.Context, r application.CreateMer
 		return application.ProviderMergeRequest{}, err
 	}
 	return application.ProviderMergeRequest{IID: mr.IID, State: mr.State, SourceBranch: mr.SourceBranch, TargetBranch: mr.TargetBranch, HeadSHA: mr.SHA, WebURL: mr.WebURL}, nil
+}
+
+func (c *Client) BootstrapRepository(ctx context.Context, request application.BootstrapRepositoryRequest) (string, error) {
+	if request.ProviderProjectID <= 0 || strings.TrimSpace(request.Branch) == "" || strings.TrimSpace(request.ExpectedBaseSHA) == "" || strings.TrimSpace(request.CommitMessage) == "" || len(request.Files) == 0 || len(request.Files) > 100 {
+		return "", errors.New("gitlab bootstrap request is invalid")
+	}
+	actions := make([]map[string]any, 0, len(request.Files))
+	seen := make(map[string]struct{}, len(request.Files))
+	total := 0
+	for _, file := range request.Files {
+		file.Path = strings.TrimSpace(file.Path)
+		cleaned := pathpkg.Clean(file.Path)
+		if file.Path == "" || cleaned != file.Path || cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") || strings.HasPrefix(file.Path, "/") || strings.Contains(file.Path, `\`) || strings.Contains(file.Path, "\x00") {
+			return "", errors.New("gitlab bootstrap file path is invalid")
+		}
+		if _, exists := seen[file.Path]; exists {
+			return "", errors.New("gitlab bootstrap file path is duplicated")
+		}
+		seen[file.Path] = struct{}{}
+		total += len(file.Content)
+		if total > 4<<20 {
+			return "", errors.New("gitlab bootstrap content is too large")
+		}
+		action := "create"
+		if file.Update {
+			action = "update"
+		}
+		actions = append(actions, map[string]any{
+			"action": action, "file_path": file.Path, "content": base64.StdEncoding.EncodeToString(file.Content),
+			"encoding": "base64", "execute_filemode": file.Executable,
+		})
+	}
+	body := map[string]any{
+		"branch": request.Branch, "start_sha": request.ExpectedBaseSHA,
+		"commit_message": request.CommitMessage, "actions": actions,
+	}
+	var commit struct {
+		ID string `json:"id"`
+	}
+	path := "/projects/" + strconv.FormatInt(request.ProviderProjectID, 10) + "/repository/commits"
+	if err := c.do(ctx, http.MethodPost, path, body, &commit); err == nil {
+		if commit.ID == "" {
+			return "", errors.New("gitlab bootstrap commit response has no id")
+		}
+		return commit.ID, nil
+	} else {
+		var apiErr *APIError
+		if !errors.As(err, &apiErr) || (apiErr.Status != http.StatusBadRequest && apiErr.Status != http.StatusConflict) {
+			return "", err
+		}
+		matches, verifyErr := c.bootstrapFilesMatch(ctx, request)
+		if verifyErr != nil || !matches {
+			return "", err
+		}
+	}
+	return c.GetBranchHead(ctx, request.ProviderProjectID, request.Branch)
+}
+
+func (c *Client) bootstrapFilesMatch(ctx context.Context, request application.BootstrapRepositoryRequest) (bool, error) {
+	for _, expected := range request.Files {
+		var file struct {
+			Content  string `json:"content"`
+			Encoding string `json:"encoding"`
+		}
+		path := "/projects/" + strconv.FormatInt(request.ProviderProjectID, 10) + "/repository/files/" + url.PathEscape(expected.Path) + "?ref=" + url.QueryEscape(request.Branch)
+		if err := c.do(ctx, http.MethodGet, path, nil, &file); err != nil {
+			return false, err
+		}
+		if file.Encoding != "base64" {
+			return false, errors.New("gitlab repository file uses unexpected encoding")
+		}
+		decoded, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(file.Content, "\n", ""))
+		if err != nil {
+			return false, err
+		}
+		if !bytes.Equal(decoded, expected.Content) {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 func redact(v, secret string) string {
 	if secret != "" {

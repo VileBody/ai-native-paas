@@ -159,6 +159,18 @@ type CreateProjectResponse struct {
 	ProjectID            string `json:"project_id"`
 	GitURL               string `json:"git_url"`
 	MCPURL               string `json:"mcp_url"`
+	AgentID              string `json:"agent_id"`
 	AgentEnrollmentToken string `json:"agent_enrollment_token"`
 	EnrollmentExpiresIn  int64  `json:"enrollment_expires_in_seconds"`
+}
+
+type CreateProjectRequest struct {
+	Name string `json:"name"`
+}
+
+func (r CreateProjectRequest) Validate() error {
+	if !dnsLabel.MatchString(r.Name) {
+		return errors.New("project name must be a DNS label")
+	}
+	return nil
 }

@@ -109,6 +109,25 @@ type ProviderMergeRequest struct {
 	State, SourceBranch, TargetBranch, HeadSHA, WebURL string
 }
 
+type BootstrapFile struct {
+	Path       string
+	Content    []byte
+	Executable bool
+	Update     bool
+}
+
+type BootstrapRepositoryRequest struct {
+	ProviderProjectID int64
+	Branch            string
+	ExpectedBaseSHA   string
+	CommitMessage     string
+	Files             []BootstrapFile
+}
+
+type RepositoryBootstrapper interface {
+	BootstrapRepository(context.Context, BootstrapRepositoryRequest) (string, error)
+}
+
 type GitProvider interface {
 	CreateRepository(context.Context, CreateRepositoryRequest) (ProviderRepository, error)
 	FindRepositoryByCorrelation(context.Context, int64, string) (ProviderRepository, bool, error)
