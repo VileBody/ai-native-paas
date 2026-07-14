@@ -201,6 +201,17 @@ type EnrollmentCredential struct {
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
+type RefreshExchange struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+type AccessCredential struct {
+	AccessToken string                 `json:"access_token"`
+	TokenType   string                 `json:"token_type"`
+	ExpiresIn   int64                  `json:"expires_in_seconds"`
+	Claims      AccessCredentialClaims `json:"claims"`
+}
+
 type AccessCredentialClaims struct {
 	TenantID  string    `json:"tenant_id"`
 	ProjectID string    `json:"project_id"`
