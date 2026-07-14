@@ -41,6 +41,9 @@ func (c *agentControlFake) Outcome(_ context.Context, outcome workspacev1.AgentC
 	c.outcomes = append(c.outcomes, outcome)
 	return nil
 }
+func (c *agentControlFake) ResolveEnvironment(context.Context, workspacev1.AgentCredentialResolve) (workspacev1.AgentCredentialView, error) {
+	return workspacev1.AgentCredentialView{}, errors.New("unused")
+}
 func (c *agentControlFake) Rotate(context.Context, string) error { return nil }
 func (c *agentControlFake) CertificateNotAfter() time.Time       { return time.Now().Add(time.Hour) }
 

@@ -16,6 +16,34 @@ import (
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
+type credentialControlFake struct {
+	request workspacev1.AgentCredentialResolve
+	view    workspacev1.AgentCredentialView
+}
+
+func (f *credentialControlFake) ResolveEnvironment(_ context.Context, request workspacev1.AgentCredentialResolve) (workspacev1.AgentCredentialView, error) {
+	f.request = request
+	return f.view, nil
+}
+
+func TestWorkspaceAgent_RemoteCredentialsAreExactAndBecomeRedactionSentinels(t *testing.T) {
+	now := time.Date(2026, 7, 14, 18, 0, 0, 0, time.UTC)
+	control := &credentialControlFake{view: workspacev1.AgentCredentialView{
+		Values: map[string]string{"GITLAB_TOKEN": "credential-sentinel-never-log"}, ExpiresAt: now.Add(10 * time.Minute),
+	}}
+	resolver := RemoteEnvironmentResolver{Control: control, Now: func() time.Time { return now }}
+	resolved, err := resolver.Resolve(context.Background(), EnvironmentResolutionRequest{
+		SessionID: "session-2", ExecutionSessionID: "session-1", CommandID: "command-1",
+		References: map[string]string{"GITLAB_TOKEN": "credential://gitlab-project-1"}, CredentialLeases: []string{"gitlab-project-1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if control.request.SessionID != "session-2" || control.request.ExecutionSessionID != "session-1" || control.request.CommandID != "command-1" || resolved.Values["GITLAB_TOKEN"] != "credential-sentinel-never-log" || len(resolved.RedactionValues) != 1 {
+		t.Fatalf("request=%#v resolved=%#v", control.request, resolved)
+	}
+}
+
 func TestWorkspaceAgentRedactor_RedactsSecretAcrossWritesAndANSISequences(t *testing.T) {
 	stdout, _ := newBoundedSinks(4096)
 	writer := newRedactingWriter(stdout, []string{"secret-sentinel"})

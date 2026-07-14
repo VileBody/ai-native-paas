@@ -106,3 +106,19 @@ type AgentSessions interface {
 type LeaseRevoker interface {
 	Revoke(context.Context, string, string) error
 }
+
+type CredentialSourceRequest struct {
+	TenantID         string
+	ProjectID        string
+	WorkspaceID      string
+	TaskID           string
+	CommandID        string
+	AgentSessionID   string
+	VMID             string
+	EnvironmentRefs  map[string]string
+	CredentialLeases []string
+}
+
+type CredentialSource interface {
+	Resolve(context.Context, CredentialSourceRequest) (workspacev1.AgentCredentialView, error)
+}

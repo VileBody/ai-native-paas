@@ -16,6 +16,7 @@ type ControlPlane interface {
 	Next(context.Context, string) (*workspacev1.AgentMessage, error)
 	Acknowledge(context.Context, string, string, bool) error
 	Outcome(context.Context, workspacev1.AgentCommandOutcome) error
+	ResolveEnvironment(context.Context, workspacev1.AgentCredentialResolve) (workspacev1.AgentCredentialView, error)
 	Rotate(context.Context, string) error
 	CertificateNotAfter() time.Time
 }
@@ -177,7 +178,10 @@ func (a *Agent) handleExec(ctx context.Context, sessionID string, message worksp
 		}
 		return a.flushOutcomes(ctx, sessionID)
 	}
-	environment, resolveErr := a.Resolver.Resolve(ctx, message.Spec.EnvironmentRefs, message.CredentialLeases)
+	environment, resolveErr := a.Resolver.Resolve(ctx, EnvironmentResolutionRequest{
+		SessionID: sessionID, ExecutionSessionID: sessionID, CommandID: message.CommandID,
+		References: message.Spec.EnvironmentRefs, CredentialLeases: message.CredentialLeases,
+	})
 	if _, err := a.Journal.MarkRunning(message.CommandID, sessionID); err != nil {
 		return err
 	}

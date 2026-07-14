@@ -20,6 +20,7 @@ import (
 type Handler struct {
 	Registry     *session.Registry
 	Workspaces   *workspace.Service
+	Credentials  WorkspaceCredentialResolver
 	Bindings     AgentBindingResolver
 	Certificates CertificateRotator
 	Principals   PrincipalResolver
@@ -33,6 +34,10 @@ type AgentBindingResolver interface {
 
 type CertificateRotator interface {
 	Sign(context.Context, bootstrap.Identity, []byte) (bootstrap.CertificateBundle, error)
+}
+
+type WorkspaceCredentialResolver interface {
+	ResolveCredentials(context.Context, workspace.CredentialResolveRequest) (workspacev1.AgentCredentialView, error)
 }
 
 func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
@@ -52,9 +57,41 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		h.acknowledge(response, request)
 	case request.Method == http.MethodPost && request.URL.Path == "/api/v1/workspace-agent/outcomes":
 		h.outcome(response, request)
+	case request.Method == http.MethodPost && request.URL.Path == "/api/v1/workspace-agent/credentials:resolve":
+		h.resolveCredentials(response, request)
 	default:
 		writeError(response, http.StatusNotFound, "NOT_FOUND", "route not found")
 	}
+}
+
+func (h Handler) resolveCredentials(response http.ResponseWriter, request *http.Request) {
+	principal, ok := h.authenticate(response, request)
+	if !ok {
+		return
+	}
+	if h.Credentials == nil {
+		writeError(response, http.StatusServiceUnavailable, "UNAVAILABLE", "workspace credential service unavailable")
+		return
+	}
+	var body workspacev1.AgentCredentialResolve
+	if decode(request, h.bodyLimit(), &body) != nil || strings.TrimSpace(body.CommandID) == "" {
+		writeError(response, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid workspace credential request")
+		return
+	}
+	bound, err := h.Registry.AuthorizeOutcomeFor(request.Context(), principal, body.SessionID, body.ExecutionSessionID)
+	if err != nil {
+		writeSessionError(response, err)
+		return
+	}
+	view, err := h.Credentials.ResolveCredentials(request.Context(), workspace.CredentialResolveRequest{
+		TenantID: bound.TenantID, ProjectID: bound.ProjectID, WorkspaceID: bound.WorkspaceID, TaskID: bound.TaskID,
+		CommandID: body.CommandID, AgentSessionID: bound.ID, VMID: bound.VMID,
+	})
+	if err != nil {
+		writeError(response, http.StatusForbidden, "PERMISSION_DENIED", "workspace credential request is not command-scoped")
+		return
+	}
+	writeJSON(response, http.StatusOK, view)
 }
 
 func (h Handler) rotateCertificate(response http.ResponseWriter, request *http.Request) {

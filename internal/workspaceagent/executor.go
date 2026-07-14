@@ -18,16 +18,70 @@ type ResolvedEnvironment struct {
 }
 
 type EnvironmentResolver interface {
-	Resolve(context.Context, map[string]string, []string) (ResolvedEnvironment, error)
+	Resolve(context.Context, EnvironmentResolutionRequest) (ResolvedEnvironment, error)
+}
+
+type EnvironmentResolutionRequest struct {
+	SessionID          string
+	ExecutionSessionID string
+	CommandID          string
+	References         map[string]string
+	CredentialLeases   []string
 }
 
 type FailClosedEnvironmentResolver struct{}
 
-func (FailClosedEnvironmentResolver) Resolve(_ context.Context, references map[string]string, leases []string) (ResolvedEnvironment, error) {
-	if len(references) != 0 || len(leases) != 0 {
+func (FailClosedEnvironmentResolver) Resolve(_ context.Context, request EnvironmentResolutionRequest) (ResolvedEnvironment, error) {
+	if len(request.References) != 0 || len(request.CredentialLeases) != 0 {
 		return ResolvedEnvironment{}, errors.New("workspace credential gateway is unavailable")
 	}
 	return ResolvedEnvironment{Values: map[string]string{}}, nil
+}
+
+type CredentialControlPlane interface {
+	ResolveEnvironment(context.Context, workspacev1.AgentCredentialResolve) (workspacev1.AgentCredentialView, error)
+}
+
+type RemoteEnvironmentResolver struct {
+	Control CredentialControlPlane
+	Now     func() time.Time
+}
+
+func (r RemoteEnvironmentResolver) Resolve(ctx context.Context, request EnvironmentResolutionRequest) (ResolvedEnvironment, error) {
+	if r.Control == nil || r.Now == nil || !identityPattern.MatchString(request.SessionID) || !identityPattern.MatchString(request.ExecutionSessionID) || !identityPattern.MatchString(request.CommandID) {
+		return ResolvedEnvironment{}, errors.New("workspace credential resolution is invalid")
+	}
+	if len(request.References) == 0 && len(request.CredentialLeases) == 0 {
+		return ResolvedEnvironment{Values: map[string]string{}}, nil
+	}
+	view, err := r.Control.ResolveEnvironment(ctx, workspacev1.AgentCredentialResolve{
+		SessionID: request.SessionID, ExecutionSessionID: request.ExecutionSessionID, CommandID: request.CommandID,
+	})
+	if err != nil || !view.ExpiresAt.After(r.Now().UTC().Add(15*time.Second)) {
+		return ResolvedEnvironment{}, errors.New("workspace credential resolution failed")
+	}
+	values := make(map[string]string, len(view.Values))
+	redactions := make([]string, 0, len(view.Values))
+	for name, value := range view.Values {
+		if _, requested := request.References[name]; !requested || !environmentVariableName(name) || reservedEnvironmentName(name) || value == "" || len(value) > 64<<10 || strings.ContainsRune(value, '\x00') {
+			clearStringMap(values)
+			return ResolvedEnvironment{}, errors.New("workspace credential response binding is invalid")
+		}
+		values[name] = value
+		redactions = append(redactions, value)
+	}
+	if len(values) != len(request.References) {
+		clearStringMap(values)
+		return ResolvedEnvironment{}, errors.New("workspace credential response is incomplete")
+	}
+	return ResolvedEnvironment{Values: values, RedactionValues: redactions}, nil
+}
+
+func clearStringMap(values map[string]string) {
+	for name := range values {
+		values[name] = ""
+		delete(values, name)
+	}
 }
 
 type ExecutionResult struct {

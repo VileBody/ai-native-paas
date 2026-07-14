@@ -128,6 +128,15 @@ type fakeLeases struct {
 	revoked map[string]int
 }
 
+type fakeCredentials struct {
+	request CredentialSourceRequest
+}
+
+func (f *fakeCredentials) Resolve(_ context.Context, request CredentialSourceRequest) (workspacev1.AgentCredentialView, error) {
+	f.request = request
+	return workspacev1.AgentCredentialView{Values: map[string]string{"GITLAB_TOKEN": "short-lived-token"}, ExpiresAt: time.Date(2026, 7, 14, 6, 10, 0, 0, time.UTC)}, nil
+}
+
 func (l *fakeLeases) Revoke(_ context.Context, leaseID, _ string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -139,14 +148,15 @@ func (l *fakeLeases) Revoke(_ context.Context, leaseID, _ string) error {
 }
 
 type fixture struct {
-	service  *Service
-	store    *MemoryStore
-	provider *fakeProvider
-	sessions *fakeSessions
-	leases   *fakeLeases
-	clock    *testClock
-	scope    Scope
-	spec     workspacev1.WorkspaceSpec
+	service     *Service
+	store       *MemoryStore
+	provider    *fakeProvider
+	sessions    *fakeSessions
+	leases      *fakeLeases
+	credentials *fakeCredentials
+	clock       *testClock
+	scope       Scope
+	spec        workspacev1.WorkspaceSpec
 }
 
 func newFixture() *fixture {
@@ -155,20 +165,53 @@ func newFixture() *fixture {
 	provider := &fakeProvider{}
 	sessions := &fakeSessions{connected: true, vmID: "twc-vm-1"}
 	leases := &fakeLeases{}
+	credentials := &fakeCredentials{}
 	service := &Service{
-		Store: store, Provider: provider, Sessions: sessions, Leases: leases, Clock: clock, IDs: &testIDs{},
+		Store: store, Provider: provider, Sessions: sessions, Leases: leases, Credentials: credentials, Clock: clock, IDs: &testIDs{},
 		Policy: DefaultCommandPolicy(), ReconcilerID: "workspace-manager-1", WorkspaceVPCID: "vpc-workspace",
 		AllowedEgressHosts: []string{"gitlab.com", "registry.npmjs.org", "ai-native-paas-registry.registry.twcstorage.ru"},
 		EgressGatewayCIDRs: []string{"192.168.75.4/32"}, DNSResolverCIDRs: []string{"192.168.75.1/32"},
 		DeniedCIDRs: []string{"192.168.73.0/24", "192.168.74.0/24", "10.0.0.0/8", "172.16.0.0/12"},
 	}
 	return &fixture{
-		service: service, store: store, provider: provider, sessions: sessions, leases: leases, clock: clock,
+		service: service, store: store, provider: provider, sessions: sessions, leases: leases, credentials: credentials, clock: clock,
 		scope: Scope{TenantID: "tenant-1", ProjectID: "project-1", ActorID: "agent-1"},
 		spec: workspacev1.WorkspaceSpec{
 			ProjectID: "project-1", TaskID: "task-1", ImageDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			CPUMillis: 2000, MemoryMiB: 4096, TTLSeconds: 900, NetworkProfile: "isolated-governed", CredentialLeases: []string{"repo-lease"},
+			CPUMillis: 2000, MemoryMiB: 4096, TTLSeconds: 900, NetworkProfile: "isolated-governed", CredentialLeases: []string{"repo-lease", "command-lease"},
 		},
+	}
+}
+
+func TestWorkspace_CredentialsUsePersistedCommandAndMTLSExecutionBinding(t *testing.T) {
+	f := newFixture()
+	ready := f.ready(t)
+	view, err := f.service.Exec(context.Background(), ExecRequest{
+		Scope: f.scope, WorkspaceID: ready.WorkspaceID, Kind: "git_checkout", IdempotencyKey: "credentials-1",
+		CredentialLeases: []string{"repo-lease"}, Spec: workspacev1.CommandSpec{
+			Argv: []string{"git", "fetch", "origin"}, WorkingDir: "repo", TimeoutSeconds: 60, OutputLimitBytes: 4096,
+			EnvironmentRefs: map[string]string{"GITLAB_TOKEN": "credential://repo-lease"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err = f.service.Dispatch(context.Background(), f.scope, view.CommandID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := f.service.ResolveCredentials(context.Background(), CredentialResolveRequest{
+		TenantID: f.scope.TenantID, ProjectID: f.scope.ProjectID, WorkspaceID: ready.WorkspaceID, TaskID: "task-1",
+		CommandID: view.CommandID, AgentSessionID: "mtls-session-1", VMID: "twc-vm-1",
+	})
+	if err != nil || resolved.Values["GITLAB_TOKEN"] != "short-lived-token" || f.credentials.request.EnvironmentRefs["GITLAB_TOKEN"] != "credential://repo-lease" {
+		t.Fatalf("resolved=%#v source=%#v err=%v", resolved, f.credentials.request, err)
+	}
+	if _, err := f.service.ResolveCredentials(context.Background(), CredentialResolveRequest{
+		TenantID: f.scope.TenantID, ProjectID: f.scope.ProjectID, WorkspaceID: ready.WorkspaceID, TaskID: "task-1",
+		CommandID: view.CommandID, AgentSessionID: "mtls-session-1", VMID: "attacker-vm",
+	}); !errors.Is(err, ErrPolicyDenied) {
+		t.Fatalf("foreign execution binding accepted: %v", err)
 	}
 }
 

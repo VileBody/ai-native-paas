@@ -138,6 +138,22 @@ func (c *Client) Outcome(ctx context.Context, outcome workspacev1.AgentCommandOu
 	return c.doJSON(ctx, http.MethodPost, "/api/v1/workspace-agent/outcomes", outcome, http.StatusOK, nil)
 }
 
+func (c *Client) ResolveEnvironment(ctx context.Context, request workspacev1.AgentCredentialResolve) (workspacev1.AgentCredentialView, error) {
+	var view workspacev1.AgentCredentialView
+	if err := c.doJSON(ctx, http.MethodPost, "/api/v1/workspace-agent/credentials:resolve", request, http.StatusOK, &view); err != nil {
+		return workspacev1.AgentCredentialView{}, err
+	}
+	if len(view.Values) > 128 || !view.ExpiresAt.After(time.Now().UTC().Add(15*time.Second)) {
+		return workspacev1.AgentCredentialView{}, errors.New("workspace credential response is invalid")
+	}
+	for name, value := range view.Values {
+		if !environmentVariableName(name) || reservedEnvironmentName(name) || value == "" || len(value) > 64<<10 || strings.ContainsRune(value, '\x00') {
+			return workspacev1.AgentCredentialView{}, errors.New("workspace credential response is invalid")
+		}
+	}
+	return view, nil
+}
+
 func (c *Client) Rotate(ctx context.Context, sessionID string) error {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {

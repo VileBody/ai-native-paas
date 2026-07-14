@@ -36,31 +36,33 @@ type managerIDs struct{ inner *agentsupport.IDs }
 func (i managerIDs) New(prefix string) string { return i.inner.NewID(prefix) }
 
 type config struct {
-	Address               string
-	DatabaseURL           string
-	ServerCertificateFile string
-	ServerPrivateKeyFile  string
-	ClientCAFile          string
-	TrustDomain           string
-	OpenBaoAddress        string
-	OpenBaoTokenFile      string
-	OpenBaoPKIMount       string
-	OpenBaoRole           string
-	OpenBaoTTL            time.Duration
-	TimewebAPIURL         string
-	TimewebTokenFile      string
-	TimewebProjectID      int64
-	TimewebConfiguratorID int64
-	TimewebZone           string
-	TimewebBandwidthMbps  int64
-	TimewebSystemDiskMiB  int64
-	WorkspaceVPCID        string
-	WorkspaceImages       map[string]string
-	ControlPlaneURL       string
-	AllowedEgressHosts    []string
-	EgressGatewayCIDRs    []string
-	DNSResolverCIDRs      []string
-	DeniedCIDRs           []string
+	Address                string
+	DatabaseURL            string
+	ServerCertificateFile  string
+	ServerPrivateKeyFile   string
+	ClientCAFile           string
+	TrustDomain            string
+	OpenBaoAddress         string
+	OpenBaoTokenFile       string
+	OpenBaoPKIMount        string
+	OpenBaoRole            string
+	OpenBaoTTL             time.Duration
+	OpenBaoCredentialMount string
+	OpenBaoCredentialTTL   time.Duration
+	TimewebAPIURL          string
+	TimewebTokenFile       string
+	TimewebProjectID       int64
+	TimewebConfiguratorID  int64
+	TimewebZone            string
+	TimewebBandwidthMbps   int64
+	TimewebSystemDiskMiB   int64
+	WorkspaceVPCID         string
+	WorkspaceImages        map[string]string
+	ControlPlaneURL        string
+	AllowedEgressHosts     []string
+	EgressGatewayCIDRs     []string
+	DNSResolverCIDRs       []string
+	DeniedCIDRs            []string
 }
 
 func main() {
@@ -70,6 +72,7 @@ func main() {
 		platformprofile.Prod("workspace-agent-postgres-sessions"),
 		platformprofile.Prod("timeweb-workspace-provider"),
 		platformprofile.Prod("openbao-pki-and-lease-revocation"),
+		platformprofile.Prod("openbao-command-credential-broker"),
 		platformprofile.Prod("verified-spiffe-mtls"),
 	)
 	if err != nil || profile != platformprofile.Production {
@@ -81,7 +84,6 @@ func main() {
 		logger.Error("invalid workspace-manager configuration", "error", err)
 		os.Exit(1)
 	}
-
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	db, err := postgresbootstrap.Open(ctx, settings.DatabaseURL)
@@ -98,6 +100,14 @@ func main() {
 
 	clock := agentsupport.Clock{}
 	ids := managerIDs{inner: &agentsupport.IDs{}}
+	credentialSource, err := workspaceopenbao.NewCredentialSource(workspaceopenbao.CredentialConfig{
+		Address: settings.OpenBaoAddress, TokenFile: settings.OpenBaoTokenFile, Mount: settings.OpenBaoCredentialMount,
+		MaximumTTL: settings.OpenBaoCredentialTTL, Clock: clock,
+	})
+	if err != nil {
+		logger.Error("initialize OpenBao workspace credential source", "error", err)
+		os.Exit(1)
+	}
 	issuer, err := workspaceopenbao.NewIssuer(workspaceopenbao.Config{
 		Address: settings.OpenBaoAddress, TokenFile: settings.OpenBaoTokenFile, PKIMount: settings.OpenBaoPKIMount,
 		Role: settings.OpenBaoRole, TrustDomain: settings.TrustDomain, TTL: settings.OpenBaoTTL, Clock: clock,
@@ -128,7 +138,7 @@ func main() {
 	sessions := &session.Registry{Store: &sessionpostgres.Store{DB: db}, Clock: clock, IDs: ids}
 	workerID := ids.New("workspace-manager")
 	service := &workspace.Service{
-		Store: store, Provider: provider, Sessions: sessions, Leases: issuer, Clock: clock, IDs: ids,
+		Store: store, Provider: provider, Sessions: sessions, Leases: issuer, Credentials: credentialSource, Clock: clock, IDs: ids,
 		Policy: workspace.DefaultCommandPolicy(), ReconcilerID: workerID, WorkspaceVPCID: settings.WorkspaceVPCID,
 		AllowedEgressHosts: settings.AllowedEgressHosts, EgressGatewayCIDRs: settings.EgressGatewayCIDRs,
 		DNSResolverCIDRs: settings.DNSResolverCIDRs, DeniedCIDRs: settings.DeniedCIDRs,
@@ -142,7 +152,7 @@ func main() {
 		os.Exit(1)
 	}
 	agentHandler := sessionhttp.Handler{
-		Registry: sessions, Workspaces: service, Bindings: service, Certificates: issuer,
+		Registry: sessions, Workspaces: service, Credentials: service, Bindings: service, Certificates: issuer,
 		Principals: sessionhttp.SPIFFEResolver{TrustDomain: settings.TrustDomain}, MaxBodyBytes: 64 << 10,
 	}
 	handler := http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
@@ -227,7 +237,8 @@ func loadConfig() (config, error) {
 		ClientCAFile: required("WORKSPACE_CLIENT_CA_FILE"), TrustDomain: required("WORKSPACE_TRUST_DOMAIN"),
 		OpenBaoAddress: required("OPENBAO_ADDR"), OpenBaoTokenFile: required("OPENBAO_TOKEN_FILE"),
 		OpenBaoPKIMount: env("OPENBAO_WORKSPACE_PKI_MOUNT", "workspace-pki"), OpenBaoRole: env("OPENBAO_WORKSPACE_PKI_ROLE", "workspace-agent"),
-		TimewebAPIURL: env("TIMEWEB_API_URL", "https://api.timeweb.cloud/api/v1"), TimewebTokenFile: required("TIMEWEB_TOKEN_FILE"),
+		OpenBaoCredentialMount: env("OPENBAO_WORKSPACE_CREDENTIAL_MOUNT", "workspace-credentials"),
+		TimewebAPIURL:          env("TIMEWEB_API_URL", "https://api.timeweb.cloud/api/v1"), TimewebTokenFile: required("TIMEWEB_TOKEN_FILE"),
 		TimewebZone: env("TIMEWEB_AVAILABILITY_ZONE", "msk-1"), WorkspaceVPCID: required("WORKSPACE_VPC_ID"),
 		ControlPlaneURL: required("WORKSPACE_AGENT_PUBLIC_URL"), AllowedEgressHosts: csv("WORKSPACE_ALLOWED_EGRESS_HOSTS"),
 		EgressGatewayCIDRs: csv("WORKSPACE_EGRESS_GATEWAY_CIDRS"), DNSResolverCIDRs: csv("WORKSPACE_DNS_RESOLVER_CIDRS"),
@@ -235,6 +246,9 @@ func loadConfig() (config, error) {
 	}
 	var err error
 	if settings.OpenBaoTTL, err = duration("OPENBAO_WORKSPACE_CERT_TTL", 15*time.Minute); err != nil {
+		return config{}, err
+	}
+	if settings.OpenBaoCredentialTTL, err = duration("OPENBAO_WORKSPACE_CREDENTIAL_MAX_TTL", 15*time.Minute); err != nil {
 		return config{}, err
 	}
 	if settings.TimewebProjectID, err = integer("TIMEWEB_PROJECT_ID", 0); err != nil || settings.TimewebProjectID <= 0 {

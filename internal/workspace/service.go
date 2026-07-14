@@ -19,6 +19,7 @@ type Service struct {
 	Provider           Provider
 	Sessions           AgentSessions
 	Leases             LeaseRevoker
+	Credentials        CredentialSource
 	Clock              Clock
 	IDs                IDGenerator
 	Policy             CommandPolicy
@@ -265,12 +266,16 @@ func (s *Service) Exec(ctx context.Context, request ExecRequest) (workspacev1.Co
 	if workspace.State != workspacev1.WorkspaceReady && workspace.State != workspacev1.WorkspaceBusy || !workspace.ExpiresAt.After(now) {
 		return workspacev1.CommandView{}, ErrConflict
 	}
+	if !subset(request.CredentialLeases, workspace.Spec.CredentialLeases) {
+		return workspacev1.CommandView{}, ErrPolicyDenied
+	}
 	fingerprintValue := struct {
 		WorkspaceID      string
 		Spec             workspacev1.CommandSpec
 		Kind             string
 		SerializationKey string
-	}{request.WorkspaceID, request.Spec, request.Kind, request.SerializationKey}
+		CredentialLeases []string
+	}{request.WorkspaceID, request.Spec, request.Kind, request.SerializationKey, request.CredentialLeases}
 	hash, err := agentv2.StableFingerprint(fingerprintValue)
 	if err != nil {
 		return workspacev1.CommandView{}, err
@@ -287,6 +292,45 @@ func (s *Service) Exec(ctx context.Context, request ExecRequest) (workspacev1.Co
 		return workspacev1.CommandView{}, err
 	}
 	return command.View(), nil
+}
+
+type CredentialResolveRequest struct {
+	TenantID       string
+	ProjectID      string
+	WorkspaceID    string
+	TaskID         string
+	CommandID      string
+	AgentSessionID string
+	VMID           string
+}
+
+// ResolveCredentials materializes only the refs stored with an already
+// dispatched command. Scope and execution binding come from the verified mTLS
+// session, never from the agent's JSON arguments.
+func (s *Service) ResolveCredentials(ctx context.Context, request CredentialResolveRequest) (workspacev1.AgentCredentialView, error) {
+	if s == nil || s.Store == nil || s.Credentials == nil || s.Clock == nil {
+		return workspacev1.AgentCredentialView{}, errors.New("workspace credential service is unavailable")
+	}
+	for _, value := range []string{request.TenantID, request.ProjectID, request.WorkspaceID, request.TaskID, request.CommandID, request.AgentSessionID, request.VMID} {
+		if strings.TrimSpace(value) == "" {
+			return workspacev1.AgentCredentialView{}, ErrPolicyDenied
+		}
+	}
+	command, err := s.Store.GetCommand(ctx, request.TenantID, request.ProjectID, request.CommandID)
+	if err != nil {
+		return workspacev1.AgentCredentialView{}, err
+	}
+	if command.State != workspacev1.CommandRunning || command.WorkspaceID != request.WorkspaceID || command.TaskID != request.TaskID || command.AgentSessionID != request.AgentSessionID || command.ExecutionVMID != request.VMID {
+		return workspacev1.AgentCredentialView{}, ErrPolicyDenied
+	}
+	if len(command.Spec.EnvironmentRefs) == 0 && len(command.CredentialLeases) == 0 {
+		return workspacev1.AgentCredentialView{Values: map[string]string{}, ExpiresAt: s.Clock.Now().UTC().Add(time.Minute)}, nil
+	}
+	return s.Credentials.Resolve(ctx, CredentialSourceRequest{
+		TenantID: request.TenantID, ProjectID: request.ProjectID, WorkspaceID: request.WorkspaceID, TaskID: request.TaskID,
+		CommandID: command.ID, AgentSessionID: command.AgentSessionID, VMID: command.ExecutionVMID,
+		EnvironmentRefs: cloneStringMap(command.Spec.EnvironmentRefs), CredentialLeases: append([]string(nil), command.CredentialLeases...),
+	})
 }
 
 // Dispatch performs the asynchronous outbox step for a queued command. A
@@ -553,4 +597,25 @@ func copyInt(value *int) *int {
 }
 func equalExitCode(left, right *int) bool {
 	return left == nil && right == nil || left != nil && right != nil && *left == *right
+}
+
+func subset(values, allowed []string) bool {
+	set := make(map[string]struct{}, len(allowed))
+	for _, value := range allowed {
+		set[value] = struct{}{}
+	}
+	for _, value := range values {
+		if _, ok := set[value]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func cloneStringMap(value map[string]string) map[string]string {
+	result := make(map[string]string, len(value))
+	for key, item := range value {
+		result[key] = item
+	}
+	return result
 }

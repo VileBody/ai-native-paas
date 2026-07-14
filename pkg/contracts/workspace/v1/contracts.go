@@ -173,3 +173,20 @@ type AgentCommandOutcome struct {
 	FinishedAt            time.Time    `json:"finished_at"`
 	ProcessTreeTerminated bool         `json:"process_tree_terminated,omitempty"`
 }
+
+// AgentCredentialResolve identifies an already accepted command. Environment
+// references are intentionally not accepted from the agent: the control plane
+// resolves the exact references persisted with the RUNNING command.
+type AgentCredentialResolve struct {
+	SessionID          string `json:"session_id"`
+	ExecutionSessionID string `json:"execution_session_id,omitempty"`
+	CommandID          string `json:"command_id"`
+}
+
+// AgentCredentialView is a short-lived, command-scoped materialization. It is
+// delivered only over the workspace's verified mTLS channel and must never be
+// persisted by the agent.
+type AgentCredentialView struct {
+	Values    map[string]string `json:"values"`
+	ExpiresAt time.Time         `json:"expires_at"`
+}

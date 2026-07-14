@@ -33,6 +33,15 @@ type bindingResolver struct{}
 
 type certificateRotator struct{ identity bootstrap.Identity }
 
+type credentialResolver struct {
+	request workspace.CredentialResolveRequest
+}
+
+func (r *credentialResolver) ResolveCredentials(_ context.Context, request workspace.CredentialResolveRequest) (workspacev1.AgentCredentialView, error) {
+	r.request = request
+	return workspacev1.AgentCredentialView{Values: map[string]string{"TOKEN": "short-lived"}, ExpiresAt: time.Date(2026, 7, 14, 12, 10, 0, 0, time.UTC)}, nil
+}
+
 func (r *certificateRotator) Sign(_ context.Context, identity bootstrap.Identity, csr []byte) (bootstrap.CertificateBundle, error) {
 	r.identity = identity
 	if string(csr) != "test-csr" {
@@ -103,6 +112,26 @@ func TestWorkspaceAgentHTTP_RotationUsesOnlyVerifiedSessionIdentity(t *testing.T
 	foreignResponse := serve(handler, withCertificate(httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/certificate:rotate", strings.NewReader(body)), foreign))
 	if foreignResponse.Code != http.StatusForbidden {
 		t.Fatalf("foreign session rotated certificate: %d", foreignResponse.Code)
+	}
+}
+
+func TestWorkspaceAgentHTTP_CredentialScopeComesOnlyFromVerifiedSession(t *testing.T) {
+	handler, _, _, certificate := handlerFixture(t)
+	connected := connectAgent(t, handler, certificate)
+	resolver := &credentialResolver{}
+	handler.Credentials = resolver
+	body := fmt.Sprintf(`{"session_id":%q,"execution_session_id":%q,"command_id":"command-1"}`, connected.SessionID, connected.SessionID)
+	response := serve(handler, withCertificate(httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/credentials:resolve", strings.NewReader(body)), certificate))
+	if response.Code != http.StatusOK {
+		t.Fatalf("credential status=%d body=%s", response.Code, response.Body.String())
+	}
+	if resolver.request.TenantID != "tenant-1" || resolver.request.ProjectID != "project-1" || resolver.request.WorkspaceID != "workspace-1" || resolver.request.TaskID != "task-1" || resolver.request.AgentSessionID != connected.SessionID || resolver.request.VMID != "vm-1" || resolver.request.CommandID != "command-1" {
+		t.Fatalf("credential scope=%#v", resolver.request)
+	}
+	foreign := clientCertificate(t, time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC), "/tenant/tenant-1/project/project-2/workspace/workspace-1/task/task-1/agent/agent-1")
+	denied := serve(handler, withCertificate(httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/credentials:resolve", strings.NewReader(body)), foreign))
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("foreign credential request status=%d body=%s", denied.Code, denied.Body.String())
 	}
 }
 

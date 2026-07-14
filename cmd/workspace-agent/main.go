@@ -22,6 +22,7 @@ func main() {
 		platformprofile.Prod("durable-command-journal"),
 		platformprofile.Prod("process-group-executor"),
 		platformprofile.Prod("streaming-secret-redaction"),
+		platformprofile.Prod("remote-command-credential-broker"),
 	)
 	if err != nil || profile != platformprofile.Production {
 		logger.Error("workspace-agent requires a valid production profile")
@@ -48,7 +49,7 @@ func main() {
 	}
 	agent := &workspaceagent.Agent{
 		WorkspaceID: config.WorkspaceID, Control: client, Journal: journal,
-		Resolver: workspaceagent.FailClosedEnvironmentResolver{},
+		Resolver: workspaceagent.RemoteEnvironmentResolver{Control: client, Now: time.Now},
 		Executor: workspaceagent.Executor{WorkspaceRoot: config.WorkspaceRoot, Policy: workspace.DefaultCommandPolicy(), Now: time.Now, RequireCgroup: true},
 		Outputs:  workspaceagent.FileOutputSink{Directory: filepath.Join(config.JournalDirectory, "output")},
 		Policy:   workspace.DefaultCommandPolicy(), Now: time.Now,
