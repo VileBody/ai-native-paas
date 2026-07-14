@@ -2,6 +2,8 @@ package testkit
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	kernelv1 "github.com/keir-research/ai-native-paas/contracts/kernel/v1"
 	"github.com/keir-research/ai-native-paas/internal/agent/application"
@@ -31,6 +33,7 @@ type Source struct {
 	mu                                      sync.Mutex
 	Projects                                map[string]application.ProjectRef
 	ByKey                                   map[string]string
+	PatchCommits                            []application.CommitRef
 	CreateCalls, PatchCalls, ReconcileCalls int
 	LostWebhook                             bool
 	Credential                              string
@@ -72,7 +75,11 @@ func (s *Source) ApplyPatch(_ context.Context, tenant, actor string, a applicati
 	if s.Fail != nil {
 		return application.CommitRef{}, s.Fail
 	}
-	return application.CommitRef{ProjectID: a.ProjectID, RepositoryID: "repo-" + a.ProjectID, Branch: a.Branch, CommitSHA: "abcdef0123456789"}, nil
+	raw := fmt.Sprintf("%s\x00%s\x00%s\x00%s\x00%s\x00%v", tenant, actor, key, a.BaseCommitSHA, a.Message, a.Files)
+	sum := sha256.Sum256([]byte(raw))
+	commit := application.CommitRef{ProjectID: a.ProjectID, RepositoryID: "repo-" + a.ProjectID, Branch: a.Branch, CommitSHA: hex.EncodeToString(sum[:])[:40]}
+	s.PatchCommits = append(s.PatchCommits, commit)
+	return commit, nil
 }
 func (s *Source) CreateBranch(_ context.Context, tenant, actor string, a application.CreateBranchArguments, key string) (application.CommitRef, error) {
 	return application.CommitRef{ProjectID: a.ProjectID, RepositoryID: "repo-" + a.ProjectID, Branch: a.Branch, CommitSHA: a.BaseCommitSHA}, nil
@@ -111,7 +118,8 @@ func (b *Builds) Request(_ context.Context, tenant string, rev sourcev1.SourceRe
 		return application.BuildResult{Build: b.ByID[id]}, nil
 	}
 	id := fmt.Sprintf("build-%d", len(b.ByID)+1)
-	artifact := buildv1.ArtifactRef{ArtifactID: "artifact-" + id, Repository: "registry.invalid/" + tenant + "/app", Digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", MediaType: "application/vnd.oci.image.manifest.v1+json"}
+	artifactHash := sha256.Sum256([]byte(rev.CommitSHA))
+	artifact := buildv1.ArtifactRef{ArtifactID: "artifact-" + id, Repository: "registry.invalid/" + tenant + "/app", Digest: "sha256:" + hex.EncodeToString(artifactHash[:]), MediaType: "application/vnd.oci.image.manifest.v1+json"}
 	v := buildv1.BuildView{BuildID: id, TenantID: tenant, Identity: rev.CommitSHA, State: buildv1.BuildSucceeded, CorrelationID: corr, Artifact: &artifact, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 	b.ByID[id] = v
 	b.ByKey[tenant+":"+key] = id
@@ -208,6 +216,19 @@ func (r *Runtime) Reconcile(context.Context, string, string) error {
 	r.ReconcileCalls++
 	r.mu.Unlock()
 	return nil
+}
+
+func (r *Runtime) SetStatus(deploymentID string, phase runtimev1.DeploymentPhase, readyReplicas int) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	status, ok := r.ByID[deploymentID]
+	if !ok {
+		return false
+	}
+	status.Phase = phase
+	status.ReadyReplicas = readyReplicas
+	r.ByID[deploymentID] = status
+	return true
 }
 
 type Attachments struct {

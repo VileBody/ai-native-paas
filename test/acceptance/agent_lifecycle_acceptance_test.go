@@ -154,3 +154,88 @@ func TestAcceptance_AgentCannotDeployProductionWithoutApproval(t *testing.T) {
 		t.Fatalf("err=%v deploy calls=%d", err, f.runtime.DeployCalls)
 	}
 }
+
+func TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix(t *testing.T) {
+	f := newLifecycleFixture(t)
+	project := f.invoke(t, agentv1.ToolCreateProject, application.CreateProjectArguments{Name: "repairable-api"}, "repair-create-project", "")
+	projectID := project.Result.ID
+
+	patch := func(key, base, message, content string) application.CommitRef {
+		response := f.invoke(t, agentv1.ToolApplyRepositoryPatch, application.ApplyPatchArguments{
+			ProjectID: projectID, BaseCommitSHA: base, Branch: "main", Message: message,
+			Files: []application.PatchFile{{Path: "main.go", Content: content}},
+		}, key, "")
+		var commit application.CommitRef
+		if err := json.Unmarshal(response.Result.Data, &commit); err != nil {
+			t.Fatal(err)
+		}
+		return commit
+	}
+	build := func(key string, commit application.CommitRef) buildv1.BuildView {
+		var arguments application.RequestBuildArguments
+		arguments.Revision.ProjectID = commit.ProjectID
+		arguments.Revision.RepositoryID = commit.RepositoryID
+		arguments.Revision.Branch = commit.Branch
+		arguments.Revision.CommitSHA = commit.CommitSHA
+		arguments.EstimatedMinutes = 2
+		response := f.invoke(t, agentv1.ToolRequestBuild, arguments, key, "")
+		var view buildv1.BuildView
+		if err := json.Unmarshal(response.Result.Data, &view); err != nil {
+			t.Fatal(err)
+		}
+		return view
+	}
+	configuration := runtimev1.ReleaseConfig{
+		Region: "eu1", Isolation: runtimev1.IsolationSandboxed, Unit: "u1",
+		Processes:         map[string]runtimev1.ProcessSpec{"web": {Port: 8080, MinReplicas: 1, MaxReplicas: 2, HealthPath: "/health"}},
+		GeneratedHostname: "repairable.apps.example.test", RolloutTimeoutSeconds: 300, EgressProfile: "public-default",
+	}
+	deploy := func(key string, revision int64, buildID string) agentv1.InvocationResponse {
+		return f.invoke(t, agentv1.ToolDeploy, application.DeployArguments{
+			BuildID: buildID, ApplicationID: "repairable-api", EnvironmentID: "env-staging", EnvironmentName: "staging",
+			ExpectedEnvironmentRevision: revision, Configuration: configuration,
+		}, key, "")
+	}
+
+	initialCommit := patch("repair-initial-patch", "abcdef0", "initial implementation", "package main\nfunc healthy() bool { return false }\n")
+	initialBuild := build("repair-initial-build", initialCommit)
+	initialDeployment := deploy("repair-initial-deploy", 1, initialBuild.BuildID)
+	if initialBuild.Identity != initialCommit.CommitSHA || initialBuild.Artifact == nil || initialDeployment.Result == nil {
+		t.Fatalf("initial commit=%+v build=%+v deployment=%+v", initialCommit, initialBuild, initialDeployment)
+	}
+	if !f.runtime.SetStatus(initialDeployment.Result.ID, runtimev1.DeploymentFailed, 0) {
+		t.Fatal("initial deployment status was not found")
+	}
+	failed := f.invoke(t, agentv1.ToolGetDeployment, application.GetDeploymentArguments{DeploymentID: initialDeployment.Result.ID}, "repair-observe-health-failure", "")
+	if failed.Result.State != string(runtimev1.DeploymentFailed) || f.runtime.ReconcileCalls != 0 {
+		t.Fatalf("failed status=%+v runtime_reconciles=%d", failed, f.runtime.ReconcileCalls)
+	}
+
+	repairCommit := patch("repair-followup-patch", initialCommit.CommitSHA, "fix health endpoint", "package main\nfunc healthy() bool { return true }\n")
+	if repairCommit.CommitSHA == initialCommit.CommitSHA || repairCommit.CommitSHA == "" || len(f.source.PatchCommits) != 2 {
+		t.Fatalf("initial=%+v repair=%+v commits=%+v", initialCommit, repairCommit, f.source.PatchCommits)
+	}
+	repairBuild := build("repair-followup-build", repairCommit)
+	if repairBuild.Identity != repairCommit.CommitSHA || repairBuild.Artifact == nil || repairBuild.Artifact.Digest == initialBuild.Artifact.Digest {
+		t.Fatalf("initial build=%+v repair build=%+v", initialBuild, repairBuild)
+	}
+	repairedDeployment := deploy("repair-followup-deploy", 2, repairBuild.BuildID)
+	ready := f.invoke(t, agentv1.ToolGetDeployment, application.GetDeploymentArguments{DeploymentID: repairedDeployment.Result.ID}, "repair-observe-ready", "")
+	if repairedDeployment.Result.ID == initialDeployment.Result.ID || ready.Result.State != string(runtimev1.DeploymentReady) ||
+		f.runtime.DeployCalls != 2 || f.runtime.ReconcileCalls != 0 || f.runtime.LastExpectedRevision != 2 ||
+		f.runtime.LastDeployRequest.Artifact.Digest != repairBuild.Artifact.Digest {
+		t.Fatalf("repaired=%+v ready=%+v runtime deploys=%d reconciles=%d request=%+v", repairedDeployment, ready, f.runtime.DeployCalls, f.runtime.ReconcileCalls, f.runtime.LastDeployRequest)
+	}
+
+	audit, err := f.svc.AuditTrail(context.Background(), "tenant-acme", "task-booking")
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := map[agentv1.Tool]int{}
+	for _, event := range audit {
+		counts[event.Tool]++
+	}
+	if counts[agentv1.ToolApplyRepositoryPatch] != 2 || counts[agentv1.ToolRequestBuild] != 2 || counts[agentv1.ToolDeploy] != 2 || counts[agentv1.ToolGetDeployment] != 2 {
+		t.Fatalf("repair audit counts=%v", counts)
+	}
+}

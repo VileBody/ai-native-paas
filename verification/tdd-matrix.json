@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 963,
-  "discovered_unique_test_name_count": 961,
+  "discovered_go_test_count": 964,
+  "discovered_unique_test_name_count": 962,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1338,10 +1338,10 @@
       "id": "G19",
       "level": "acceptance",
       "name": "TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "test/acceptance/agent_lifecycle_acceptance_test.go",
       "test_name": "TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix"
+      "test_ref": "test/acceptance/agent_lifecycle_acceptance_test.go::TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix"
     },
     {
       "family": "G",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 2,
-      "REUSED": 89
+      "NEW": 1,
+      "REUSED": 90
     },
     "unmapped": 0
   }
