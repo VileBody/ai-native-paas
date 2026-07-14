@@ -3,6 +3,11 @@ ALTER TABLE infrastructure.plans
     ADD COLUMN IF NOT EXISTS apply_authorization_fingerprint text
         CHECK (apply_authorization_fingerprint IS NULL OR apply_authorization_fingerprint ~ '^sha256:[0-9a-f]{64}$');
 
+-- The v003 immutability trigger correctly rejects every update to an already
+-- started plan. Remove it only inside this migration transaction, backfill the
+-- new immutable identity, then install the stricter replacement below.
+DROP TRIGGER IF EXISTS infrastructure_plan_identity_immutable ON infrastructure.plans;
+
 -- Applies authorized before this migration cannot be replayed safely because
 -- the original request binding was not persisted. Give them a deliberately
 -- unmatchable binding so the completeness invariant holds and every retry is
@@ -35,3 +40,7 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
+CREATE TRIGGER infrastructure_plan_identity_immutable
+BEFORE UPDATE ON infrastructure.plans
+FOR EACH ROW EXECUTE FUNCTION infrastructure.protect_plan_identity();

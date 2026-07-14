@@ -10,6 +10,7 @@ import (
 
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -78,6 +79,25 @@ func (s *Service) Get(ctx context.Context, scope Scope, workspaceID string) (wor
 		return workspacev1.WorkspaceRef{}, err
 	}
 	return workspace.Ref(), nil
+}
+
+// GetSourceRevision returns the immutable source binding accepted when the
+// workspace was created. It is intentionally not derived from command input.
+func (s *Service) GetSourceRevision(ctx context.Context, scope Scope, workspaceID string) (sourcev2.SourceRevision, error) {
+	if err := s.requireStore(); err != nil {
+		return sourcev2.SourceRevision{}, err
+	}
+	if err := scope.validate(); err != nil {
+		return sourcev2.SourceRevision{}, err
+	}
+	value, err := s.Store.GetWorkspace(ctx, scope.TenantID, scope.ProjectID, workspaceID)
+	if err != nil {
+		return sourcev2.SourceRevision{}, err
+	}
+	if value.Spec.SourceRevision == nil || value.Spec.SourceRevision.Validate() != nil {
+		return sourcev2.SourceRevision{}, ErrPolicyDenied
+	}
+	return *value.Spec.SourceRevision, nil
 }
 
 // Reconcile performs a single idempotent provider step. It is intended for a

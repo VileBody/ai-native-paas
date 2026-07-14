@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 837,
-  "discovered_unique_test_name_count": 835,
+  "discovered_go_test_count": 838,
+  "discovered_unique_test_name_count": 836,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1288,10 +1288,10 @@
       "id": "G14",
       "level": "application",
       "name": "TestAgent_DeployWorkflowStartsFromExactRepositoryRevision",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/project/mcp/handler_test.go",
       "test_name": "TestAgent_DeployWorkflowStartsFromExactRepositoryRevision",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_DeployWorkflowStartsFromExactRepositoryRevision"
+      "test_ref": "internal/project/mcp/handler_test.go::TestAgent_DeployWorkflowStartsFromExactRepositoryRevision"
     },
     {
       "family": "G",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 77,
-      "NEW": 51,
-      "REUSED": 29
+      "NEW": 50,
+      "REUSED": 30
     },
     "unmapped": 0
   }

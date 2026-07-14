@@ -19,6 +19,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -30,6 +31,7 @@ type ProjectReader interface {
 type WorkspaceCommands interface {
 	Create(context.Context, workspace.CreateRequest) (workspacev1.WorkspaceRef, error)
 	Get(context.Context, workspace.Scope, string) (workspacev1.WorkspaceRef, error)
+	GetSourceRevision(context.Context, workspace.Scope, string) (sourcev2.SourceRevision, error)
 	Exec(context.Context, workspace.ExecRequest) (workspacev1.CommandView, error)
 	Destroy(context.Context, workspace.Scope, string) (workspacev1.WorkspaceRef, error)
 }
@@ -172,6 +174,9 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 
 type workspaceCreateArguments struct {
 	ImageDigest      string   `json:"image_digest"`
+	RepositoryID     string   `json:"repository_id"`
+	CommitSHA        string   `json:"commit_sha"`
+	SourceRoot       string   `json:"source_root,omitempty"`
 	CPUMillis        int64    `json:"cpu_millis"`
 	MemoryMiB        int64    `json:"memory_mib"`
 	TTLSeconds       int64    `json:"ttl_seconds"`
@@ -203,13 +208,18 @@ func (h Handler) invokeWorkspace(ctx context.Context, verified agentv2.VerifiedI
 	switch request.Tool {
 	case agentv2.ToolWorkspaceCreate:
 		var arguments workspaceCreateArguments
-		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil {
+		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || h.Projects == nil {
 			return nil, errInvalidWorkspaceArguments
 		}
+		repository, err := h.Projects.GetRepositoryForProject(ctx, verified.TenantID, verified.ProjectID)
+		if err != nil || arguments.RepositoryID != repository.ID {
+			return nil, errInvalidWorkspaceArguments
+		}
+		revision := sourcev2.SourceRevision{RepositoryID: repository.ID, CommitSHA: arguments.CommitSHA, SourceRoot: arguments.SourceRoot}
 		spec := workspacev1.WorkspaceSpec{
 			ProjectID: verified.ProjectID, TaskID: request.TaskID, ImageDigest: arguments.ImageDigest,
 			CPUMillis: arguments.CPUMillis, MemoryMiB: arguments.MemoryMiB, TTLSeconds: arguments.TTLSeconds,
-			NetworkProfile: arguments.NetworkProfile, CredentialLeases: append([]string(nil), arguments.CredentialLeases...),
+			NetworkProfile: arguments.NetworkProfile, CredentialLeases: append([]string(nil), arguments.CredentialLeases...), SourceRevision: &revision,
 		}
 		if spec.Validate() != nil {
 			return nil, errInvalidWorkspaceArguments
@@ -296,6 +306,15 @@ func (h Handler) invokeInfrastructure(ctx context.Context, verified agentv2.Veri
 		var arguments infraPlanArguments
 		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || !validRelativePlanPath(arguments.PlanPath) || h.Workspaces == nil {
 			return nil, errInvalidInfrastructureArguments
+		}
+		revision, err := h.Workspaces.GetSourceRevision(ctx, workspace.Scope{
+			TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID,
+		}, arguments.WorkspaceID)
+		if err != nil {
+			return nil, err
+		}
+		if arguments.SourceSHA != revision.CommitSHA {
+			return nil, infraapp.ErrPermissionDenied
 		}
 		timeout := arguments.TimeoutSeconds
 		if timeout == 0 {

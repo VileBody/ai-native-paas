@@ -13,6 +13,16 @@
       "minItems": 1,
       "type": "array"
     },
+    "credential_leases": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
     "environment_refs": {
       "additionalProperties": {
         "maxLength": 4096,
@@ -22,8 +32,24 @@
       "maxProperties": 128,
       "type": "object"
     },
+    "kind": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "output_limit_bytes": {
+      "maximum": 1073741824,
+      "minimum": 1024,
+      "type": "integer"
+    },
+    "serialization_key": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
     "timeout_seconds": {
-      "minimum": 0,
+      "maximum": 86400,
+      "minimum": 1,
       "type": "integer"
     },
     "working_dir": {
@@ -42,7 +68,9 @@
   "required": [
     "workspace_id",
     "argv",
-    "timeout_seconds"
+    "timeout_seconds",
+    "output_limit_bytes",
+    "kind"
   ],
   "title": "workspace_exec arguments",
   "type": "object"

@@ -3,17 +3,35 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "approval_grant_id": {
-      "maxLength": 63,
-      "minLength": 1,
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
-      "type": "string"
+    "credential_leases": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "environment_refs": {
+      "additionalProperties": {
+        "maxLength": 4096,
+        "minLength": 0,
+        "type": "string"
+      },
+      "maxProperties": 128,
+      "type": "object"
     },
     "estimate_version": {
       "maxLength": 63,
       "minLength": 1,
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
       "type": "string"
+    },
+    "output_limit_bytes": {
+      "maximum": 1073741824,
+      "minimum": 1024,
+      "type": "integer"
     },
     "plan_hash": {
       "maxLength": 71,
@@ -27,10 +45,32 @@
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
       "type": "string"
     },
+    "plan_path": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    },
     "reservation_id": {
       "maxLength": 63,
       "minLength": 1,
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
+      "type": "string"
+    },
+    "target": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "timeout_seconds": {
+      "maximum": 86400,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "working_dir": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
       "type": "string"
     }
   },
@@ -38,7 +78,9 @@
     "plan_id",
     "plan_hash",
     "estimate_version",
-    "reservation_id"
+    "reservation_id",
+    "target",
+    "plan_path"
   ],
   "title": "infra_apply arguments",
   "type": "object"

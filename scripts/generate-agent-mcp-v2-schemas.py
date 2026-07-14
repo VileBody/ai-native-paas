@@ -37,6 +37,9 @@ URL = string(maximum=4096, pattern=r"^https://")
 INT = {"type": "integer", "minimum": 0}
 BOOL = {"type": "boolean"}
 STRING_MAP = {"type": "object", "maxProperties": 128, "additionalProperties": string(minimum=0, maximum=4096)}
+LEASE = string(maximum=256, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
+LEASES = {"type": "array", "maxItems": 64, "items": LEASE}
+ARGV = {"type": "array", "minItems": 1, "maxItems": 128, "items": string(minimum=0, maximum=4096)}
 
 tools = {}
 
@@ -69,18 +72,61 @@ add(PROJECT, "repository_commit", {"branch": NAME, "base_sha": SHA, "message": s
 add(PROJECT, "repository_push", {"branch": NAME, "commit_sha": SHA}, ("branch", "commit_sha"))
 add(PROJECT, "repository_create_merge_request", {"source_branch": NAME, "target_branch": NAME, "title": string(maximum=500)}, ("source_branch", "target_branch", "title"))
 
-add(WORKSPACE, "workspace_create", {"task_id": ID, "image_digest": DIGEST, "cpu_millis": INT, "memory_mib": INT, "ttl_seconds": INT}, ("task_id", "image_digest"))
+add(WORKSPACE, "workspace_create", {
+    "repository_id": ID,
+    "commit_sha": SHA,
+    "source_root": PATH,
+    "image_digest": DIGEST,
+    "cpu_millis": {"type": "integer", "minimum": 250, "maximum": 64000},
+    "memory_mib": {"type": "integer", "minimum": 256, "maximum": 262144},
+    "ttl_seconds": {"type": "integer", "minimum": 60, "maximum": 86400},
+    "network_profile": string(enum=["isolated-governed"]),
+    "credential_leases": LEASES,
+}, ("repository_id", "commit_sha", "image_digest", "cpu_millis", "memory_mib", "ttl_seconds", "network_profile"))
 add(WORKSPACE, "workspace_get", {"workspace_id": ID}, ("workspace_id",), True)
-add(WORKSPACE, "workspace_exec", {"workspace_id": ID, "argv": {"type": "array", "minItems": 1, "maxItems": 128, "items": string(minimum=0, maximum=4096)}, "working_dir": PATH, "timeout_seconds": INT, "environment_refs": STRING_MAP}, ("workspace_id", "argv", "timeout_seconds"))
+add(WORKSPACE, "workspace_exec", {
+    "workspace_id": ID,
+    "argv": ARGV,
+    "working_dir": PATH,
+    "environment_refs": STRING_MAP,
+    "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 86400},
+    "output_limit_bytes": {"type": "integer", "minimum": 1024, "maximum": 1073741824},
+    "kind": NAME,
+    "serialization_key": NAME,
+    "credential_leases": LEASES,
+}, ("workspace_id", "argv", "timeout_seconds", "output_limit_bytes", "kind"))
 add(WORKSPACE, "workspace_upload_artifact", {"workspace_id": ID, "path": PATH, "content_digest": DIGEST}, ("workspace_id", "path", "content_digest"))
 add(WORKSPACE, "workspace_cancel_command", {"workspace_id": ID, "command_id": ID}, ("workspace_id", "command_id"))
-add(WORKSPACE, "workspace_destroy", {"workspace_id": ID, "reason": string(maximum=500)}, ("workspace_id",))
+add(WORKSPACE, "workspace_destroy", {"workspace_id": ID}, ("workspace_id",))
 
 add(INFRA, "infra_init", {"workspace_id": ID, "root": PATH}, ("workspace_id", "root"))
 add(INFRA, "infra_validate", {"workspace_id": ID, "root": PATH}, ("workspace_id", "root"))
-add(INFRA, "infra_plan", {"workspace_id": ID, "root": PATH, "source_sha": SHA, "variables": STRING_MAP, "destroy": BOOL}, ("workspace_id", "root", "source_sha"))
+add(INFRA, "infra_plan", {
+    "workspace_id": ID,
+    "target": NAME,
+    "source_sha": SHA,
+    "state_generation": INT,
+    "plan_path": PATH,
+    "working_dir": PATH,
+    "environment_refs": STRING_MAP,
+    "credential_leases": LEASES,
+    "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 600},
+    "output_limit_bytes": {"type": "integer", "minimum": 1024, "maximum": 1073741824},
+}, ("workspace_id", "target", "source_sha", "state_generation", "plan_path"))
 add(INFRA, "infra_get_plan", {"plan_id": ID}, ("plan_id",), True)
-add(INFRA, "infra_apply", {"plan_id": ID, "plan_hash": DIGEST, "estimate_version": ID, "reservation_id": ID, "approval_grant_id": ID}, ("plan_id", "plan_hash", "estimate_version", "reservation_id"))
+add(INFRA, "infra_apply", {
+    "plan_id": ID,
+    "plan_hash": DIGEST,
+    "estimate_version": ID,
+    "reservation_id": ID,
+    "target": NAME,
+    "plan_path": PATH,
+    "working_dir": PATH,
+    "environment_refs": STRING_MAP,
+    "credential_leases": LEASES,
+    "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 86400},
+    "output_limit_bytes": {"type": "integer", "minimum": 1024, "maximum": 1073741824},
+}, ("plan_id", "plan_hash", "estimate_version", "reservation_id", "target", "plan_path"))
 add(INFRA, "infra_destroy", {"plan_id": ID, "plan_hash": DIGEST, "estimate_version": ID, "reservation_id": ID, "approval_grant_id": ID}, ("plan_id", "plan_hash", "estimate_version", "reservation_id", "approval_grant_id"))
 add(INFRA, "infra_state_list", {"state_generation": INT}, read_only=True)
 add(INFRA, "infra_import", {"workspace_id": ID, "address": NAME, "external_id": NAME}, ("workspace_id", "address", "external_id"))
@@ -112,8 +158,8 @@ add(PROVIDER, "capability_bind", {"kind": string(enum=["llm.openrouter-compatibl
 add(PROVIDER, "capability_get_usage", {"binding_id": ID, "period": ID}, ("binding_id", "period"), True)
 
 add(GOVERNANCE, "cost_estimate", {"plan_id": ID, "plan_hash": DIGEST}, ("plan_id", "plan_hash"), True)
-add(GOVERNANCE, "approval_request", {"plan_hash": DIGEST, "estimate_version": ID, "target": NAME, "reason": string(maximum=1000)}, ("plan_hash", "estimate_version", "target", "reason"))
-add(GOVERNANCE, "approval_get", {"approval_request_id": ID}, ("approval_request_id",), True)
+add(GOVERNANCE, "approval_request", {"plan_id": ID}, ("plan_id",))
+add(GOVERNANCE, "approval_get", {"plan_id": ID}, ("plan_id",), True)
 add(GOVERNANCE, "operation_get", {"operation_id": ID}, ("operation_id",), True)
 add(GOVERNANCE, "operation_wait", {"operation_id": ID, "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 60}}, ("operation_id",), True)
 add(GOVERNANCE, "operation_cancel", {"operation_id": ID, "reason": string(maximum=500)}, ("operation_id",))

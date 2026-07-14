@@ -20,6 +20,7 @@ import (
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
 	commercev2 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v2"
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -58,9 +59,10 @@ func (r projectReader) GetRepositoryForProject(_ context.Context, tenantID, proj
 }
 
 type workspaceCommands struct {
-	created workspace.CreateRequest
-	exec    workspace.ExecRequest
-	scope   workspace.Scope
+	created  workspace.CreateRequest
+	exec     workspace.ExecRequest
+	scope    workspace.Scope
+	revision sourcev2.SourceRevision
 }
 
 func (w *workspaceCommands) Create(_ context.Context, request workspace.CreateRequest) (workspacev1.WorkspaceRef, error) {
@@ -70,6 +72,10 @@ func (w *workspaceCommands) Create(_ context.Context, request workspace.CreateRe
 func (w *workspaceCommands) Get(_ context.Context, scope workspace.Scope, workspaceID string) (workspacev1.WorkspaceRef, error) {
 	w.scope = scope
 	return workspacev1.WorkspaceRef{WorkspaceID: workspaceID, ProjectID: scope.ProjectID, TaskID: "task-1", State: workspacev1.WorkspaceReady}, nil
+}
+func (w *workspaceCommands) GetSourceRevision(_ context.Context, scope workspace.Scope, _ string) (sourcev2.SourceRevision, error) {
+	w.scope = scope
+	return w.revision, nil
 }
 func (w *workspaceCommands) Exec(_ context.Context, request workspace.ExecRequest) (workspacev1.CommandView, error) {
 	w.exec = request
@@ -102,7 +108,7 @@ func mcpFixture(t *testing.T, scopes []string) (Handler, string, *workspaceComma
 	}
 	project, _ := domain.NewProject("project-1", "tenant-1", "booking", clock.now)
 	repository, _ := domain.NewRepository("repo-1", "tenant-1", project.ID, "gitlab", "corr-1", 77, clock.now)
-	workspaces := &workspaceCommands{}
+	workspaces := &workspaceCommands{revision: sourcev2.SourceRevision{RepositoryID: repository.ID, CommitSHA: strings.Repeat("a", 40)}}
 	infrastructure := &infraapp.Service{
 		Store: inframemory.New(), Clock: clock, IDs: &mcpIDs{},
 		Prices: infraapp.PriceBook{
@@ -193,6 +199,21 @@ func TestProjectMCP_ExactPlanApprovalGatesVerifiedWorkspaceApply(t *testing.T) {
 	}
 }
 
+func TestAgent_DeployWorkflowStartsFromExactRepositoryRevision(t *testing.T) {
+	handler, access, workspaces := mcpFixture(t, []string{"agent.tool:infra_plan"})
+	requestPlan := invocation(agentv2.ToolInfraPlan)
+	requestPlan.IdempotencyKey = "plan-spoofed-revision"
+	requestPlan.Arguments = json.RawMessage(`{
+		"workspace_id":"workspace-1","target":"staging",
+		"source_sha":"ffffffffffffffffffffffffffffffffffffffff",
+		"state_generation":1,"plan_path":"saved.plan","working_dir":"infrastructure"
+	}`)
+	response := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, requestPlan)
+	if response.Code != http.StatusForbidden || workspaces.exec.WorkspaceID != "" {
+		t.Fatalf("unbound revision plan status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
+	}
+}
+
 func request(t *testing.T, handler http.Handler, method, path, token string, body any) *httptest.ResponseRecorder {
 	t.Helper()
 	var reader *bytes.Reader
@@ -254,9 +275,9 @@ func TestProjectMCP_WorkspaceToolsDeriveScopeAndProjectFromAccessCredential(t *t
 	scopes := []string{"agent.tool:workspace_create", "agent.tool:workspace_get", "agent.tool:workspace_exec", "agent.tool:workspace_destroy"}
 	handler, access, workspaces := mcpFixture(t, scopes)
 	create := invocation(agentv2.ToolWorkspaceCreate)
-	create.Arguments = json.RawMessage(`{"image_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cpu_millis":2000,"memory_mib":4096,"ttl_seconds":900,"network_profile":"isolated-governed"}`)
+	create.Arguments = json.RawMessage(`{"repository_id":"repo-1","commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","image_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cpu_millis":2000,"memory_mib":4096,"ttl_seconds":900,"network_profile":"isolated-governed"}`)
 	created := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, create)
-	if created.Code != http.StatusOK || workspaces.created.Scope.TenantID != "tenant-1" || workspaces.created.Scope.ProjectID != "project-1" || workspaces.created.Scope.ActorID != "agent-1" || workspaces.created.Spec.ProjectID != "project-1" || workspaces.created.Spec.TaskID != "task-1" {
+	if created.Code != http.StatusOK || workspaces.created.Scope.TenantID != "tenant-1" || workspaces.created.Scope.ProjectID != "project-1" || workspaces.created.Scope.ActorID != "agent-1" || workspaces.created.Spec.ProjectID != "project-1" || workspaces.created.Spec.TaskID != "task-1" || workspaces.created.Spec.SourceRevision == nil || workspaces.created.Spec.SourceRevision.RepositoryID != "repo-1" {
 		t.Fatalf("created status=%d body=%s request=%#v", created.Code, created.Body.String(), workspaces.created)
 	}
 
@@ -273,7 +294,7 @@ func TestProjectMCP_WorkspaceToolsDeriveScopeAndProjectFromAccessCredential(t *t
 	before := workspaces.created
 	crossScope := invocation(agentv2.ToolWorkspaceCreate)
 	crossScope.IdempotencyKey = "create-cross"
-	crossScope.Arguments = json.RawMessage(`{"project_id":"victim","image_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cpu_millis":2000,"memory_mib":4096,"ttl_seconds":900,"network_profile":"isolated-governed"}`)
+	crossScope.Arguments = json.RawMessage(`{"project_id":"victim","repository_id":"repo-1","commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","image_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cpu_millis":2000,"memory_mib":4096,"ttl_seconds":900,"network_profile":"isolated-governed"}`)
 	rejected := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, crossScope)
 	if rejected.Code != http.StatusBadRequest || workspaces.created.IdempotencyKey != before.IdempotencyKey {
 		t.Fatalf("scope override status=%d body=%s request=%#v", rejected.Code, rejected.Body.String(), workspaces.created)

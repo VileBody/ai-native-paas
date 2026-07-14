@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 )
 
 const APIVersion = "workspace.platform.example.com/v1"
@@ -31,14 +33,15 @@ const (
 )
 
 type WorkspaceSpec struct {
-	ProjectID        string   `json:"project_id"`
-	TaskID           string   `json:"task_id"`
-	ImageDigest      string   `json:"image_digest"`
-	CPUMillis        int64    `json:"cpu_millis"`
-	MemoryMiB        int64    `json:"memory_mib"`
-	TTLSeconds       int64    `json:"ttl_seconds"`
-	NetworkProfile   string   `json:"network_profile"`
-	CredentialLeases []string `json:"credential_leases,omitempty"`
+	ProjectID        string                   `json:"project_id"`
+	TaskID           string                   `json:"task_id"`
+	ImageDigest      string                   `json:"image_digest"`
+	CPUMillis        int64                    `json:"cpu_millis"`
+	MemoryMiB        int64                    `json:"memory_mib"`
+	TTLSeconds       int64                    `json:"ttl_seconds"`
+	NetworkProfile   string                   `json:"network_profile"`
+	CredentialLeases []string                 `json:"credential_leases,omitempty"`
+	SourceRevision   *sourcev2.SourceRevision `json:"source_revision,omitempty"`
 }
 
 func (s WorkspaceSpec) Validate() error {
@@ -52,6 +55,9 @@ func (s WorkspaceSpec) Validate() error {
 		if !credentialLeaseID.MatchString(leaseID) {
 			return errors.New("invalid workspace credential lease references")
 		}
+	}
+	if s.SourceRevision != nil && s.SourceRevision.Validate() != nil {
+		return errors.New("invalid workspace source revision")
 	}
 	return nil
 }

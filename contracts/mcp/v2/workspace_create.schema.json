@@ -3,9 +3,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "commit_sha": {
+      "maxLength": 64,
+      "minLength": 40,
+      "pattern": "^[0-9a-f]{40,64}$",
+      "type": "string"
+    },
     "cpu_millis": {
-      "minimum": 0,
+      "maximum": 64000,
+      "minimum": 250,
       "type": "integer"
+    },
+    "credential_leases": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array"
     },
     "image_digest": {
       "maxLength": 71,
@@ -14,23 +31,44 @@
       "type": "string"
     },
     "memory_mib": {
-      "minimum": 0,
+      "maximum": 262144,
+      "minimum": 256,
       "type": "integer"
     },
-    "task_id": {
+    "network_profile": {
+      "enum": [
+        "isolated-governed"
+      ],
+      "maxLength": 4096,
+      "minLength": 1,
+      "type": "string"
+    },
+    "repository_id": {
       "maxLength": 63,
       "minLength": 1,
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$",
       "type": "string"
     },
+    "source_root": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    },
     "ttl_seconds": {
-      "minimum": 0,
+      "maximum": 86400,
+      "minimum": 60,
       "type": "integer"
     }
   },
   "required": [
-    "task_id",
-    "image_digest"
+    "repository_id",
+    "commit_sha",
+    "image_digest",
+    "cpu_millis",
+    "memory_mib",
+    "ttl_seconds",
+    "network_profile"
   ],
   "title": "workspace_create arguments",
   "type": "object"

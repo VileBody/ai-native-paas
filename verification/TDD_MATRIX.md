@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **837**
-- Reused now: **29**
-- New local/contract tests required: **51**
+- Discovered Go tests/fuzz targets: **838**
+- Reused now: **30**
+- New local/contract tests required: **50**
 - Live/provider/system tests required: **77**
 - Unmapped: **0**
 
@@ -142,7 +142,7 @@ A release gate may become green only after every referenced test exists and pass
 | `G11` | REUSED | system | `internal/workspace/service_tdd_test.go::TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage` |
 | `G12` | REUSED | chaos | `internal/workspace/service_tdd_test.go::TestWorkspace_RestartRecoversDurableCommandOutcomeWithoutRepeatingApply` |
 | `G13` | REUSED | concurrency | `internal/workspace/service_tdd_test.go::TestWorkspace_ConcurrentCommandPolicySerializesStatefulOperations` |
-| `G14` | NEW | application | `test/pivot/agent_workspace_test.go::TestAgent_DeployWorkflowStartsFromExactRepositoryRevision` |
+| `G14` | REUSED | application | `internal/project/mcp/handler_test.go::TestAgent_DeployWorkflowStartsFromExactRepositoryRevision` |
 | `G15` | REUSED | application/OpenTofu integration | `test/pivot/agent_workspace_test.go::TestInfraPlan_IsPureIdempotentAndStoresCanonicalPlanHash` |
 | `G16` | REUSED | cross-domain | `test/pivot/agent_workspace_test.go::TestInfraApply_RequiresMatchingPlanReservationAndApproval` |
 | `G17` | NEW | live state backend/concurrency | `test/pivot/agent_workspace_test.go::TestInfraState_RemoteLockPreventsConcurrentMutation` |

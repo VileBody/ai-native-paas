@@ -3,10 +3,31 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "destroy": {
-      "type": "boolean"
+    "credential_leases": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array"
     },
-    "root": {
+    "environment_refs": {
+      "additionalProperties": {
+        "maxLength": 4096,
+        "minLength": 0,
+        "type": "string"
+      },
+      "maxProperties": 128,
+      "type": "object"
+    },
+    "output_limit_bytes": {
+      "maximum": 1073741824,
+      "minimum": 1024,
+      "type": "integer"
+    },
+    "plan_path": {
       "maxLength": 4096,
       "minLength": 1,
       "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
@@ -18,14 +39,25 @@
       "pattern": "^[0-9a-f]{40,64}$",
       "type": "string"
     },
-    "variables": {
-      "additionalProperties": {
-        "maxLength": 4096,
-        "minLength": 0,
-        "type": "string"
-      },
-      "maxProperties": 128,
-      "type": "object"
+    "state_generation": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "target": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "timeout_seconds": {
+      "maximum": 600,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "working_dir": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
     },
     "workspace_id": {
       "maxLength": 63,
@@ -36,8 +68,10 @@
   },
   "required": [
     "workspace_id",
-    "root",
-    "source_sha"
+    "target",
+    "source_sha",
+    "state_generation",
+    "plan_path"
   ],
   "title": "infra_plan arguments",
   "type": "object"
