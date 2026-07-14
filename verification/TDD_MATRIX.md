@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **984**
-- Reused now: **96**
+- Discovered Go tests/fuzz targets: **987**
+- Reused now: **99**
 - New local/contract tests required: **0**
-- Live/provider/system tests required: **61**
+- Live/provider/system tests required: **58**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -61,11 +61,11 @@ A release gate may become green only after every referenced test exists and pass
 | `B13` | LIVE_ONLY | application/system | `test/pivot/build_v2_test.go::TestBuild_CancelStopsExecutionAndRevokesBuildCredentials` |
 | `B14` | REUSED | registry integration | `internal/build/multiarch/multiarch_test.go::TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests` |
 | `B15` | REUSED | contract/crypto | `internal/build/provenance/provenance_test.go::TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest` |
-| `R1` | LIVE_ONLY | application | `test/pivot/runtime_gitops_test.go::TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath` |
+| `R1` | REUSED | application | `internal/runtime/gitops/policy_test.go::TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath` |
 | `R2` | LIVE_ONLY | integration/golden | `test/pivot/runtime_gitops_test.go::TestGitOps_HelmRenderIsDeterministicForPinnedInputs` |
 | `R3` | REUSED | integration/fuzz | `internal/runtime/gitops/kustomize_test.go::TestGitOps_KustomizeRenderIsDeterministicAndPathSafe` |
-| `R4` | LIVE_ONLY | policy | `test/pivot/runtime_gitops_test.go::TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit` |
-| `R5` | LIVE_ONLY | policy | `test/pivot/runtime_gitops_test.go::TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource` |
+| `R4` | REUSED | policy | `internal/runtime/gitops/policy_test.go::TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit` |
+| `R5` | REUSED | policy | `internal/runtime/gitops/policy_test.go::TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource` |
 | `R6` | LIVE_ONLY | manifest contract + real Argo | `test/pivot/runtime_gitops_test.go::TestArgoProject_AllowsOnlyExpectedRepositoryClusterAndNamespaces` |
 | `R7` | LIVE_ONLY | application/system | `test/pivot/runtime_gitops_test.go::TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady` |
 | `R8` | REUSED | application + Git | `internal/runtime/application/gitops_saga_test.go::TestRuntime_RollbackCreatesAuditableGitRevision` |

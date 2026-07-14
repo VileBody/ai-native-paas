@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 984,
-  "discovered_unique_test_name_count": 982,
+  "discovered_go_test_count": 987,
+  "discovered_unique_test_name_count": 985,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -478,10 +478,10 @@
       "id": "R1",
       "level": "application",
       "name": "TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/runtime_gitops_test.go",
+      "status": "REUSED",
+      "test_file": "internal/runtime/gitops/policy_test.go",
       "test_name": "TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath",
-      "test_ref": "test/pivot/runtime_gitops_test.go::TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath"
+      "test_ref": "internal/runtime/gitops/policy_test.go::TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath"
     },
     {
       "family": "R",
@@ -508,20 +508,20 @@
       "id": "R4",
       "level": "policy",
       "name": "TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/runtime_gitops_test.go",
+      "status": "REUSED",
+      "test_file": "internal/runtime/gitops/policy_test.go",
       "test_name": "TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit",
-      "test_ref": "test/pivot/runtime_gitops_test.go::TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit"
+      "test_ref": "internal/runtime/gitops/policy_test.go::TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit"
     },
     {
       "family": "R",
       "id": "R5",
       "level": "policy",
       "name": "TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/runtime_gitops_test.go",
+      "status": "REUSED",
+      "test_file": "internal/runtime/gitops/policy_test.go",
       "test_name": "TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource",
-      "test_ref": "test/pivot/runtime_gitops_test.go::TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource"
+      "test_ref": "internal/runtime/gitops/policy_test.go::TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource"
     },
     {
       "family": "R",
@@ -1589,8 +1589,8 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 61,
-      "REUSED": 96
+      "LIVE_ONLY": 58,
+      "REUSED": 99
     },
     "unmapped": 0
   }
