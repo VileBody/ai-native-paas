@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **923**
-- Reused now: **57**
-- New local/contract tests required: **34**
+- Discovered Go tests/fuzz targets: **924**
+- Reused now: **58**
+- New local/contract tests required: **33**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -59,7 +59,7 @@ A release gate may become green only after every referenced test exists and pass
 | `B11` | REUSED | policy | `internal/build/dockerfilepolicy/policy_test.go::TestBuild_MutableBaseOrOutputTagCannotDefineProductionArtifact` |
 | `B12` | REUSED | PostgreSQL + concurrency | `test/integration/postgres_build_test.go::TestBuild_SameIdentityConcurrentRequestsExecuteOnce` |
 | `B13` | LIVE_ONLY | application/system | `test/pivot/build_v2_test.go::TestBuild_CancelStopsExecutionAndRevokesBuildCredentials` |
-| `B14` | NEW | registry integration | `test/pivot/build_v2_test.go::TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests` |
+| `B14` | REUSED | registry integration | `internal/build/multiarch/multiarch_test.go::TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests` |
 | `B15` | REUSED | contract/crypto | `internal/build/provenance/provenance_test.go::TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest` |
 | `R1` | LIVE_ONLY | application | `test/pivot/runtime_gitops_test.go::TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath` |
 | `R2` | LIVE_ONLY | integration/golden | `test/pivot/runtime_gitops_test.go::TestGitOps_HelmRenderIsDeterministicForPinnedInputs` |

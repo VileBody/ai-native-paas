@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 923,
-  "discovered_unique_test_name_count": 921,
+  "discovered_go_test_count": 924,
+  "discovered_unique_test_name_count": 922,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -458,10 +458,10 @@
       "id": "B14",
       "level": "registry integration",
       "name": "TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests",
-      "status": "NEW",
-      "test_file": "test/pivot/build_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/build/multiarch/multiarch_test.go",
       "test_name": "TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests",
-      "test_ref": "test/pivot/build_v2_test.go::TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests"
+      "test_ref": "internal/build/multiarch/multiarch_test.go::TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests"
     },
     {
       "family": "B",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 34,
-      "REUSED": 57
+      "NEW": 33,
+      "REUSED": 58
     },
     "unmapped": 0
   }
