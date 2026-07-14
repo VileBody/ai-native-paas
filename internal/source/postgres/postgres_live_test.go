@@ -164,6 +164,50 @@ func TestPostgres_BranchEnvironmentStateRoundTripsThroughStore(t *testing.T) {
 		t.Fatalf("restored=%+v", restored)
 	}
 }
+func TestPostgres_BootstrapRevisionRoundTripsThroughStore(t *testing.T) {
+	reset(t)
+	if _, err := psql(t, seedSQL()); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("source_test_pgx", dsn(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := &sourcepostgres.Store{DB: db}
+	revision := strings.Repeat("b", 40)
+	if err = store.Transact(context.Background(), func(tx application.Tx) error {
+		repository, ok := tx.GetRepository("r")
+		if !ok {
+			return fmt.Errorf("repository missing")
+		}
+		expected := repository.Version
+		if _, err := repository.RecordBootstrapRevision(revision, time.Now()); err != nil {
+			return err
+		}
+		return tx.UpdateRepository(repository, expected)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var restored domain.Repository
+	if err = store.Transact(context.Background(), func(tx application.Tx) error {
+		var ok bool
+		restored, ok = tx.GetRepository("r")
+		if !ok {
+			return fmt.Errorf("repository missing after update")
+		}
+		return nil
+	}); err != nil || restored.BootstrapRevision != revision {
+		t.Fatalf("repository=%+v err=%v", restored, err)
+	}
+	if _, err = psql(t, "UPDATE source.repositories SET bootstrap_revision=repeat('c',40) WHERE id='r';"); err == nil {
+		t.Fatal("bootstrap revision mutation accepted")
+	}
+	out, err := psql(t, "SELECT bootstrap_revision FROM source.repositories WHERE id='r';")
+	if err != nil || out != revision {
+		t.Fatalf("bootstrap revision after rejected mutation=%q err=%v", out, err)
+	}
+}
 func TestPostgres_ProjectRepositoryOutboxAtomic(t *testing.T) {
 	reset(t)
 	script := `BEGIN; INSERT INTO source.projects(id,tenant_id,name,slug,version,created_at,updated_at) VALUES('p','t','P','p',1,now(),now()); INSERT INTO source.repositories(id,tenant_id,project_id,provider,provider_namespace_id,provider_path,web_url,default_branch,state,last_error,correlation_id,version,created_at,updated_at) VALUES('r','t','p','gitlab',7,'','','main','REQUESTED','','corr',1,now(),now()); INSERT INTO source.outbox(id,topic,aggregate_id,payload,created_at) VALUES('e','x','p','{}',now()); SELECT 1/0; COMMIT;`

@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -70,6 +71,21 @@ func TestRepository_ArchiveRestoreAndPurgeStateMachine(t *testing.T) {
 	}
 	if err := r.Resume(now.Add(5 * time.Minute)); !domain.HasCode(err, domain.CodeConflict) {
 		t.Fatalf("purge-pending repository restored: %v", err)
+	}
+}
+func TestRepository_BootstrapRevisionIsImmutable(t *testing.T) {
+	r, _ := domain.NewRepository("r", "t", "p", "gitlab", "corr", 7, now)
+	_ = r.BeginProvisioning(now)
+	_ = r.AttachProvider(42, "g/p", "", "main", now)
+	revision := strings.Repeat("a", 40)
+	if changed, err := r.RecordBootstrapRevision(revision, now.Add(time.Minute)); err != nil || !changed || r.BootstrapRevision != revision {
+		t.Fatalf("repository=%+v changed=%v err=%v", r, changed, err)
+	}
+	if changed, err := r.RecordBootstrapRevision(revision, now.Add(2*time.Minute)); err != nil || changed {
+		t.Fatalf("idempotent record changed=%v err=%v", changed, err)
+	}
+	if _, err := r.RecordBootstrapRevision(strings.Repeat("b", 40), now.Add(3*time.Minute)); !domain.HasCode(err, domain.CodeConflict) {
+		t.Fatalf("bootstrap revision mutation err=%v", err)
 	}
 }
 func TestBranchPush_DuplicateIsNoop(t *testing.T) {

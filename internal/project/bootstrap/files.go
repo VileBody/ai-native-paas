@@ -44,6 +44,7 @@ func Files(options Options) ([]application.BootstrapFile, error) {
 	}
 	return []application.BootstrapFile{
 		{Path: "README.md", Update: true, Content: []byte(readme(options.Name))},
+		{Path: ".gitignore", Content: []byte(gitignore)},
 		{Path: "platform.yaml", Content: platformYAML},
 		{Path: "infrastructure/tofu/versions.tf", Content: []byte(tofuVersions)},
 		{Path: "infrastructure/tofu/main.tf", Content: []byte(tofuMain)},
@@ -53,6 +54,15 @@ func Files(options Options) ([]application.BootstrapFile, error) {
 		{Path: "recipes.lock.yaml", Content: []byte(recipesLock)},
 	}, nil
 }
+
+const gitignore = `.env
+.env.*
+!.env.example
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+`
 
 func readme(name string) string {
 	return "# " + name + "\n\nThis private repository is managed by the AI-native DevOps Platform.\n\n" +

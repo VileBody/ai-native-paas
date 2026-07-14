@@ -148,6 +148,9 @@ func (t *tx) UpdateRepository(v domain.Repository, expected int64) error {
 	if old.ProviderProjectID != 0 && v.ProviderProjectID != old.ProviderProjectID {
 		return domain.NewError(domain.CodeConflict, "provider identity immutable")
 	}
+	if old.BootstrapRevision != "" && v.BootstrapRevision != old.BootstrapRevision {
+		return domain.NewError(domain.CodeConflict, "bootstrap revision immutable")
+	}
 	t.repositories[v.ID] = v
 	return nil
 }

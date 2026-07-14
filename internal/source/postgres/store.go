@@ -160,14 +160,14 @@ func (a *txAdapter) UpdateProject(p domain.Project, expected int64) error {
 func scanRepo(row interface{ Scan(...any) error }) (domain.Repository, error) {
 	var r domain.Repository
 	var providerID sql.NullInt64
-	err := row.Scan(&r.ID, &r.TenantID, &r.ProjectID, &r.Provider, &r.ProviderNamespaceID, &providerID, &r.ProviderPath, &r.WebURL, &r.DefaultBranch, &r.State, &r.LastError, &r.CorrelationID, &r.Version, &r.CreatedAt, &r.UpdatedAt)
+	err := row.Scan(&r.ID, &r.TenantID, &r.ProjectID, &r.Provider, &r.ProviderNamespaceID, &providerID, &r.ProviderPath, &r.WebURL, &r.DefaultBranch, &r.BootstrapRevision, &r.State, &r.LastError, &r.CorrelationID, &r.Version, &r.CreatedAt, &r.UpdatedAt)
 	if providerID.Valid {
 		r.ProviderProjectID = providerID.Int64
 	}
 	return r, err
 }
 
-const repoColumns = "id,tenant_id,project_id,provider,provider_namespace_id,provider_project_id,provider_path,web_url,default_branch,state,last_error,correlation_id,version,created_at,updated_at"
+const repoColumns = "id,tenant_id,project_id,provider,provider_namespace_id,provider_project_id,provider_path,web_url,default_branch,bootstrap_revision,state,last_error,correlation_id,version,created_at,updated_at"
 
 func (a *txAdapter) GetRepository(id string) (domain.Repository, bool) {
 	r, err := scanRepo(a.tx.QueryRow("SELECT "+repoColumns+" FROM source.repositories WHERE id=$1", id))
@@ -198,7 +198,7 @@ func (a *txAdapter) InsertRepository(r domain.Repository) error {
 	if r.ProviderProjectID > 0 {
 		pid = r.ProviderProjectID
 	}
-	_, err := a.tx.Exec("INSERT INTO source.repositories("+repoColumns+") VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)", r.ID, r.TenantID, r.ProjectID, r.Provider, r.ProviderNamespaceID, pid, r.ProviderPath, r.WebURL, r.DefaultBranch, r.State, r.LastError, r.CorrelationID, r.Version, r.CreatedAt, r.UpdatedAt)
+	_, err := a.tx.Exec("INSERT INTO source.repositories("+repoColumns+") VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)", r.ID, r.TenantID, r.ProjectID, r.Provider, r.ProviderNamespaceID, pid, r.ProviderPath, r.WebURL, r.DefaultBranch, r.BootstrapRevision, r.State, r.LastError, r.CorrelationID, r.Version, r.CreatedAt, r.UpdatedAt)
 	return mapDB(err)
 }
 func (a *txAdapter) UpdateRepository(r domain.Repository, expected int64) error {
@@ -206,7 +206,7 @@ func (a *txAdapter) UpdateRepository(r domain.Repository, expected int64) error 
 	if r.ProviderProjectID > 0 {
 		pid = r.ProviderProjectID
 	}
-	res, err := a.tx.Exec("UPDATE source.repositories SET provider_project_id=$1,provider_path=$2,web_url=$3,default_branch=$4,state=$5,last_error=$6,version=$7,updated_at=$8 WHERE id=$9 AND version=$10", pid, r.ProviderPath, r.WebURL, r.DefaultBranch, r.State, r.LastError, r.Version, r.UpdatedAt, r.ID, expected)
+	res, err := a.tx.Exec("UPDATE source.repositories SET provider_project_id=$1,provider_path=$2,web_url=$3,default_branch=$4,bootstrap_revision=$5,state=$6,last_error=$7,version=$8,updated_at=$9 WHERE id=$10 AND version=$11", pid, r.ProviderPath, r.WebURL, r.DefaultBranch, r.BootstrapRevision, r.State, r.LastError, r.Version, r.UpdatedAt, r.ID, expected)
 	return affected(res, err, "repository")
 }
 func (a *txAdapter) ListRepositories() []domain.Repository {

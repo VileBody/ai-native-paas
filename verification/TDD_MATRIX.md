@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **899**
-- Reused now: **44**
+- Discovered Go tests/fuzz targets: **903**
+- Reused now: **45**
 - New local/contract tests required: **44**
-- Live/provider/system tests required: **69**
+- Live/provider/system tests required: **68**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -28,7 +28,7 @@ A release gate may become green only after every referenced test exists and pass
 | `K12` | REUSED | identity provider integration | `internal/identity/httpauth/middleware_test.go::TestKernel_OIDCAndMTLSIdentityCannotBeConfused` |
 | `K13` | REUSED | live PostgreSQL | `test/integration/postgres_migration_lock_test.go::TestPostgres_ConcurrentMigrationStartupUsesOneOwner` |
 | `K14` | LIVE_ONLY | chaos + PostgreSQL | `test/pivot/kernel_v2_test.go::TestKernel_OperationCheckpointSurvivesDatabaseFailover` |
-| `S1` | LIVE_ONLY | application + GitLab contract | `test/pivot/source_v2_test.go::TestSource_CreateProjectBootstrapsV2RepositoryLayout` |
+| `S1` | REUSED | application + GitLab contract | `test/pivot/source_v2_test.go::TestSource_CreateProjectBootstrapsV2RepositoryLayout` |
 | `S2` | REUSED | real local Git integration | `internal/workspaceagent/source_v2_test.go::TestSource_CheckoutUsesExactCommitNotMutableBranchHead` |
 | `S3` | REUSED | fuzz + application | `internal/workspaceagent/source_v2_test.go::TestSource_PatchRejectsNonCanonicalAndGitInternalPaths` |
 | `S4` | REUSED | application | `internal/workspace/service_tdd_test.go::TestSource_ProductionGitOpsPathRequiresApprovalPolicy` |

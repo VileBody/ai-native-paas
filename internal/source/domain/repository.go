@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/hex"
 	"strings"
 	"time"
 )
@@ -26,6 +27,7 @@ type Repository struct {
 	ProviderPath        string
 	WebURL              string
 	DefaultBranch       string
+	BootstrapRevision   string
 	State               RepositoryState
 	LastError           string
 	CorrelationID       string
@@ -42,6 +44,30 @@ func NewRepository(id, tenantID, projectID, provider, correlationID string, name
 	now = now.UTC()
 	return Repository{ID: id, TenantID: tenantID, ProjectID: projectID, Provider: provider, ProviderNamespaceID: namespaceID,
 		CorrelationID: correlationID, State: RepositoryRequested, DefaultBranch: "main", Version: 1, CreatedAt: now, UpdatedAt: now}, nil
+}
+func (r *Repository) RecordBootstrapRevision(revision string, now time.Time) (bool, error) {
+	revision = strings.ToLower(strings.TrimSpace(revision))
+	if (len(revision) != 40 && len(revision) != 64) || !validHex(revision) {
+		return false, NewError(CodeInvalidArgument, "bootstrap revision must be a commit sha")
+	}
+	if r.State != RepositoryReady || r.ProviderProjectID <= 0 {
+		return false, NewError(CodeConflict, "repository is not ready for bootstrap evidence")
+	}
+	if r.BootstrapRevision == revision {
+		return false, nil
+	}
+	if r.BootstrapRevision != "" {
+		return false, NewError(CodeConflict, "bootstrap revision is immutable")
+	}
+	r.BootstrapRevision = revision
+	r.Version++
+	r.UpdatedAt = now.UTC()
+	return true, nil
+}
+
+func validHex(value string) bool {
+	_, err := hex.DecodeString(value)
+	return err == nil
 }
 func (r *Repository) BeginProvisioning(now time.Time) error {
 	if r.State == RepositoryReady {

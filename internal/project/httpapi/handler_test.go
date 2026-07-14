@@ -52,6 +52,10 @@ func (s httpSource) CreateProject(context.Context, sourceapp.CreateProjectComman
 func (s httpSource) ProvisionRepository(context.Context, sourceapp.ProvisionRepositoryCommand) (domain.Repository, error) {
 	return s.repository, nil
 }
+func (s httpSource) RecordBootstrapRevision(_ context.Context, command sourceapp.RecordBootstrapRevisionCommand) (domain.Repository, error) {
+	_, err := s.repository.RecordBootstrapRevision(command.Revision, time.Now())
+	return s.repository, err
+}
 
 type httpBootstrapper struct{}
 

@@ -23,7 +23,7 @@ func TestBootstrapFiles_ContainStrictPlatformContractAndCanonicalRoots(t *testin
 	if err != nil || contract.Metadata.Name != "booking" || contract.Workspace.ImageDigest != digest {
 		t.Fatalf("contract=%#v err=%v", contract, err)
 	}
-	for _, path := range []string{"README.md", "infrastructure/tofu/main.tf", "deploy/base/kustomization.yaml", "deploy/environments/development/kustomization.yaml", "deploy/environments/production/kustomization.yaml", "recipes.lock.yaml"} {
+	for _, path := range []string{"README.md", ".gitignore", "infrastructure/tofu/main.tf", "deploy/base/kustomization.yaml", "deploy/environments/development/kustomization.yaml", "deploy/environments/production/kustomization.yaml", "recipes.lock.yaml"} {
 		if len(byPath[path]) == 0 {
 			t.Fatalf("missing bootstrap file %s", path)
 		}

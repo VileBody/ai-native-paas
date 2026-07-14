@@ -52,3 +52,12 @@ func TestMigrations_PreviewEnvironmentBindingAndDeletionAreDurable(t *testing.T)
 		}
 	}
 }
+
+func TestMigrations_BootstrapRevisionIsImmutableEvidenceShape(t *testing.T) {
+	sql := migration(t, "005_bootstrap_revision.sql")
+	for _, required := range []string{"bootstrap_revision", "NOT NULL DEFAULT ''", "source_repository_bootstrap_revision_sha", "[0-9a-f]{40}", "BEFORE UPDATE OF bootstrap_revision", "immutable once assigned"} {
+		if !strings.Contains(sql, required) {
+			t.Fatalf("missing %s", required)
+		}
+	}
+}

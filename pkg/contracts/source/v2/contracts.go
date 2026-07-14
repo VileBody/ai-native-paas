@@ -49,7 +49,7 @@ type RevisionObservedEvent struct {
 }
 
 func (e RevisionObservedEvent) Validate() error {
-	if strings.TrimSpace(e.TenantID) == "" || strings.TrimSpace(e.ProjectID) == "" || strings.TrimSpace(e.RepositoryID) == "" || !safeBranch(e.Branch) || !fullSHA.MatchString(e.CommitSHA) || (e.Reason != "webhook" && e.Reason != "reconciliation") || e.ObservedAt.IsZero() {
+	if strings.TrimSpace(e.TenantID) == "" || strings.TrimSpace(e.ProjectID) == "" || strings.TrimSpace(e.RepositoryID) == "" || !safeBranch(e.Branch) || !fullSHA.MatchString(e.CommitSHA) || (e.Reason != "bootstrap" && e.Reason != "webhook" && e.Reason != "reconciliation") || e.ObservedAt.IsZero() {
 		return errors.New("invalid revision observed event")
 	}
 	return nil

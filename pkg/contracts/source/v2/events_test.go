@@ -16,6 +16,10 @@ func TestRevisionObservedEvent_RequiresImmutableRevisionAndBoundedReason(t *test
 	if err := event.Validate(); err != nil {
 		t.Fatal(err)
 	}
+	event.Reason = "bootstrap"
+	if err := event.Validate(); err != nil {
+		t.Fatalf("bounded bootstrap reason rejected: %v", err)
+	}
 	event.CommitSHA = "main"
 	if err := event.Validate(); err == nil {
 		t.Fatal("mutable revision accepted")

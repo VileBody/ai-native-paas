@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 899,
-  "discovered_unique_test_name_count": 897,
+  "discovered_go_test_count": 903,
+  "discovered_unique_test_name_count": 901,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -148,7 +148,7 @@
       "id": "S1",
       "level": "application + GitLab contract",
       "name": "TestSource_CreateProjectBootstrapsV2RepositoryLayout",
-      "status": "LIVE_ONLY",
+      "status": "REUSED",
       "test_file": "test/pivot/source_v2_test.go",
       "test_name": "TestSource_CreateProjectBootstrapsV2RepositoryLayout",
       "test_ref": "test/pivot/source_v2_test.go::TestSource_CreateProjectBootstrapsV2RepositoryLayout"
@@ -1589,9 +1589,9 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 69,
+      "LIVE_ONLY": 68,
       "NEW": 44,
-      "REUSED": 44
+      "REUSED": 45
     },
     "unmapped": 0
   }

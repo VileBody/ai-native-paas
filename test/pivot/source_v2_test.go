@@ -2,6 +2,7 @@ package pivot_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/keir-research/ai-native-paas/internal/agent/enrollment"
+	projectapp "github.com/keir-research/ai-native-paas/internal/project/application"
 	sourceapp "github.com/keir-research/ai-native-paas/internal/source/application"
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
 	"github.com/keir-research/ai-native-paas/internal/source/gitlab"
@@ -37,6 +40,15 @@ type sourcePurgeAuthorizer struct {
 	allowed bool
 	calls   int
 	seen    sourceapp.ProjectPurgeAuthorization
+}
+
+type sourceEnrollmentIssuer struct {
+	binding enrollment.Binding
+}
+
+func (i *sourceEnrollmentIssuer) Issue(_ context.Context, binding enrollment.Binding) (enrollment.EnrollmentToken, error) {
+	i.binding = binding
+	return enrollment.EnrollmentToken{EnrollmentID: "enrollment-source-v2", Token: "one-time-source-v2", ExpiresAt: time.Now().Add(enrollment.EnrollmentTTL)}, nil
 }
 
 func (a *sourcePurgeAuthorizer) VerifyAndConsumeProjectPurge(_ context.Context, authorization sourceapp.ProjectPurgeAuthorization) error {
@@ -90,6 +102,114 @@ func sourceV2Outbox(store *memory.Store, topic string) []sourceapp.OutboxRecord 
 		}
 	}
 	return result
+}
+
+func TestSource_CreateProjectBootstrapsV2RepositoryLayout(t *testing.T) {
+	baseRevision := strings.Repeat("a", 40)
+	bootstrapRevision := strings.Repeat("b", 40)
+	currentHead := baseRevision
+	bootstrapFiles := map[string][]byte{}
+	projectCreates := 0
+	bootstrapCommits := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v4/projects":
+			projectCreates++
+			var body struct {
+				NamespaceID int64  `json:"namespace_id"`
+				Path        string `json:"path"`
+				Visibility  string `json:"visibility"`
+				Description string `json:"description"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.NamespaceID != 77 || body.Path != "booking" || body.Visibility != "private" || !strings.Contains(body.Description, "paas-correlation:") {
+				t.Fatalf("unsafe project create body: %+v", body)
+			}
+			_, _ = io.WriteString(w, `{"id":42,"namespace":{"id":77},"path":"booking","path_with_namespace":"beta/booking","web_url":"https://gitlab.example/beta/booking","default_branch":"main","description":"platform-managed"}`)
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v4/projects/42/protected_branches":
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v4/projects/42/repository/branches/main":
+			_, _ = fmt.Fprintf(w, `{"commit":{"id":%q}}`, currentHead)
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v4/projects/42/repository/commits":
+			bootstrapCommits++
+			var body struct {
+				Branch        string `json:"branch"`
+				StartSHA      string `json:"start_sha"`
+				CommitMessage string `json:"commit_message"`
+				Actions       []struct {
+					Path     string `json:"file_path"`
+					Content  string `json:"content"`
+					Encoding string `json:"encoding"`
+				} `json:"actions"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Branch != "main" || body.StartSHA != baseRevision || !strings.Contains(body.CommitMessage, "PaaS-Correlation:") {
+				t.Fatalf("bootstrap is not exact-SHA bound: %+v", body)
+			}
+			for _, action := range body.Actions {
+				if action.Encoding != "base64" {
+					t.Fatalf("unexpected bootstrap encoding for %s", action.Path)
+				}
+				content, err := base64.StdEncoding.DecodeString(action.Content)
+				if err != nil {
+					t.Fatal(err)
+				}
+				bootstrapFiles[action.Path] = content
+			}
+			currentHead = bootstrapRevision
+			_, _ = fmt.Fprintf(w, `{"id":%q}`, bootstrapRevision)
+		default:
+			t.Fatalf("unexpected GitLab request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	store := memory.New()
+	clock := &testkit.Clock{T: time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)}
+	ids := &testkit.IDs{}
+	provider := &gitlab.Client{BaseURL: server.URL}
+	source := &sourceapp.Service{Store: store, Provider: provider, Clock: clock, IDs: ids}
+	enrollmentIssuer := &sourceEnrollmentIssuer{}
+	projects := &projectapp.Service{
+		Source: source, Bootstrapper: provider, Enrollment: enrollmentIssuer, GitLabNamespaceID: 77,
+		MCPBaseURL: "https://mcp.example.test", WorkspaceImageDigest: "sha256:" + strings.Repeat("c", 64),
+	}
+	created, err := projects.Create(context.Background(), projectapp.CreateCommand{TenantID: "tenant-1", UserID: "user-1", Name: "booking", IdempotencyKey: "create-source-v2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository, err := source.GetRepositoryForProject(context.Background(), "tenant-1", created.ProjectID)
+	if err != nil || repository.ProviderProjectID != 42 || repository.BootstrapRevision != bootstrapRevision {
+		t.Fatalf("repository=%+v err=%v", repository, err)
+	}
+	var branch domain.BranchHead
+	if err = store.Transact(context.Background(), func(tx sourceapp.Tx) error {
+		branch, _ = tx.GetBranch(repository.ID, repository.DefaultBranch)
+		return nil
+	}); err != nil || branch.CommitSHA != bootstrapRevision {
+		t.Fatalf("bootstrap branch=%+v err=%v", branch, err)
+	}
+	for _, path := range []string{"README.md", ".gitignore", "platform.yaml", "infrastructure/tofu/main.tf", "deploy/base/kustomization.yaml", "deploy/environments/development/kustomization.yaml", "deploy/environments/production/kustomization.yaml", "recipes.lock.yaml"} {
+		if len(bootstrapFiles[path]) == 0 {
+			t.Fatalf("bootstrap file missing: %s", path)
+		}
+	}
+	if projectCreates != 1 || bootstrapCommits != 1 || enrollmentIssuer.binding.ProjectID != created.ProjectID {
+		t.Fatalf("creates=%d commits=%d binding=%+v", projectCreates, bootstrapCommits, enrollmentIssuer.binding)
+	}
+	if len(sourceV2Outbox(store, "source.repository_bootstrapped.v2")) != 1 || len(sourceV2Outbox(store, sourcev2.EventRevisionObserved)) != 1 {
+		t.Fatal("bootstrap revision evidence was not emitted exactly once")
+	}
+	replayed, err := source.RecordBootstrapRevision(context.Background(), sourceapp.RecordBootstrapRevisionCommand{
+		TenantID: "tenant-1", ActorID: "user-1", RepositoryID: repository.ID, Revision: strings.ToUpper(bootstrapRevision),
+	})
+	if err != nil || replayed.BootstrapRevision != bootstrapRevision || len(sourceV2Outbox(store, "source.repository_bootstrapped.v2")) != 1 {
+		t.Fatalf("bootstrap revision replay=%+v err=%v", replayed, err)
+	}
 }
 
 func TestSource_MissedWebhookRecoveredByBranchReconciler(t *testing.T) {

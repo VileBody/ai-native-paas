@@ -19,6 +19,7 @@ import (
 type Source interface {
 	CreateProject(context.Context, sourceapp.CreateProjectCommand) (sourceapp.CreateProjectResult, error)
 	ProvisionRepository(context.Context, sourceapp.ProvisionRepositoryCommand) (domain.Repository, error)
+	RecordBootstrapRevision(context.Context, sourceapp.RecordBootstrapRevisionCommand) (domain.Repository, error)
 }
 
 type EnrollmentIssuer interface {
@@ -73,13 +74,22 @@ func (s *Service) Create(ctx context.Context, command CreateCommand) (projectv2.
 	if err != nil {
 		return projectv2.CreateProjectResponse{}, err
 	}
-	_, err = s.Bootstrapper.BootstrapRepository(ctx, sourceapp.BootstrapRepositoryRequest{
+	bootstrapRevision, err := s.Bootstrapper.BootstrapRepository(ctx, sourceapp.BootstrapRepositoryRequest{
 		ProviderProjectID: repository.ProviderProjectID, Branch: repository.DefaultBranch,
 		ExpectedBaseSHA: baseSHA, Files: files,
 		CommitMessage: "Initialize AI-native platform project\n\nPaaS-Correlation: " + repository.CorrelationID,
 	})
 	if err != nil {
 		return projectv2.CreateProjectResponse{}, err
+	}
+	repository, err = s.Source.RecordBootstrapRevision(ctx, sourceapp.RecordBootstrapRevisionCommand{
+		TenantID: command.TenantID, ActorID: command.UserID, RepositoryID: repository.ID, Revision: bootstrapRevision,
+	})
+	if err != nil {
+		return projectv2.CreateProjectResponse{}, err
+	}
+	if repository.BootstrapRevision != strings.ToLower(strings.TrimSpace(bootstrapRevision)) {
+		return projectv2.CreateProjectResponse{}, errors.New("bootstrap revision was not persisted")
 	}
 	agentID := "agent-" + created.Project.ID
 	scopes := make([]string, 0, len(agentv2.ToolCatalog()))

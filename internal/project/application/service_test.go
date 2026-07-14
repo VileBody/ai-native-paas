@@ -16,6 +16,13 @@ type sourceStub struct {
 	create sourceapp.CreateProjectResult
 	repo   domain.Repository
 	cmd    sourceapp.CreateProjectCommand
+	record sourceapp.RecordBootstrapRevisionCommand
+}
+
+func (s *sourceStub) RecordBootstrapRevision(_ context.Context, command sourceapp.RecordBootstrapRevisionCommand) (domain.Repository, error) {
+	s.record = command
+	_, err := s.repo.RecordBootstrapRevision(command.Revision, time.Now())
+	return s.repo, err
 }
 
 func (s *sourceStub) CreateProject(_ context.Context, command sourceapp.CreateProjectCommand) (sourceapp.CreateProjectResult, error) {
@@ -78,6 +85,9 @@ func TestCreateProject_ProvisionsBootstrapsAndIssuesBoundEnrollment(t *testing.T
 	}
 	if bootstrapper.request.ExpectedBaseSHA == "" || len(bootstrapper.request.Files) < 8 || !strings.Contains(bootstrapper.request.CommitMessage, "corr_123") {
 		t.Fatalf("bootstrap request=%#v", bootstrapper.request)
+	}
+	if source.record.RepositoryID != "repo_123" || source.record.Revision != "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" || source.repo.BootstrapRevision != source.record.Revision {
+		t.Fatalf("bootstrap revision command=%#v repository=%#v", source.record, source.repo)
 	}
 	if enrollmentIssuer.binding.ProjectID != "prj_123" || enrollmentIssuer.binding.UserID != "user-1" || enrollmentIssuer.binding.AgentID != response.AgentID || len(enrollmentIssuer.binding.Scopes) < 40 {
 		t.Fatalf("binding=%#v", enrollmentIssuer.binding)

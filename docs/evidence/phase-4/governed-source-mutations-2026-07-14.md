@@ -4,6 +4,9 @@ Status: `LOCAL_GREEN`, `DB_GREEN`; provider-live GitLab gate remains pending.
 
 Implemented:
 
+- Project creation performs one exact-base GitLab batch commit for the strict
+  v2 repository layout, persists its immutable bootstrap revision in
+  PostgreSQL and publishes the authoritative source revision before enrollment.
 - Project MCP repository tools resolve repository, exact source revision,
   actor, task and correlation from verified scope rather than arguments.
 - `repository_create_branch` performs an exact-SHA checkout inside the
@@ -62,9 +65,9 @@ Evidence:
   temporary in-cluster test pod and
   `TestPostgres_WorkspaceCommitReceiptMigrationAndRoundTrip` passed. The pod
   was deleted immediately after the test.
-- Pivot matrix discovers executable evidence for S2, S3, S4, S5, S6, S7,
+- Pivot matrix discovers executable evidence for S1, S2, S3, S4, S5, S6, S7,
   S9, S10, S12, S13, S14, S15, S16 and S17; the complete matrix remains mapped
-  at 157 requirements and now discovers 899 Go test/fuzz targets.
+  at 157 requirements and now discovers 903 Go test/fuzz targets.
 - Managed PostgreSQL migration `004_branch_environment_cleanup.sql`, the full
   tagged Source suite and the real Store round-trip passed in temporary
   in-cluster test pods; see
@@ -76,6 +79,8 @@ Evidence:
   `docs/evidence/phase-4/gitlab-rate-limit-recovery-2026-07-14.md`.
 - Reversible archive and separately approved purge pass the S16 contract; see
   `docs/evidence/phase-4/gitlab-project-archive-2026-07-14.md`.
+- Exact-base v2 repository bootstrap and durable bootstrap revision pass the S1
+  contract; see `docs/evidence/phase-4/project-bootstrap-v2-2026-07-14.md`.
 
 Remaining source gates:
 
