@@ -101,7 +101,7 @@ func TestStatus_MissedWatchEventRecoveredByPeriodicRead(t *testing.T) {
 	}
 }
 
-func TestStatus_UnknownKubernetesObjectIsQuarantined(t *testing.T) {
+func TestRuntime_UnknownObservedObjectIsQuarantined(t *testing.T) {
 	f := newStatusFixture(t)
 	err := f.service.ObserveRuntimeObject(context.Background(), application.ObservedObject{CellID: f.cell.ID, Namespace: "attacker", Kind: runtimev1.Kind, Name: "foreign", Labels: map[string]string{"platform.example.com/release-id": f.deployment.ReleaseID}})
 	if err != nil {

@@ -4,8 +4,8 @@ Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
 - Discovered Go tests/fuzz targets: **924**
-- Reused now: **58**
-- New local/contract tests required: **33**
+- Reused now: **60**
+- New local/contract tests required: **31**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -68,7 +68,7 @@ A release gate may become green only after every referenced test exists and pass
 | `R5` | LIVE_ONLY | policy | `test/pivot/runtime_gitops_test.go::TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource` |
 | `R6` | LIVE_ONLY | manifest contract + real Argo | `test/pivot/runtime_gitops_test.go::TestArgoProject_AllowsOnlyExpectedRepositoryClusterAndNamespaces` |
 | `R7` | LIVE_ONLY | application/system | `test/pivot/runtime_gitops_test.go::TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady` |
-| `R8` | NEW | application + Git | `test/pivot/runtime_gitops_test.go::TestRuntime_RollbackCreatesAuditableGitRevision` |
+| `R8` | REUSED | application + Git | `internal/runtime/application/gitops_saga_test.go::TestRuntime_RollbackCreatesAuditableGitRevision` |
 | `R9` | LIVE_ONLY | system | `test/pivot/runtime_gitops_test.go::TestRuntime_DriftIsReportedAndSelfHealFollowsPolicy` |
 | `R10` | LIVE_ONLY | Kubernetes system | `test/pivot/runtime_gitops_test.go::TestRuntime_NamespaceAndServiceAccountIsolation` |
 | `R11` | LIVE_ONLY | system | `test/pivot/runtime_gitops_test.go::TestRuntime_HPAAndGitOpsDoNotFightOverReplicas` |
@@ -76,7 +76,7 @@ A release gate may become green only after every referenced test exists and pass
 | `R13` | NEW | operator contract | `test/pivot/runtime_gitops_test.go::TestRuntime_PaaSAppFastPathProducesEquivalentStandardResources` |
 | `R14` | LIVE_ONLY | real Argo/ApplicationSet | `test/pivot/runtime_gitops_test.go::TestRuntime_PreviewApplicationSetCreatedAndRemovedFromBranchLifecycle` |
 | `R15` | LIVE_ONLY | Kubernetes/Gateway system | `test/pivot/runtime_gitops_test.go::TestRuntime_FailedNewRevisionKeepsPreviousTrafficWhereStrategySupportsIt` |
-| `R16` | NEW | reconciliation | `test/pivot/runtime_gitops_test.go::TestRuntime_UnknownObservedObjectIsQuarantined` |
+| `R16` | REUSED | reconciliation | `internal/runtime/application/status_test.go::TestRuntime_UnknownObservedObjectIsQuarantined` |
 | `R17` | LIVE_ONLY | real Kubernetes | `test/pivot/runtime_gitops_test.go::TestRuntime_GVisorRequiredForSharedUntrustedTier` |
 | `R18` | LIVE_ONLY | real Kubernetes/network | `test/pivot/runtime_gitops_test.go::TestRuntime_CiliumDefaultDenyAndExplicitEgressProfiles` |
 | `A5.1` | NEW | application | `test/pivot/attachments_v2_test.go::TestSecret_SetIsWriteOnlyAndReturnsMetadataOnly` |

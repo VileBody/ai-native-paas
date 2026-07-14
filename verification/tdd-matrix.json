@@ -548,10 +548,10 @@
       "id": "R8",
       "level": "application + Git",
       "name": "TestRuntime_RollbackCreatesAuditableGitRevision",
-      "status": "NEW",
-      "test_file": "test/pivot/runtime_gitops_test.go",
+      "status": "REUSED",
+      "test_file": "internal/runtime/application/gitops_saga_test.go",
       "test_name": "TestRuntime_RollbackCreatesAuditableGitRevision",
-      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_RollbackCreatesAuditableGitRevision"
+      "test_ref": "internal/runtime/application/gitops_saga_test.go::TestRuntime_RollbackCreatesAuditableGitRevision"
     },
     {
       "family": "R",
@@ -628,10 +628,10 @@
       "id": "R16",
       "level": "reconciliation",
       "name": "TestRuntime_UnknownObservedObjectIsQuarantined",
-      "status": "NEW",
-      "test_file": "test/pivot/runtime_gitops_test.go",
+      "status": "REUSED",
+      "test_file": "internal/runtime/application/status_test.go",
       "test_name": "TestRuntime_UnknownObservedObjectIsQuarantined",
-      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_UnknownObservedObjectIsQuarantined"
+      "test_ref": "internal/runtime/application/status_test.go::TestRuntime_UnknownObservedObjectIsQuarantined"
     },
     {
       "family": "R",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 33,
-      "REUSED": 58
+      "NEW": 31,
+      "REUSED": 60
     },
     "unmapped": 0
   }

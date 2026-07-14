@@ -117,7 +117,7 @@ func TestGitOpsCommit_ConcurrentDeployUsesOptimisticLock(t *testing.T) {
 	}
 }
 
-func TestGitOpsCommit_RevertCreatesExplicitRollbackRelease(t *testing.T) {
+func TestRuntime_RollbackCreatesAuditableGitRevision(t *testing.T) {
 	f := newFixture(t)
 	useLocalGitOps(t, f)
 	original, err := f.service.Deploy(context.Background(), f.request("deploy-original"))
@@ -142,6 +142,19 @@ func TestGitOpsCommit_RevertCreatesExplicitRollbackRelease(t *testing.T) {
 	}
 	if _, ok := snapshot.Commits[candidate.ID]; !ok {
 		t.Fatal("rollback release has no GitOps commit")
+	}
+	commit := snapshot.Commits[candidate.ID]
+	if commit.CommitSHA == "" || commit.ReleaseID != candidate.ID || commit.Path == "" || commit.ManifestHash == "" {
+		t.Fatalf("rollback commit=%+v", commit)
+	}
+	audited := false
+	for _, record := range snapshot.Audit {
+		if record.Action == "runtime.release.rollback" && record.ResourceID == candidate.ID && record.ActorID == "user-1" {
+			audited = true
+		}
+	}
+	if !audited {
+		t.Fatalf("rollback audit missing: %+v", snapshot.Audit)
 	}
 }
 
