@@ -62,6 +62,7 @@ qemu-img resize "$image" 40G >/dev/null
 virt-customize -a "$image" --network \
   --upload infra/images/workspace/debian-snapshot.sources:/etc/apt/sources.list.d/debian.sources \
   --run-command 'rm -f /etc/apt/sources.list' \
+  --run-command 'printf "nameserver 169.254.2.3\n" > /etc/resolv.conf' \
   --install 'ca-certificates,git,jq,make,python3,ripgrep,uidmap,slirp4netns,fuse-overlayfs,runc' \
   --uninstall 'openssh-server' \
   --copy-in "$work_directory/root/usr/local/bin":/usr/local \
@@ -78,6 +79,7 @@ virt-customize -a "$image" --network \
   --run-command 'systemctl enable ai-native-paas-workspace-agent.service ai-native-paas-buildkit.service' \
   --run-command 'dpkg-query -W -f="\${Package}\t\${Version}\n" | sort > /usr/share/ai-native-paas/debian-packages.tsv' \
   --run-command 'syft scan dir:/ -o spdx-json=/usr/share/ai-native-paas/sbom.spdx.json' \
+  --run-command 'rm -f /etc/resolv.conf' \
   --run-command 'rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb /tmp/* /var/tmp/*' \
   --run-command 'cloud-init clean --logs --machine-id'
 

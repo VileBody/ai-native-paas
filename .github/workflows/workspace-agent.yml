@@ -102,7 +102,7 @@ jobs:
           LIBGUESTFS_BACKEND_SETTINGS: force_tcg
         run: |
           guestfish --network -a /dev/null run : debug sh \
-            "ip -4 address show dev eth0; ip route; cat /etc/resolv.conf; getent ahostsv4 snapshot.debian.org"
+            "printf 'nameserver 169.254.2.3\\n' > /etc/resolv.conf; ip -4 address show dev eth0; ip route; getent ahostsv4 snapshot.debian.org"
       - run: ./scripts/build-workspace-image.sh
         env:
           LIBGUESTFS_APPEND: ipv6.disable=1
