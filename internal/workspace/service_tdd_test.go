@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -137,6 +138,16 @@ type fakeOutputs struct {
 	chunk workspacev1.AgentOutputChunk
 }
 
+type fakePlanReceipts struct {
+	scope   PlanReceiptScope
+	receipt infrastructurev1.AgentPlanReceipt
+}
+
+func (f *fakePlanReceipts) PutPlanReceipt(_ context.Context, scope PlanReceiptScope, receipt infrastructurev1.AgentPlanReceipt) error {
+	f.scope, f.receipt = scope, receipt
+	return nil
+}
+
 func (f *fakeOutputs) PutChunk(_ context.Context, scope CommandOutputScope, chunk workspacev1.AgentOutputChunk) error {
 	f.scope, f.chunk = scope, chunk
 	return nil
@@ -165,6 +176,7 @@ type fixture struct {
 	leases      *fakeLeases
 	credentials *fakeCredentials
 	outputs     *fakeOutputs
+	receipts    *fakePlanReceipts
 	clock       *testClock
 	scope       Scope
 	spec        workspacev1.WorkspaceSpec
@@ -178,20 +190,56 @@ func newFixture() *fixture {
 	leases := &fakeLeases{}
 	credentials := &fakeCredentials{}
 	outputs := &fakeOutputs{}
+	receipts := &fakePlanReceipts{}
 	service := &Service{
-		Store: store, Provider: provider, Sessions: sessions, Leases: leases, Credentials: credentials, Outputs: outputs, Clock: clock, IDs: &testIDs{},
+		Store: store, Provider: provider, Sessions: sessions, Leases: leases, Credentials: credentials, Outputs: outputs, PlanReceipts: receipts, Clock: clock, IDs: &testIDs{},
 		Policy: DefaultCommandPolicy(), ReconcilerID: "workspace-manager-1", WorkspaceVPCID: "vpc-workspace",
 		AllowedEgressHosts: []string{"gitlab.com", "registry.npmjs.org", "ai-native-paas-registry.registry.twcstorage.ru"},
 		EgressGatewayCIDRs: []string{"192.168.75.4/32"}, DNSResolverCIDRs: []string{"192.168.75.1/32"},
 		DeniedCIDRs: []string{"192.168.73.0/24", "192.168.74.0/24", "10.0.0.0/8", "172.16.0.0/12"},
 	}
 	return &fixture{
-		service: service, store: store, provider: provider, sessions: sessions, leases: leases, credentials: credentials, outputs: outputs, clock: clock,
+		service: service, store: store, provider: provider, sessions: sessions, leases: leases, credentials: credentials, outputs: outputs, receipts: receipts, clock: clock,
 		scope: Scope{TenantID: "tenant-1", ProjectID: "project-1", ActorID: "agent-1"},
 		spec: workspacev1.WorkspaceSpec{
 			ProjectID: "project-1", TaskID: "task-1", ImageDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			CPUMillis: 2000, MemoryMiB: 4096, TTLSeconds: 900, NetworkProfile: "isolated-governed", CredentialLeases: []string{"repo-lease", "command-lease"},
 		},
+	}
+}
+
+func TestWorkspace_PlanReceiptRequiresRunningInfraPlanAndMTLSBinding(t *testing.T) {
+	f := newFixture()
+	ready := f.ready(t)
+	view, err := f.service.Exec(context.Background(), ExecRequest{
+		Scope: f.scope, WorkspaceID: ready.WorkspaceID, Kind: "infra_plan", SerializationKey: "production", IdempotencyKey: "plan-receipt-1",
+		Spec: workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-tofu-plan", "saved.plan"}, WorkingDir: "infrastructure", TimeoutSeconds: 300, OutputLimitBytes: 4096},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.service.Dispatch(context.Background(), f.scope, view.CommandID); err != nil {
+		t.Fatal(err)
+	}
+	receipt := infrastructurev1.AgentPlanReceipt{
+		SessionID: "mtls-session-1", ExecutionSessionID: "mtls-session-1", CommandID: view.CommandID,
+		ArtifactDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		PlanJSON:       []byte(`{"resource_changes":[]}`), CapturedAt: f.clock.Now(),
+	}
+	request := CredentialResolveRequest{
+		TenantID: f.scope.TenantID, ProjectID: f.scope.ProjectID, WorkspaceID: ready.WorkspaceID, TaskID: "task-1",
+		CommandID: view.CommandID, AgentSessionID: "mtls-session-1", VMID: "twc-vm-1",
+	}
+	if err := f.service.RecordPlanReceipt(context.Background(), request, receipt); err != nil {
+		t.Fatal(err)
+	}
+	if f.receipts.scope.ActorID != "agent-1" || f.receipts.scope.CommandID != view.CommandID || f.receipts.receipt.ArtifactDigest != receipt.ArtifactDigest {
+		t.Fatalf("scope=%#v receipt=%#v", f.receipts.scope, f.receipts.receipt)
+	}
+	tampered := receipt
+	tampered.CommandID = "foreign-command"
+	if err := f.service.RecordPlanReceipt(context.Background(), request, tampered); err == nil {
+		t.Fatal("cross-command plan receipt was accepted")
 	}
 }
 

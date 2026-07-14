@@ -5,8 +5,11 @@ on:
     paths:
       - 'cmd/workspace-manager/**'
       - 'internal/workspace/**'
+      - 'internal/infrastructure/**'
+      - 'pkg/contracts/infrastructure/v1/**'
       - 'pkg/contracts/workspace/v1/**'
       - 'test/integration/postgres_workspace_test.go'
+      - 'test/integration/postgres_infrastructure_test.go'
       - 'test/architecture/workspace_execution_boundary_test.go'
       - 'go.mod'
       - 'go.sum'
@@ -29,8 +32,8 @@ jobs:
           go-version: '1.25.x'
           cache: true
       - run: make fmt-check
-      - run: go vet ./cmd/workspace-manager ./internal/workspace/... ./pkg/contracts/workspace/v1
-      - run: go test -race -count=1 ./internal/workspace/... ./pkg/contracts/workspace/v1 ./test/architecture
+      - run: go vet ./cmd/workspace-manager ./internal/infrastructure/... ./internal/workspace/... ./pkg/contracts/infrastructure/v1 ./pkg/contracts/workspace/v1
+      - run: go test -race -count=1 ./internal/infrastructure/... ./internal/workspace/... ./pkg/contracts/infrastructure/v1 ./pkg/contracts/workspace/v1 ./test/architecture
       - run: go build -trimpath ./cmd/workspace-manager
 
   postgres:
@@ -59,7 +62,7 @@ jobs:
           go-version: '1.25.x'
           cache: true
       - run: sudo apt-get update && sudo apt-get install -y libpq-dev pkg-config postgresql-client
-      - run: go test -race -count=1 -tags=postgres_integration ./test/integration -run '^TestPostgres_Workspace' -v
+      - run: go test -race -count=1 -tags=postgres_integration ./test/integration -run '^TestPostgres_(Infrastructure|Workspace)' -v
 
   image:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'

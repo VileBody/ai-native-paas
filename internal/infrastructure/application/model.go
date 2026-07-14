@@ -11,10 +11,11 @@ import (
 )
 
 var (
-	ErrConflict         = errors.New("infrastructure conflict")
-	ErrNotFound         = errors.New("infrastructure record not found")
-	ErrApprovalRequired = errors.New("exact-plan approval is required")
-	ErrPermissionDenied = errors.New("infrastructure authorization denied")
+	ErrConflict          = errors.New("infrastructure conflict")
+	ErrNotFound          = errors.New("infrastructure record not found")
+	ErrApprovalRequired  = errors.New("exact-plan approval is required")
+	ErrPermissionDenied  = errors.New("infrastructure authorization denied")
+	ErrDependencyPending = errors.New("infrastructure dependency is pending")
 )
 
 type UnitPrice struct {
@@ -72,6 +73,19 @@ type ApprovalGrant struct {
 	ConsumedAt      time.Time
 }
 
+type PlanReceiptRecord struct {
+	TenantID       string
+	ProjectID      string
+	WorkspaceID    string
+	TaskID         string
+	CommandID      string
+	ActorID        string
+	ArtifactDigest string
+	PlanJSON       []byte
+	CapturedAt     time.Time
+	ReceivedAt     time.Time
+}
+
 type ApplyMatch struct {
 	TenantID         string
 	ProjectID        string
@@ -85,6 +99,7 @@ type Store interface {
 	GetPlan(context.Context, string, string, string) (PlanRecord, error)
 	CreateApproval(context.Context, ApprovalGrant) (ApprovalGrant, error)
 	GetActiveApproval(context.Context, string, string, string, string, time.Time) (ApprovalGrant, error)
+	GetPlanReceipt(context.Context, string, string, string) (PlanReceiptRecord, error)
 	AuthorizeApply(context.Context, ApplyMatch) (PlanRecord, error)
 }
 

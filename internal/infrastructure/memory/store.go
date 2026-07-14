@@ -6,6 +6,8 @@ import (
 	"time"
 
 	infraapp "github.com/keir-research/ai-native-paas/internal/infrastructure/application"
+	"github.com/keir-research/ai-native-paas/internal/workspace"
+	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 )
 
 type Store struct {
@@ -13,10 +15,44 @@ type Store struct {
 	plans       map[string]infraapp.PlanRecord
 	idempotency map[string]string
 	approvals   map[string]infraapp.ApprovalGrant
+	receipts    map[string]infraapp.PlanReceiptRecord
 }
 
 func New() *Store {
-	return &Store{plans: map[string]infraapp.PlanRecord{}, idempotency: map[string]string{}, approvals: map[string]infraapp.ApprovalGrant{}}
+	return &Store{plans: map[string]infraapp.PlanRecord{}, idempotency: map[string]string{}, approvals: map[string]infraapp.ApprovalGrant{}, receipts: map[string]infraapp.PlanReceiptRecord{}}
+}
+
+func (s *Store) PutPlanReceipt(_ context.Context, scope workspace.PlanReceiptScope, receipt infrastructurev1.AgentPlanReceipt) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if receipt.Validate() != nil || scope.TenantID == "" || scope.ProjectID == "" || scope.WorkspaceID == "" || scope.TaskID == "" || scope.CommandID != receipt.CommandID || scope.ActorID == "" {
+		return infraapp.ErrPermissionDenied
+	}
+	candidate := infraapp.PlanReceiptRecord{
+		TenantID: scope.TenantID, ProjectID: scope.ProjectID, WorkspaceID: scope.WorkspaceID,
+		TaskID: scope.TaskID, CommandID: scope.CommandID, ActorID: scope.ActorID,
+		ArtifactDigest: receipt.ArtifactDigest, PlanJSON: append([]byte(nil), receipt.PlanJSON...),
+		CapturedAt: receipt.CapturedAt, ReceivedAt: receipt.CapturedAt,
+	}
+	if stored, ok := s.receipts[scope.CommandID]; ok {
+		if stored.TenantID != candidate.TenantID || stored.ProjectID != candidate.ProjectID || stored.WorkspaceID != candidate.WorkspaceID || stored.ActorID != candidate.ActorID || stored.ArtifactDigest != candidate.ArtifactDigest || string(stored.PlanJSON) != string(candidate.PlanJSON) {
+			return infraapp.ErrConflict
+		}
+		return nil
+	}
+	s.receipts[scope.CommandID] = candidate
+	return nil
+}
+
+func (s *Store) GetPlanReceipt(_ context.Context, tenantID, projectID, commandID string) (infraapp.PlanReceiptRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	receipt, ok := s.receipts[commandID]
+	if !ok || receipt.TenantID != tenantID || receipt.ProjectID != projectID {
+		return infraapp.PlanReceiptRecord{}, infraapp.ErrNotFound
+	}
+	receipt.PlanJSON = append([]byte(nil), receipt.PlanJSON...)
+	return receipt, nil
 }
 
 func (s *Store) CreatePlan(_ context.Context, record infraapp.PlanRecord) (infraapp.PlanRecord, error) {

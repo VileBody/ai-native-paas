@@ -9,6 +9,7 @@ import (
 	"time"
 
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
+	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -21,6 +22,7 @@ type Service struct {
 	Leases             LeaseRevoker
 	Credentials        CredentialSource
 	Outputs            CommandOutputStore
+	PlanReceipts       PlanReceiptStore
 	Clock              Clock
 	IDs                IDGenerator
 	Policy             CommandPolicy
@@ -343,6 +345,23 @@ func (s *Service) RecordOutputChunk(ctx context.Context, request CredentialResol
 		TenantID: command.TenantID, ProjectID: command.ProjectID, WorkspaceID: command.WorkspaceID, TaskID: command.TaskID,
 		CommandID: command.ID, AgentSessionID: command.AgentSessionID, VMID: command.ExecutionVMID,
 	}, chunk)
+}
+
+func (s *Service) RecordPlanReceipt(ctx context.Context, request CredentialResolveRequest, receipt infrastructurev1.AgentPlanReceipt) error {
+	if s == nil || s.Store == nil || s.PlanReceipts == nil || receipt.Validate() != nil || receipt.CommandID != request.CommandID || receipt.ExecutionSessionID != request.AgentSessionID {
+		return errors.New("workspace plan receipt service is unavailable")
+	}
+	command, err := s.authorizeExecution(ctx, request)
+	if err != nil {
+		return err
+	}
+	if command.Kind != "infra_plan" || command.ActorID == "" || command.StartedAt == nil || receipt.CapturedAt.Before(*command.StartedAt) || receipt.CapturedAt.After(s.Clock.Now().UTC().Add(time.Minute)) {
+		return ErrPolicyDenied
+	}
+	return s.PlanReceipts.PutPlanReceipt(ctx, PlanReceiptScope{
+		TenantID: command.TenantID, ProjectID: command.ProjectID, WorkspaceID: command.WorkspaceID,
+		TaskID: command.TaskID, CommandID: command.ID, ActorID: command.ActorID,
+	}, receipt)
 }
 
 func (s *Service) authorizeExecution(ctx context.Context, request CredentialResolveRequest) (Command, error) {

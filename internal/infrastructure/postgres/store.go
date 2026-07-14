@@ -10,11 +10,14 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
 
 	infraapp "github.com/keir-research/ai-native-paas/internal/infrastructure/application"
+	"github.com/keir-research/ai-native-paas/internal/workspace"
+	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 )
 
 //go:embed migrations/*.sql
@@ -77,6 +80,48 @@ func (s *Store) Migrate(ctx context.Context) error {
 }
 
 const planColumns = `id,tenant_id,requested_by_actor_id,project_id,workspace_id,source_sha,plan_hash,state_generation,changes,destructive,requires_approval,estimate_version,estimate_fingerprint,artifact_digest,target,idempotency_key,idempotency_fingerprint,estimate,reservation,apply_started_at,created_at,version`
+
+func (s *Store) PutPlanReceipt(ctx context.Context, scope workspace.PlanReceiptScope, receipt infrastructurev1.AgentPlanReceipt) error {
+	if s == nil || s.DB == nil || receipt.Validate() != nil || scope.TenantID == "" || scope.ProjectID == "" || scope.WorkspaceID == "" || scope.TaskID == "" || scope.CommandID != receipt.CommandID || scope.ActorID == "" {
+		return infraapp.ErrPermissionDenied
+	}
+	result, err := s.DB.ExecContext(ctx, `
+		INSERT INTO infrastructure.plan_receipts(command_id,tenant_id,project_id,workspace_id,task_id,actor_id,artifact_digest,plan_json,captured_at)
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(command_id) DO NOTHING`,
+		scope.CommandID, scope.TenantID, scope.ProjectID, scope.WorkspaceID, scope.TaskID, scope.ActorID,
+		receipt.ArtifactDigest, []byte(receipt.PlanJSON), receipt.CapturedAt)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil || rows == 1 {
+		return err
+	}
+	stored, err := s.GetPlanReceipt(ctx, scope.TenantID, scope.ProjectID, scope.CommandID)
+	if err != nil {
+		return err
+	}
+	if stored.WorkspaceID != scope.WorkspaceID || stored.TaskID != scope.TaskID || stored.ActorID != scope.ActorID || stored.ArtifactDigest != receipt.ArtifactDigest || !sameJSON(stored.PlanJSON, receipt.PlanJSON) || stored.CapturedAt.Sub(receipt.CapturedAt).Abs() > time.Microsecond {
+		return infraapp.ErrConflict
+	}
+	return nil
+}
+
+func sameJSON(left, right []byte) bool {
+	var a, b any
+	return json.Unmarshal(left, &a) == nil && json.Unmarshal(right, &b) == nil && reflect.DeepEqual(a, b)
+}
+
+func (s *Store) GetPlanReceipt(ctx context.Context, tenantID, projectID, commandID string) (infraapp.PlanReceiptRecord, error) {
+	var receipt infraapp.PlanReceiptRecord
+	err := s.DB.QueryRowContext(ctx, `
+		SELECT tenant_id,project_id,workspace_id,task_id,command_id,actor_id,artifact_digest,plan_json,captured_at,received_at
+		FROM infrastructure.plan_receipts WHERE tenant_id=$1 AND project_id=$2 AND command_id=$3`, tenantID, projectID, commandID).Scan(
+		&receipt.TenantID, &receipt.ProjectID, &receipt.WorkspaceID, &receipt.TaskID, &receipt.CommandID,
+		&receipt.ActorID, &receipt.ArtifactDigest, &receipt.PlanJSON, &receipt.CapturedAt, &receipt.ReceivedAt,
+	)
+	return receipt, mapNotFound(err)
+}
 
 func (s *Store) CreatePlan(ctx context.Context, record infraapp.PlanRecord) (infraapp.PlanRecord, error) {
 	changes, estimate, reservation, err := marshalPlan(record)

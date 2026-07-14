@@ -19,6 +19,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
 	commercev2 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v2"
+	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -131,10 +132,25 @@ func TestProjectMCP_ExactPlanApprovalGatesVerifiedWorkspaceApply(t *testing.T) {
 	planRequest.Arguments = json.RawMessage(`{
 		"workspace_id":"workspace-1","target":"production",
 		"source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		"artifact_digest":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 		"state_generation":1,
-		"plan_json":{"resource_changes":[{"address":"twc_server.app","provider_name":"timeweb","type":"twc_server","change":{"actions":["create"]}}]}
+		"plan_path":"saved.plan","working_dir":"infrastructure"
 	}`)
+	waitingPlan := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, planRequest)
+	if waitingPlan.Code != http.StatusOK || !strings.Contains(waitingPlan.Body.String(), "WAITING_DEPENDENCY") || workspaces.exec.Kind != "infra_plan" || workspaces.exec.Spec.Argv[0] != "workspace-agent" {
+		t.Fatalf("waiting plan status=%d body=%s request=%#v", waitingPlan.Code, waitingPlan.Body.String(), workspaces.exec)
+	}
+	infrastructure := handler.Infrastructure.(*infraapp.Service)
+	receipts := infrastructure.Store.(*inframemory.Store)
+	now := time.Date(2026, 7, 14, 5, 0, 0, 0, time.UTC)
+	if err := receipts.PutPlanReceipt(context.Background(), workspace.PlanReceiptScope{
+		TenantID: "tenant-1", ProjectID: "project-1", WorkspaceID: "workspace-1", TaskID: "task-1", CommandID: "command-1", ActorID: "agent-1",
+	}, infrastructurev1.AgentPlanReceipt{
+		SessionID: "session-1", ExecutionSessionID: "session-1", CommandID: "command-1",
+		ArtifactDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		PlanJSON:       json.RawMessage(`{"resource_changes":[{"address":"twc_server.app","provider_name":"timeweb","type":"twc_server","change":{"actions":["create"]}}]}`), CapturedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	planned := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, planRequest)
 	if planned.Code != http.StatusOK {
 		t.Fatalf("plan status=%d body=%s", planned.Code, planned.Body.String())
@@ -155,7 +171,6 @@ func TestProjectMCP_ExactPlanApprovalGatesVerifiedWorkspaceApply(t *testing.T) {
 		t.Fatalf("approval request status=%d body=%s", waiting.Code, waiting.Body.String())
 	}
 
-	infrastructure := handler.Infrastructure.(*infraapp.Service)
 	grant, err := infrastructure.GrantApproval(context.Background(), infraapp.GrantApprovalCommand{
 		TenantID: "tenant-1", ProjectID: "project-1", PlanID: plan.Summary.PlanID,
 		ApproverUserID: "user-1", ExpiresAt: mcpClock{now: time.Date(2026, 7, 14, 5, 0, 0, 0, time.UTC)}.now.Add(5 * time.Minute),

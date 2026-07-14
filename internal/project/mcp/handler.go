@@ -35,7 +35,7 @@ type WorkspaceCommands interface {
 }
 
 type InfrastructureCommands interface {
-	Plan(context.Context, infraapp.PlanCommand) (infraapp.PlanResult, error)
+	PlanFromReceipt(context.Context, infraapp.ReceiptPlanCommand) (infraapp.PlanResult, error)
 	GetPlan(context.Context, string, string, string) (infraapp.PlanRecord, error)
 	GetApprovalStatus(context.Context, string, string, string, string) (infraapp.ApprovalStatus, error)
 	AuthorizeApply(context.Context, infraapp.ApplyCommand) (infraapp.PlanRecord, error)
@@ -248,12 +248,16 @@ func (h Handler) invokeWorkspace(ctx context.Context, verified agentv2.VerifiedI
 }
 
 type infraPlanArguments struct {
-	WorkspaceID     string          `json:"workspace_id"`
-	Target          string          `json:"target"`
-	SourceSHA       string          `json:"source_sha"`
-	ArtifactDigest  string          `json:"artifact_digest"`
-	StateGeneration int64           `json:"state_generation"`
-	PlanJSON        json.RawMessage `json:"plan_json"`
+	WorkspaceID      string            `json:"workspace_id"`
+	Target           string            `json:"target"`
+	SourceSHA        string            `json:"source_sha"`
+	StateGeneration  int64             `json:"state_generation"`
+	PlanPath         string            `json:"plan_path"`
+	WorkingDir       string            `json:"working_dir"`
+	EnvironmentRefs  map[string]string `json:"environment_refs,omitempty"`
+	CredentialLeases []string          `json:"credential_leases,omitempty"`
+	TimeoutSeconds   int64             `json:"timeout_seconds,omitempty"`
+	OutputLimitBytes int64             `json:"output_limit_bytes,omitempty"`
 }
 
 type infraPlanLookupArguments struct {
@@ -290,15 +294,43 @@ func (h Handler) invokeInfrastructure(ctx context.Context, verified agentv2.Veri
 	switch request.Tool {
 	case agentv2.ToolInfraPlan:
 		var arguments infraPlanArguments
-		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil {
+		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || !validRelativePlanPath(arguments.PlanPath) || h.Workspaces == nil {
 			return nil, errInvalidInfrastructureArguments
 		}
-		return h.Infrastructure.Plan(ctx, infraapp.PlanCommand{
-			TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID,
-			WorkspaceID: arguments.WorkspaceID, Target: arguments.Target, SourceSHA: arguments.SourceSHA,
-			IdempotencyKey: request.IdempotencyKey, ArtifactDigest: arguments.ArtifactDigest,
-			StateGeneration: arguments.StateGeneration, PlanJSON: append([]byte(nil), arguments.PlanJSON...),
+		timeout := arguments.TimeoutSeconds
+		if timeout == 0 {
+			timeout = 600
+		}
+		outputLimit := arguments.OutputLimitBytes
+		if outputLimit == 0 {
+			outputLimit = 1 << 20
+		}
+		spec := workspacev1.CommandSpec{
+			Argv:       []string{"workspace-agent", "verified-tofu-plan", arguments.PlanPath},
+			WorkingDir: arguments.WorkingDir, EnvironmentRefs: cloneStringMap(arguments.EnvironmentRefs),
+			TimeoutSeconds: timeout, OutputLimitBytes: outputLimit,
+		}
+		if timeout > 600 || spec.Validate() != nil {
+			return nil, errInvalidInfrastructureArguments
+		}
+		command, err := h.Workspaces.Exec(ctx, workspace.ExecRequest{
+			Scope:       workspace.Scope{TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID},
+			WorkspaceID: arguments.WorkspaceID, IdempotencyKey: request.IdempotencyKey,
+			Kind: "infra_plan", SerializationKey: arguments.Target,
+			CredentialLeases: append([]string(nil), arguments.CredentialLeases...), Spec: spec,
 		})
+		if err != nil {
+			return nil, err
+		}
+		result, err := h.Infrastructure.PlanFromReceipt(ctx, infraapp.ReceiptPlanCommand{
+			TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID,
+			WorkspaceID: arguments.WorkspaceID, CommandID: command.CommandID, Target: arguments.Target,
+			SourceSHA: arguments.SourceSHA, IdempotencyKey: request.IdempotencyKey, StateGeneration: arguments.StateGeneration,
+		})
+		if errors.Is(err, infraapp.ErrDependencyPending) {
+			return map[string]any{"status": "WAITING_DEPENDENCY", "command": command}, nil
+		}
+		return result, err
 	case agentv2.ToolInfraGetPlan:
 		plan, err := h.infrastructurePlan(ctx, verified, request.Arguments)
 		if err != nil {

@@ -14,6 +14,7 @@ import (
 
 type ResolvedEnvironment struct {
 	Values          map[string]string
+	SystemValues    map[string]string
 	RedactionValues []string
 }
 
@@ -116,7 +117,7 @@ func (e Executor) Execute(parent context.Context, commandID string, spec workspa
 	defer cancel()
 	command := exec.Command(spec.Argv[0], spec.Argv[1:]...)
 	command.Dir = workingDirectory
-	command.Env = commandEnvironment(environment.Values)
+	command.Env = commandEnvironment(environment.Values, environment.SystemValues)
 	control, err := newProcessControl(commandID, e.RequireCgroup)
 	if err != nil {
 		return ExecutionResult{}, err
@@ -184,7 +185,7 @@ func classifyExit(err error) (workspacev1.CommandState, *int) {
 	return workspacev1.CommandFailed, nil
 }
 
-func commandEnvironment(values map[string]string) []string {
+func commandEnvironment(values map[string]string, system ...map[string]string) []string {
 	result := []string{
 		"HOME=/home/workspace-agent", "LANG=C.UTF-8", "LC_ALL=C.UTF-8",
 		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "TMPDIR=/var/tmp",
@@ -197,6 +198,18 @@ func commandEnvironment(values map[string]string) []string {
 	for _, name := range names {
 		if environmentVariableName(name) && !reservedEnvironmentName(name) && !strings.ContainsRune(values[name], '\x00') {
 			result = append(result, name+"="+values[name])
+		}
+	}
+	if len(system) == 1 {
+		systemNames := make([]string, 0, len(system[0]))
+		for name := range system[0] {
+			systemNames = append(systemNames, name)
+		}
+		sortStrings(systemNames)
+		for _, name := range systemNames {
+			if strings.HasPrefix(name, "PLATFORM_") && environmentVariableName(name) && !strings.ContainsRune(system[0][name], '\x00') {
+				result = append(result, name+"="+system[0][name])
+			}
 		}
 	}
 	return result
@@ -219,7 +232,7 @@ func reservedEnvironmentName(value string) bool {
 	case "HOME", "PATH", "SHELL", "LD_PRELOAD", "LD_LIBRARY_PATH", "GODEBUG", "GOTRACEBACK", "TMPDIR":
 		return true
 	default:
-		return strings.HasPrefix(value, "SYSTEMD_")
+		return strings.HasPrefix(value, "SYSTEMD_") || strings.HasPrefix(value, "PLATFORM_")
 	}
 }
 

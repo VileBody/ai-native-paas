@@ -205,6 +205,10 @@ func (a *Agent) handleExec(ctx context.Context, sessionID string, message worksp
 		}
 		return a.flushOutcomes(ctx, sessionID)
 	}
+	environment.SystemValues = map[string]string{
+		"PLATFORM_COMMAND_ID":           message.CommandID,
+		"PLATFORM_EXECUTION_SESSION_ID": sessionID,
+	}
 	executionContext, cancel := context.WithCancel(ctx)
 	a.active = &activeCommand{commandID: message.CommandID, executionSessionID: sessionID, cancel: cancel}
 	spec := cloneCommandSpec(*message.Spec)
@@ -320,6 +324,10 @@ func clearEnvironment(environment *ResolvedEnvironment) {
 	for name := range environment.Values {
 		environment.Values[name] = ""
 		delete(environment.Values, name)
+	}
+	for name := range environment.SystemValues {
+		environment.SystemValues[name] = ""
+		delete(environment.SystemValues, name)
 	}
 	for index := range environment.RedactionValues {
 		environment.RedactionValues[index] = ""

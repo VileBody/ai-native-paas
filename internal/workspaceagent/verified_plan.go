@@ -13,10 +13,18 @@ func validateVerifiedApplyArguments(arguments []string) (string, string, error) 
 	if len(arguments) != 2 || !planDigestPattern.MatchString(arguments[0]) {
 		return "", "", errors.New("exact plan digest and path are required")
 	}
-	planPath := strings.TrimSpace(arguments[1])
+	planPath, err := validateReceiptPlanPath(arguments[1])
+	if err != nil {
+		return "", "", err
+	}
+	return strings.TrimPrefix(arguments[0], "sha256:"), planPath, nil
+}
+
+func validateReceiptPlanPath(value string) (string, error) {
+	planPath := strings.TrimSpace(value)
 	clean := filepath.Clean(planPath)
 	if planPath == "" || clean == "." || clean != planPath || filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
-		return "", "", errors.New("plan path must be canonical and relative")
+		return "", errors.New("plan path must be canonical and relative")
 	}
-	return strings.TrimPrefix(arguments[0], "sha256:"), clean, nil
+	return clean, nil
 }

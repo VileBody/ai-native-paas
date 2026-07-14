@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -135,4 +136,17 @@ type CommandOutputScope struct {
 
 type CommandOutputStore interface {
 	PutChunk(context.Context, CommandOutputScope, workspacev1.AgentOutputChunk) error
+}
+
+type PlanReceiptScope struct {
+	TenantID    string
+	ProjectID   string
+	WorkspaceID string
+	TaskID      string
+	CommandID   string
+	ActorID     string
+}
+
+type PlanReceiptStore interface {
+	PutPlanReceipt(context.Context, PlanReceiptScope, infrastructurev1.AgentPlanReceipt) error
 }

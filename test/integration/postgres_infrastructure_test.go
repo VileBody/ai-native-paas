@@ -15,6 +15,7 @@ import (
 
 	infraapp "github.com/keir-research/ai-native-paas/internal/infrastructure/application"
 	infrapg "github.com/keir-research/ai-native-paas/internal/infrastructure/postgres"
+	"github.com/keir-research/ai-native-paas/internal/workspace"
 	commercev2 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v2"
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 )
@@ -61,17 +62,25 @@ func TestPostgres_InfrastructureApprovalIsExactAndSingleUse(t *testing.T) {
 			Prices:   map[string]infraapp.UnitPrice{"twc_server": {Meter: "server.month", Unit: "server-month", ProviderMinorPerQuantity: 1000, Known: true}},
 		},
 	}
-	command := infraapp.PlanCommand{
-		TenantID: "tenant-pg", ProjectID: "project-pg", ActorID: "agent-pg", WorkspaceID: "workspace-pg", Target: "production",
-		SourceSHA: strings.Repeat("a", 40), IdempotencyKey: "plan-pg",
-		ArtifactDigest: "sha256:" + strings.Repeat("b", 64), StateGeneration: 3,
+	receipt := infrastructurev1.AgentPlanReceipt{
+		SessionID: "session-pg", ExecutionSessionID: "session-pg", CommandID: "command-pg",
+		ArtifactDigest: "sha256:" + strings.Repeat("b", 64), CapturedAt: now,
 		PlanJSON: []byte(`{"resource_changes":[{"address":"twc_server.app","provider_name":"timeweb","type":"twc_server","change":{"actions":["create"]}}]}`),
 	}
-	plan, err := service.Plan(context.Background(), command)
+	if err := store.PutPlanReceipt(context.Background(), workspace.PlanReceiptScope{
+		TenantID: "tenant-pg", ProjectID: "project-pg", WorkspaceID: "workspace-pg", TaskID: "task-pg", CommandID: "command-pg", ActorID: "agent-pg",
+	}, receipt); err != nil {
+		t.Fatal(err)
+	}
+	command := infraapp.ReceiptPlanCommand{
+		TenantID: "tenant-pg", ProjectID: "project-pg", ActorID: "agent-pg", WorkspaceID: "workspace-pg", CommandID: "command-pg", Target: "production",
+		SourceSHA: strings.Repeat("a", 40), IdempotencyKey: "plan-pg", StateGeneration: 3,
+	}
+	plan, err := service.PlanFromReceipt(context.Background(), command)
 	if err != nil {
 		t.Fatal(err)
 	}
-	replayed, err := service.Plan(context.Background(), command)
+	replayed, err := service.PlanFromReceipt(context.Background(), command)
 	if err != nil || replayed.Summary.PlanID != plan.Summary.PlanID {
 		t.Fatalf("durable idempotent plan: replay=%#v err=%v", replayed, err)
 	}

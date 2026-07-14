@@ -1,6 +1,7 @@
 package workspaceagent
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -14,5 +15,16 @@ func TestVerifiedTofuApply_RequiresExactDigestAndCanonicalRelativePath(t *testin
 		if _, _, err := validateVerifiedApplyArguments(arguments); err == nil {
 			t.Fatalf("unsafe arguments accepted: %#v", arguments)
 		}
+	}
+}
+
+func TestVerifiedTofuPlanReceipt_StripsAllBeforeAfterValues(t *testing.T) {
+	raw := []byte(`{"format_version":"1.2","resource_changes":[{"address":"twc_server.app","provider_name":"timeweb","type":"twc_server","change":{"actions":["create"],"before":{"token":"SECRET_SENTINEL"},"after":{"password":"SECRET_SENTINEL"}}}]}`)
+	normalized, err := normalizePlanReceipt(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(normalized, []byte("SECRET_SENTINEL")) || bytes.Contains(normalized, []byte("before")) || bytes.Contains(normalized, []byte("after")) || !bytes.Contains(normalized, []byte("twc_server.app")) {
+		t.Fatalf("unsafe normalized receipt: %s", normalized)
 	}
 }

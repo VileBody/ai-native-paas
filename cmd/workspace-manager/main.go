@@ -19,6 +19,7 @@ import (
 	"time"
 
 	agentsupport "github.com/keir-research/ai-native-paas/internal/agent/support"
+	infrapostgres "github.com/keir-research/ai-native-paas/internal/infrastructure/postgres"
 	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 	"github.com/keir-research/ai-native-paas/internal/workspace"
@@ -83,6 +84,7 @@ func main() {
 		platformprofile.Prod("openbao-command-credential-broker"),
 		platformprofile.Prod("client-encrypted-s3-command-logs"),
 		platformprofile.Prod("verified-spiffe-mtls"),
+		platformprofile.Prod("authenticated-opentofu-plan-receipts"),
 	)
 	if err != nil || profile != platformprofile.Production {
 		logger.Error("workspace-manager requires a valid production profile")
@@ -104,6 +106,11 @@ func main() {
 	store := &workspacepostgres.Store{DB: db}
 	if err := postgresbootstrap.WithMigrationLock(ctx, db, "workspace", store.Migrate); err != nil {
 		logger.Error("migrate workspace PostgreSQL", "error", err)
+		os.Exit(1)
+	}
+	infrastructureStore := &infrapostgres.Store{DB: db}
+	if err := postgresbootstrap.WithMigrationLock(ctx, db, "infrastructure", infrastructureStore.Migrate); err != nil {
+		logger.Error("migrate infrastructure receipt PostgreSQL", "error", err)
 		os.Exit(1)
 	}
 
@@ -173,7 +180,7 @@ func main() {
 	sessions := &session.Registry{Store: &sessionpostgres.Store{DB: db}, Clock: clock, IDs: ids}
 	workerID := ids.New("workspace-manager")
 	service := &workspace.Service{
-		Store: store, Provider: provider, Sessions: sessions, Leases: issuer, Credentials: credentialSource, Outputs: logStore, Clock: clock, IDs: ids,
+		Store: store, Provider: provider, Sessions: sessions, Leases: issuer, Credentials: credentialSource, Outputs: logStore, PlanReceipts: infrastructureStore, Clock: clock, IDs: ids,
 		Policy: workspace.DefaultCommandPolicy(), ReconcilerID: workerID, WorkspaceVPCID: settings.WorkspaceVPCID,
 		AllowedEgressHosts: settings.AllowedEgressHosts, EgressGatewayCIDRs: settings.EgressGatewayCIDRs,
 		DNSResolverCIDRs: settings.DNSResolverCIDRs, DeniedCIDRs: settings.DeniedCIDRs,
@@ -187,7 +194,7 @@ func main() {
 		os.Exit(1)
 	}
 	agentHandler := sessionhttp.Handler{
-		Registry: sessions, Workspaces: service, Credentials: service, Outputs: service, Bindings: service, Certificates: issuer,
+		Registry: sessions, Workspaces: service, Credentials: service, Outputs: service, PlanReceipts: service, Bindings: service, Certificates: issuer,
 		Principals: sessionhttp.SPIFFEResolver{TrustDomain: settings.TrustDomain}, MaxBodyBytes: 64 << 10,
 	}
 	handler := http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {

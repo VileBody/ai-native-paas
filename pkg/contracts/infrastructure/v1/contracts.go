@@ -2,6 +2,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
@@ -65,6 +66,25 @@ type ApplyAuthorization struct {
 	Target          string    `json:"target"`
 	ActorID         string    `json:"actor_id"`
 	ExpiresAt       time.Time `json:"expires_at"`
+}
+
+// AgentPlanReceipt is accepted only over the workspace agent's authenticated
+// outbound mTLS session. PlanJSON contains a value-free normalized change list,
+// never the full OpenTofu before/after values.
+type AgentPlanReceipt struct {
+	SessionID          string          `json:"session_id"`
+	ExecutionSessionID string          `json:"execution_session_id"`
+	CommandID          string          `json:"command_id"`
+	ArtifactDigest     string          `json:"artifact_digest"`
+	PlanJSON           json.RawMessage `json:"plan_json"`
+	CapturedAt         time.Time       `json:"captured_at"`
+}
+
+func (r AgentPlanReceipt) Validate() error {
+	if strings.TrimSpace(r.SessionID) == "" || strings.TrimSpace(r.ExecutionSessionID) == "" || strings.TrimSpace(r.CommandID) == "" || !digest.MatchString(r.ArtifactDigest) || len(r.PlanJSON) == 0 || len(r.PlanJSON) > 8<<20 || !json.Valid(r.PlanJSON) || r.CapturedAt.IsZero() {
+		return errors.New("invalid authenticated plan receipt")
+	}
+	return nil
 }
 
 func (a ApplyAuthorization) Validate(now time.Time, approvalRequired bool) error {

@@ -17,6 +17,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	"github.com/keir-research/ai-native-paas/internal/workspace/bootstrap"
 	"github.com/keir-research/ai-native-paas/internal/workspace/session"
+	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -40,6 +41,16 @@ type credentialResolver struct {
 type outputWriter struct {
 	request workspace.CredentialResolveRequest
 	chunk   workspacev1.AgentOutputChunk
+}
+
+type planReceiptWriter struct {
+	request workspace.CredentialResolveRequest
+	receipt infrastructurev1.AgentPlanReceipt
+}
+
+func (w *planReceiptWriter) RecordPlanReceipt(_ context.Context, request workspace.CredentialResolveRequest, receipt infrastructurev1.AgentPlanReceipt) error {
+	w.request, w.receipt = request, receipt
+	return nil
 }
 
 func (w *outputWriter) RecordOutputChunk(_ context.Context, request workspace.CredentialResolveRequest, chunk workspacev1.AgentOutputChunk) error {
@@ -162,6 +173,23 @@ func TestWorkspaceAgentHTTP_OutputChunkIsDigestAndSessionBound(t *testing.T) {
 	denied := serve(handler, withCertificate(httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/output-chunks", strings.NewReader(tampered)), certificate))
 	if denied.Code != http.StatusBadRequest {
 		t.Fatalf("tampered output accepted: %d %s", denied.Code, denied.Body.String())
+	}
+}
+
+func TestWorkspaceAgentHTTP_PlanReceiptScopeComesFromMTLSSession(t *testing.T) {
+	handler, _, clock, certificate := handlerFixture(t)
+	connected := connectAgent(t, handler, certificate)
+	writer := &planReceiptWriter{}
+	handler.PlanReceipts = writer
+	body := fmt.Sprintf(`{"session_id":%q,"execution_session_id":%q,"command_id":"command-1","artifact_digest":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","plan_json":{"resource_changes":[]},"captured_at":%q}`, connected.SessionID, connected.SessionID, clock.now.Format(time.RFC3339Nano))
+	response := serve(handler, withCertificate(httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/plan-receipts", strings.NewReader(body)), certificate))
+	if response.Code != http.StatusNoContent || writer.request.TenantID != "tenant-1" || writer.request.ProjectID != "project-1" || writer.request.WorkspaceID != "workspace-1" || writer.request.AgentSessionID != connected.SessionID || writer.receipt.CommandID != "command-1" {
+		t.Fatalf("receipt status=%d body=%s request=%#v receipt=%#v", response.Code, response.Body.String(), writer.request, writer.receipt)
+	}
+	foreign := clientCertificate(t, clock.now, "/tenant/tenant-1/project/project-2/workspace/workspace-1/task/task-1/agent/agent-1")
+	denied := serve(handler, withCertificate(httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/plan-receipts", strings.NewReader(body)), foreign))
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("foreign receipt accepted: %d %s", denied.Code, denied.Body.String())
 	}
 }
 

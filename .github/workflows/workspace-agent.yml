@@ -8,6 +8,7 @@ on:
       - 'internal/workspace/bootstrap/**'
       - 'internal/workspace/session/**'
       - 'pkg/contracts/workspace/v1/**'
+      - 'pkg/contracts/infrastructure/v1/**'
       - 'infra/images/workspace/**'
       - 'scripts/build-workspace-image.sh'
       - 'go.mod'
@@ -30,8 +31,8 @@ jobs:
           go-version: '1.25.x'
           cache: true
       - run: make fmt-check
-      - run: go vet ./cmd/workspace-agent ./internal/workspaceagent ./internal/workspace/session/... ./internal/workspace/bootstrap ./pkg/contracts/workspace/v1
-      - run: go test -race -count=1 ./internal/workspaceagent ./internal/workspace/session/... ./internal/workspace/bootstrap ./pkg/contracts/workspace/v1 ./test/architecture
+      - run: go vet ./cmd/workspace-agent ./internal/workspaceagent ./internal/workspace/session/... ./internal/workspace/bootstrap ./pkg/contracts/infrastructure/v1 ./pkg/contracts/workspace/v1
+      - run: go test -race -count=1 ./internal/workspaceagent ./internal/workspace/session/... ./internal/workspace/bootstrap ./pkg/contracts/infrastructure/v1 ./pkg/contracts/workspace/v1 ./test/architecture
       - run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath ./cmd/workspace-agent
       - run: bash -n scripts/build-workspace-image.sh
       - run: jq -e '.schema == "ai-native-paas.io/workspace-image-inputs/v1" and (.tools | length) == 7' infra/images/workspace/images.lock.json

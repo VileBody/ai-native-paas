@@ -39,6 +39,40 @@ type PlanResult struct {
 	Reservation commercev2.ExecutionReservation `json:"reservation"`
 }
 
+type ReceiptPlanCommand struct {
+	TenantID        string
+	ProjectID       string
+	ActorID         string
+	WorkspaceID     string
+	CommandID       string
+	Target          string
+	SourceSHA       string
+	IdempotencyKey  string
+	StateGeneration int64
+}
+
+func (s *Service) PlanFromReceipt(ctx context.Context, command ReceiptPlanCommand) (PlanResult, error) {
+	if s == nil || s.Store == nil || command.CommandID == "" {
+		return PlanResult{}, errors.New("infrastructure receipt service is unavailable")
+	}
+	receipt, err := s.Store.GetPlanReceipt(ctx, command.TenantID, command.ProjectID, command.CommandID)
+	if errors.Is(err, ErrNotFound) {
+		return PlanResult{}, ErrDependencyPending
+	}
+	if err != nil {
+		return PlanResult{}, err
+	}
+	if receipt.WorkspaceID != command.WorkspaceID || receipt.ActorID != command.ActorID || receipt.ArtifactDigest == "" || len(receipt.PlanJSON) == 0 {
+		return PlanResult{}, ErrPermissionDenied
+	}
+	return s.Plan(ctx, PlanCommand{
+		TenantID: command.TenantID, ProjectID: command.ProjectID, ActorID: command.ActorID,
+		WorkspaceID: command.WorkspaceID, Target: command.Target, SourceSHA: command.SourceSHA,
+		IdempotencyKey: command.IdempotencyKey, ArtifactDigest: receipt.ArtifactDigest,
+		StateGeneration: command.StateGeneration, PlanJSON: append([]byte(nil), receipt.PlanJSON...),
+	})
+}
+
 type tofuPlan struct {
 	ResourceChanges []struct {
 		Address      string `json:"address"`

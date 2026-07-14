@@ -18,12 +18,18 @@ import (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if len(os.Args) > 1 {
-		if os.Args[1] != "verified-tofu-apply" {
+		var operationErr error
+		switch os.Args[1] {
+		case "verified-tofu-apply":
+			operationErr = workspaceagent.ExecuteVerifiedTofuApply(os.Args[2:])
+		case "verified-tofu-plan":
+			operationErr = workspaceagent.ExecuteVerifiedTofuPlan(os.Args[2:])
+		default:
 			logger.Error("unknown workspace-agent subcommand")
 			os.Exit(2)
 		}
-		if err := workspaceagent.ExecuteVerifiedTofuApply(os.Args[2:]); err != nil {
-			logger.Error("verified OpenTofu apply denied", "error", err)
+		if operationErr != nil {
+			logger.Error("verified OpenTofu operation denied", "error", operationErr)
 			os.Exit(1)
 		}
 		return

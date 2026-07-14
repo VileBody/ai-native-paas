@@ -14,6 +14,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	"github.com/keir-research/ai-native-paas/internal/workspace/bootstrap"
 	"github.com/keir-research/ai-native-paas/internal/workspace/session"
+	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -22,6 +23,7 @@ type Handler struct {
 	Workspaces   *workspace.Service
 	Credentials  WorkspaceCredentialResolver
 	Outputs      WorkspaceOutputWriter
+	PlanReceipts WorkspacePlanReceiptWriter
 	Bindings     AgentBindingResolver
 	Certificates CertificateRotator
 	Principals   PrincipalResolver
@@ -45,6 +47,10 @@ type WorkspaceOutputWriter interface {
 	RecordOutputChunk(context.Context, workspace.CredentialResolveRequest, workspacev1.AgentOutputChunk) error
 }
 
+type WorkspacePlanReceiptWriter interface {
+	RecordPlanReceipt(context.Context, workspace.CredentialResolveRequest, infrastructurev1.AgentPlanReceipt) error
+}
+
 func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
 	response.Header().Set("Content-Type", "application/json")
 	response.Header().Set("Cache-Control", "no-store")
@@ -66,9 +72,40 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		h.resolveCredentials(response, request)
 	case request.Method == http.MethodPost && request.URL.Path == "/api/v1/workspace-agent/output-chunks":
 		h.outputChunk(response, request)
+	case request.Method == http.MethodPost && request.URL.Path == "/api/v1/workspace-agent/plan-receipts":
+		h.planReceipt(response, request)
 	default:
 		writeError(response, http.StatusNotFound, "NOT_FOUND", "route not found")
 	}
+}
+
+func (h Handler) planReceipt(response http.ResponseWriter, request *http.Request) {
+	principal, ok := h.authenticate(response, request)
+	if !ok {
+		return
+	}
+	if h.PlanReceipts == nil {
+		writeError(response, http.StatusServiceUnavailable, "UNAVAILABLE", "workspace plan receipt service unavailable")
+		return
+	}
+	var body infrastructurev1.AgentPlanReceipt
+	if decode(request, 8<<20+(64<<10), &body) != nil || body.Validate() != nil {
+		writeError(response, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid workspace plan receipt")
+		return
+	}
+	bound, err := h.Registry.AuthorizeOutcomeFor(request.Context(), principal, body.SessionID, body.ExecutionSessionID)
+	if err != nil {
+		writeSessionError(response, err)
+		return
+	}
+	if err := h.PlanReceipts.RecordPlanReceipt(request.Context(), workspace.CredentialResolveRequest{
+		TenantID: bound.TenantID, ProjectID: bound.ProjectID, WorkspaceID: bound.WorkspaceID, TaskID: bound.TaskID,
+		CommandID: body.CommandID, AgentSessionID: bound.ID, VMID: bound.VMID,
+	}, body); err != nil {
+		writeError(response, http.StatusForbidden, "PERMISSION_DENIED", "workspace plan receipt is not command-scoped")
+		return
+	}
+	response.WriteHeader(http.StatusNoContent)
 }
 
 func (h Handler) outputChunk(response http.ResponseWriter, request *http.Request) {
