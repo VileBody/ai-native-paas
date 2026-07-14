@@ -78,6 +78,40 @@ func TestWorkspaceAgentExecutor_RedactsEnvironmentAndUsesBoundedOutput(t *testin
 	}
 }
 
+func TestWorkspaceAgentExecutor_SeparatesTaskUIDFromIdentityReader(t *testing.T) {
+	config := processIdentityConfig{
+		Required: true, TaskUID: 1001, TaskGID: 1001, VerifiedUID: 1002, VerifiedGID: 1002,
+		IdentityConfig: Config{
+			ControlPlaneURL: "https://workspace.example.com", EgressGatewayURL: "https://egress.example.com:8443",
+			WorkspaceID: "workspace-1", CorrelationID: "correlation-1", CertificateFile: "/identity/agent.crt",
+			PrivateKeyFile: "/identity/agent.key", CAFile: "/identity/ca.crt", JournalDirectory: "/state/journal", WorkspaceRoot: "/workspace",
+		},
+	}
+	task, err := selectProcessIdentity(workspacev1.CommandSpec{Argv: []string{"python3", "task.py"}}, config)
+	if err != nil || task.UID != 1001 || task.GID != 1001 || task.Home != "/home/workspace-task" || task.AttachIdentity {
+		t.Fatalf("task identity=%#v err=%v", task, err)
+	}
+	verified, err := selectProcessIdentity(workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-git-commit"}}, config)
+	if err != nil || verified.UID != 1002 || verified.GID != 1002 || verified.Home != "/home/workspace-verified" || !verified.AttachIdentity || !verified.AttachCredentials {
+		t.Fatalf("verified identity=%#v err=%v", verified, err)
+	}
+	patch, err := selectProcessIdentity(workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-git-apply-patch"}}, config)
+	if err != nil || !patch.AttachIdentity || patch.AttachCredentials {
+		t.Fatalf("patch identity=%#v err=%v", patch, err)
+	}
+	if _, err := selectProcessIdentity(workspacev1.CommandSpec{Argv: []string{"workspace-agent", "unknown"}}, config); err == nil {
+		t.Fatal("unknown workspace-agent subcommand received identity-reader UID")
+	}
+	if _, err := selectProcessIdentity(workspacev1.CommandSpec{Argv: []string{"python3"}}, processIdentityConfig{Required: true}); err == nil {
+		t.Fatal("zero task identity accepted")
+	}
+	shared := config
+	shared.VerifiedUID, shared.VerifiedGID = shared.TaskUID, shared.TaskGID
+	if _, err := selectProcessIdentity(workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-tofu-plan"}}, shared); err == nil {
+		t.Fatal("task and verified operations shared one UID")
+	}
+}
+
 func TestWorkspaceAgentExecutor_TimeoutTerminatesForkedProcessGroup(t *testing.T) {
 	root := t.TempDir()
 	pidFile := filepath.Join(root, "child.pid")

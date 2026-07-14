@@ -6,11 +6,18 @@ snapshot. Every externally downloaded tool is versioned and checksum-pinned in
 SHA. The result is a raw disk compressed with xz plus a manifest, SBOM and
 keyless Sigstore bundle.
 
-The runtime image has no SSH service or login user. The non-login
-`workspace-agent` user owns `/workspace`, the durable command journal and the
-short-lived mTLS bootstrap files. The agent has no listener. Its systemd unit
-has a delegated cgroup subtree, and each command is born in its own cgroup so
-timeout/cancel can use `cgroup.kill` even if a child calls `setsid()`.
+The runtime image has no SSH service or login user. A hardened supervisor owns
+the durable journal and identity files. Ordinary commands and rootless
+BuildKit run as `workspace-task`; governed operations run as the separate
+`workspace-verified` UID and receive the short-lived identity only through
+command-scoped file descriptors (the key is attached only for commit/plan
+receipt operations). Those FDs are marked close-on-exec before
+Git/OpenTofu children start, and neither command identity can open the identity
+directory. The non-login identities share `/workspace` through the
+non-identity `workspace-shared` group. The agent has no listener.
+Its systemd unit has a delegated cgroup subtree, and each command is born in
+its own cgroup so timeout/cancel can use `cgroup.kill` even if a child calls
+`setsid()`.
 
 The only listener is an unprivileged proxy bound to `127.0.0.1:18081`. Both
 agent commands and rootless BuildKit use it; every outbound HTTPS stream is

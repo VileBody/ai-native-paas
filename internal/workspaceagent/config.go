@@ -81,7 +81,10 @@ func readSecureFile(filename string, maximum int64) ([]byte, error) {
 	}
 	defer file.Close()
 	info, err := file.Stat()
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || info.Size() <= 0 || info.Size() > maximum {
+	// Production identity files are root:workspace-agent 0440 so only the root
+	// supervisor's identity-reader group can open them. Command processes get
+	// separate inherited FDs. Group write/execute and other access are denied.
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o037 != 0 || info.Size() <= 0 || info.Size() > maximum {
 		return nil, errors.New("workspace agent file permissions or size are invalid")
 	}
 	raw, err := io.ReadAll(io.LimitReader(file, maximum+1))

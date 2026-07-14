@@ -54,7 +54,7 @@ func TestCloudInitRenderer_EmbedsOnlyEncodedShortLivedIdentityAndNoShell(t *test
 	files := make(map[string]cloudInitFile, len(document.WriteFiles))
 	for _, file := range document.WriteFiles {
 		files[file.Path] = file
-		if file.Owner != "workspace-agent:workspace-agent" || file.Permissions != "0400" || file.Encoding != "b64" {
+		if file.Owner != "root:workspace-agent" || file.Permissions != "0440" || file.Encoding != "b64" {
 			t.Fatalf("insecure bootstrap file: %#v", file)
 		}
 	}

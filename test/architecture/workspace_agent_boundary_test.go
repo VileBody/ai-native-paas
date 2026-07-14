@@ -46,3 +46,45 @@ func TestArchitecture_WorkspaceAgentIsOutboundOnlyAndExecIsIsolatedToExecutor(t 
 		}
 	}
 }
+
+func TestArchitecture_WorkspaceSupervisorAndTaskUseSeparateUnixIdentities(t *testing.T) {
+	root := repositoryRoot(t)
+	agentUnit := readArchitectureFile(t, filepath.Join(root, "infra", "images", "workspace", "ai-native-paas-workspace-agent.service"))
+	for _, required := range []string{
+		"User=root", "Group=workspace-agent", "SupplementaryGroups=workspace-shared",
+		"CapabilityBoundingSet=CAP_SETUID CAP_SETGID", "NoNewPrivileges=yes", "ProtectProc=invisible",
+	} {
+		if !strings.Contains(agentUnit, required) {
+			t.Errorf("workspace supervisor unit lacks %q", required)
+		}
+	}
+	if strings.Contains(agentUnit, "CapabilityBoundingSet=\n") || strings.Contains(agentUnit, "AmbientCapabilities=CAP_") {
+		t.Error("workspace supervisor capability boundary is not exact")
+	}
+	buildkitUnit := readArchitectureFile(t, filepath.Join(root, "infra", "images", "workspace", "ai-native-paas-buildkit.service"))
+	for _, required := range []string{"User=workspace-task", "Group=workspace-task", "SupplementaryGroups=workspace-shared", "Environment=HOME=/home/workspace-task"} {
+		if !strings.Contains(buildkitUnit, required) {
+			t.Errorf("workspace BuildKit unit lacks %q", required)
+		}
+	}
+	imageBuild := readArchitectureFile(t, filepath.Join(root, "scripts", "build-workspace-image.sh"))
+	for _, required := range []string{
+		"useradd --uid 1000 --gid workspace-agent", "useradd --uid 1001 --gid workspace-task",
+		"useradd --uid 1002 --gid workspace-verified",
+		"install -d -m 2750 -o root -g workspace-agent /var/lib/ai-native-paas/identity",
+		"install -d -m 0770 -o workspace-task -g workspace-shared /workspace",
+	} {
+		if !strings.Contains(imageBuild, required) {
+			t.Errorf("workspace image provisioning lacks %q", required)
+		}
+	}
+}
+
+func readArchitectureFile(t *testing.T, path string) string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}

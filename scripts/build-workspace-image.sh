@@ -93,18 +93,44 @@ dpkg --force-confnew --unpack /tmp/debian-packages/*.deb
 dpkg --force-confnew --configure -a
 dpkg --purge openssh-server || true
 
+getent group workspace-agent >/dev/null 2>&1 || groupadd --gid 1000 workspace-agent
 id workspace-agent >/dev/null 2>&1 || \
-  useradd --uid 1000 --create-home --home-dir /home/workspace-agent \
-    --shell /usr/sbin/nologin workspace-agent
-install -d -m 0700 -o workspace-agent -g workspace-agent \
-  /workspace /var/lib/ai-native-paas /var/lib/ai-native-paas/identity \
-  /var/lib/ai-native-paas/journal /home/workspace-agent/.local/share/buildkit
-printf 'workspace-agent:100000:65536\n' > /etc/subuid
-printf 'workspace-agent:100000:65536\n' > /etc/subgid
+  useradd --uid 1000 --gid workspace-agent --create-home \
+    --home-dir /home/workspace-agent --shell /usr/sbin/nologin workspace-agent
+getent group workspace-task >/dev/null 2>&1 || groupadd --gid 1001 workspace-task
+id workspace-task >/dev/null 2>&1 || \
+  useradd --uid 1001 --gid workspace-task --create-home \
+    --home-dir /home/workspace-task --shell /usr/sbin/nologin workspace-task
+getent group workspace-verified >/dev/null 2>&1 || groupadd --gid 1002 workspace-verified
+id workspace-verified >/dev/null 2>&1 || \
+  useradd --uid 1002 --gid workspace-verified --create-home \
+    --home-dir /home/workspace-verified --shell /usr/sbin/nologin workspace-verified
+getent group workspace-shared >/dev/null 2>&1 || groupadd --gid 2000 workspace-shared
+usermod --append --groups workspace-shared workspace-agent
+usermod --append --groups workspace-shared workspace-task
+usermod --append --groups workspace-shared workspace-verified
+[ "$(id -u workspace-agent)" = 1000 ]
+[ "$(id -g workspace-agent)" = 1000 ]
+[ "$(id -u workspace-task)" = 1001 ]
+[ "$(id -g workspace-task)" = 1001 ]
+[ "$(id -u workspace-verified)" = 1002 ]
+[ "$(id -g workspace-verified)" = 1002 ]
+[ "$(getent group workspace-shared | cut -d: -f3)" = 2000 ]
+install -d -m 0750 -o root -g workspace-agent /var/lib/ai-native-paas
+install -d -m 2750 -o root -g workspace-agent /var/lib/ai-native-paas/identity
+install -d -m 0770 -o root -g workspace-agent /var/lib/ai-native-paas/journal
+install -d -m 0770 -o workspace-task -g workspace-shared /workspace
+install -d -m 0700 -o workspace-task -g workspace-task \
+  /home/workspace-task/.local/share/buildkit
+install -d -m 0700 -o workspace-verified -g workspace-verified /home/workspace-verified
+printf 'workspace-task:100000:65536\n' > /etc/subuid
+printf 'workspace-task:100000:65536\n' > /etc/subgid
 printf 'kernel.unprivileged_userns_clone=1\n' > \
   /etc/sysctl.d/90-workspace-rootless.conf
 passwd -l root
 passwd -l workspace-agent
+passwd -l workspace-task
+passwd -l workspace-verified
 systemctl disable ssh.service ssh.socket 2>/dev/null || true
 systemctl enable ai-native-paas-workspace-agent.service \
   ai-native-paas-buildkit.service

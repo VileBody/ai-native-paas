@@ -369,7 +369,7 @@ func replaceCredentialSet(certificateFile, privateKeyFile, caFile string, certif
 		raw  []byte
 	}{{certificateFile, certificatePEM}, {privateKeyFile, privatePEM}, {caFile, caPEM}} {
 		old, err := readSecureFile(item.path, 256<<10)
-		if err != nil || writeAtomic(item.path+".previous", old, 0o400) != nil {
+		if err != nil || writeAtomic(item.path+".previous", old, 0o440) != nil {
 			return errors.New("preserve previous workspace identity")
 		}
 	}
@@ -377,7 +377,7 @@ func replaceCredentialSet(certificateFile, privateKeyFile, caFile string, certif
 		path string
 		raw  []byte
 	}{{privateKeyFile, privatePEM}, {certificateFile, certificatePEM}, {caFile, caPEM}} {
-		if err := writeAtomic(item.path, item.raw, 0o400); err != nil {
+		if err := writeAtomic(item.path, item.raw, 0o440); err != nil {
 			return err
 		}
 	}

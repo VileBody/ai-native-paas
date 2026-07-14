@@ -96,11 +96,29 @@ type ExecutionResult struct {
 }
 
 type Executor struct {
-	WorkspaceRoot string
-	Policy        workspace.CommandPolicy
-	Now           func() time.Time
-	KillGrace     time.Duration
-	RequireCgroup bool
+	WorkspaceRoot             string
+	Policy                    workspace.CommandPolicy
+	Now                       func() time.Time
+	KillGrace                 time.Duration
+	RequireCgroup             bool
+	RequireIdentitySeparation bool
+	TaskUID, TaskGID          uint32
+	VerifiedUID, VerifiedGID  uint32
+	IdentityConfig            Config
+}
+
+type processIdentityConfig struct {
+	Required                 bool
+	TaskUID, TaskGID         uint32
+	VerifiedUID, VerifiedGID uint32
+	IdentityConfig           Config
+}
+
+type selectedProcessIdentity struct {
+	UID, GID          uint32
+	Home              string
+	AttachIdentity    bool
+	AttachCredentials bool
 }
 
 func (e Executor) Execute(parent context.Context, commandID string, spec workspacev1.CommandSpec, environment ResolvedEnvironment) (ExecutionResult, error) {
@@ -117,13 +135,24 @@ func (e Executor) Execute(parent context.Context, commandID string, spec workspa
 	defer cancel()
 	command := exec.Command(spec.Argv[0], spec.Argv[1:]...)
 	command.Dir = workingDirectory
-	command.Env = commandEnvironment(environment.Values, environment.SystemValues)
 	control, err := newProcessControl(commandID, e.RequireCgroup)
 	if err != nil {
 		return ExecutionResult{}, err
 	}
 	defer control.Close()
 	control.Configure(command)
+	home, identityConfigPath, closeIdentity, err := configureProcessIdentity(command, spec, processIdentityConfig{
+		Required: e.RequireIdentitySeparation, TaskUID: e.TaskUID, TaskGID: e.TaskGID,
+		VerifiedUID: e.VerifiedUID, VerifiedGID: e.VerifiedGID, IdentityConfig: e.IdentityConfig,
+	})
+	if err != nil {
+		return ExecutionResult{}, err
+	}
+	defer closeIdentity()
+	command.Env = commandEnvironment(home, environment.Values, environment.SystemValues)
+	if identityConfigPath != "" {
+		command.Env = append(command.Env, "WORKSPACE_AGENT_CONFIG_FILE="+identityConfigPath)
+	}
 	stdoutSink, stderrSink := newBoundedSinks(spec.OutputLimitBytes)
 	stdout := newRedactingWriter(stdoutSink, environment.RedactionValues)
 	stderr := newRedactingWriter(stderrSink, environment.RedactionValues)
@@ -185,9 +214,12 @@ func classifyExit(err error) (workspacev1.CommandState, *int) {
 	return workspacev1.CommandFailed, nil
 }
 
-func commandEnvironment(values map[string]string, system ...map[string]string) []string {
+func commandEnvironment(home string, values map[string]string, system ...map[string]string) []string {
+	if home == "" {
+		home = "/home/workspace-agent"
+	}
 	result := []string{
-		"HOME=/home/workspace-agent", "LANG=C.UTF-8", "LC_ALL=C.UTF-8",
+		"HOME=" + home, "LANG=C.UTF-8", "LC_ALL=C.UTF-8",
 		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "TMPDIR=/var/tmp",
 	}
 	names := make([]string, 0, len(values))
@@ -213,6 +245,44 @@ func commandEnvironment(values map[string]string, system ...map[string]string) [
 		}
 	}
 	return result
+}
+
+func trustedAgentSubcommand(spec workspacev1.CommandSpec) bool {
+	if len(spec.Argv) < 2 || spec.Argv[0] != "workspace-agent" {
+		return false
+	}
+	switch spec.Argv[1] {
+	case "verified-git-apply-patch", "verified-git-checkout", "verified-git-commit", "verified-git-push", "verified-tofu-apply", "verified-tofu-plan":
+		return true
+	default:
+		return false
+	}
+}
+
+func agentSubcommandNeedsCredentials(spec workspacev1.CommandSpec) bool {
+	return len(spec.Argv) >= 2 && spec.Argv[0] == "workspace-agent" && (spec.Argv[1] == "verified-git-commit" || spec.Argv[1] == "verified-tofu-plan")
+}
+
+func selectProcessIdentity(spec workspacev1.CommandSpec, config processIdentityConfig) (selectedProcessIdentity, error) {
+	if !config.Required {
+		return selectedProcessIdentity{}, nil
+	}
+	if config.TaskUID == 0 || config.TaskGID == 0 || config.VerifiedUID == 0 || config.VerifiedGID == 0 || config.TaskUID == config.VerifiedUID || config.TaskGID == config.VerifiedGID {
+		return selectedProcessIdentity{}, errors.New("workspace command identity separation is unavailable")
+	}
+	if spec.Argv[0] == "workspace-agent" {
+		if !trustedAgentSubcommand(spec) {
+			return selectedProcessIdentity{}, errors.New("workspace agent subcommand is not trusted")
+		}
+		if config.IdentityConfig.Validate() != nil {
+			return selectedProcessIdentity{}, errors.New("workspace agent identity handoff is unavailable")
+		}
+		return selectedProcessIdentity{
+			UID: config.VerifiedUID, GID: config.VerifiedGID, Home: "/home/workspace-verified",
+			AttachIdentity: true, AttachCredentials: agentSubcommandNeedsCredentials(spec),
+		}, nil
+	}
+	return selectedProcessIdentity{UID: config.TaskUID, GID: config.TaskGID, Home: "/home/workspace-task"}, nil
 }
 
 func environmentVariableName(value string) bool {

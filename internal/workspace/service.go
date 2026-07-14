@@ -281,6 +281,9 @@ func (s *Service) Exec(ctx context.Context, request ExecRequest) (workspacev1.Co
 	if err := s.Policy.Validate(request.Spec); err != nil {
 		return workspacev1.CommandView{}, err
 	}
+	if request.Spec.Argv[0] == "workspace-agent" && !governedWorkspaceAgentCommand(request.Kind, request.Spec.Argv) {
+		return workspacev1.CommandView{}, ErrPolicyDenied
+	}
 	workspace, err := s.Store.GetWorkspace(ctx, request.Scope.TenantID, request.Scope.ProjectID, request.WorkspaceID)
 	if err != nil {
 		return workspacev1.CommandView{}, err
@@ -315,6 +318,21 @@ func (s *Service) Exec(ctx context.Context, request ExecRequest) (workspacev1.Co
 		return workspacev1.CommandView{}, err
 	}
 	return command.View(), nil
+}
+
+func governedWorkspaceAgentCommand(kind string, argv []string) bool {
+	if len(argv) < 2 {
+		return false
+	}
+	expected := map[string]string{
+		"repository_checkout": "verified-git-checkout",
+		"repository_patch":    "verified-git-apply-patch",
+		"repository_commit":   "verified-git-commit",
+		"repository_push":     "verified-git-push",
+		"infra_plan":          "verified-tofu-plan",
+		"infra_apply":         "verified-tofu-apply",
+	}[kind]
+	return expected != "" && argv[0] == "workspace-agent" && argv[1] == expected
 }
 
 type CredentialResolveRequest struct {

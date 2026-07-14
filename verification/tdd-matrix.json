@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 877,
-  "discovered_unique_test_name_count": 875,
+  "discovered_go_test_count": 881,
+  "discovered_unique_test_name_count": 879,
   "pivot_requirement_count": 157,
   "requirements": [
     {

@@ -5,9 +5,10 @@ Wants=network-online.target ai-native-paas-workspace-agent.service
 
 [Service]
 Type=simple
-User=workspace-agent
-Group=workspace-agent
-Environment=HOME=/home/workspace-agent
+User=workspace-task
+Group=workspace-task
+SupplementaryGroups=workspace-shared
+Environment=HOME=/home/workspace-task
 Environment=XDG_RUNTIME_DIR=/run/workspace-buildkit
 Environment=HTTP_PROXY=http://127.0.0.1:18081
 Environment=HTTPS_PROXY=http://127.0.0.1:18081
@@ -31,7 +32,7 @@ LockPersonality=yes
 CapabilityBoundingSet=
 AmbientCapabilities=
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
-ReadWritePaths=/home/workspace-agent /run/workspace-buildkit /var/tmp /workspace
+ReadWritePaths=/home/workspace-task /run/workspace-buildkit /var/tmp /workspace
 UMask=0077
 
 [Install]

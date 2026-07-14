@@ -248,6 +248,25 @@ func TestWorkspace_PlanReceiptRequiresRunningInfraPlanAndMTLSBinding(t *testing.
 	}
 }
 
+func TestWorkspace_VerifiedAgentExecutableRequiresExactGovernedCommandKind(t *testing.T) {
+	f := newFixture()
+	ready := f.ready(t)
+	for _, request := range []ExecRequest{
+		{
+			Scope: f.scope, WorkspaceID: ready.WorkspaceID, Kind: "command", IdempotencyKey: "agent-bypass-1",
+			Spec: workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-git-commit"}, TimeoutSeconds: 60, OutputLimitBytes: 4096},
+		},
+		{
+			Scope: f.scope, WorkspaceID: ready.WorkspaceID, Kind: "infra_plan", IdempotencyKey: "agent-bypass-2",
+			Spec: workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-tofu-apply"}, TimeoutSeconds: 60, OutputLimitBytes: 4096},
+		},
+	} {
+		if _, err := f.service.Exec(context.Background(), request); !errors.Is(err, ErrPolicyDenied) {
+			t.Fatalf("governed workspace-agent bypass err=%v request=%#v", err, request)
+		}
+	}
+}
+
 func TestWorkspace_CommitReceiptRequiresRunningCommandAndSourceBinding(t *testing.T) {
 	f := newFixture()
 	f.spec.SourceRevision = &sourcev2.SourceRevision{RepositoryID: "repo-1", CommitSHA: strings.Repeat("a", 40)}

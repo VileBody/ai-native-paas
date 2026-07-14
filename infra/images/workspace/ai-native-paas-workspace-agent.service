@@ -6,8 +6,9 @@ ConditionPathExists=/var/lib/ai-native-paas/identity/workspace-agent.json
 
 [Service]
 Type=simple
-User=workspace-agent
+User=root
 Group=workspace-agent
+SupplementaryGroups=workspace-shared
 Environment=PLATFORM_PROFILE=production
 Environment=WORKSPACE_AGENT_CONFIG_FILE=/var/lib/ai-native-paas/identity/workspace-agent.json
 ExecStart=/usr/local/bin/workspace-agent
@@ -26,14 +27,15 @@ ProtectKernelModules=yes
 ProtectKernelLogs=yes
 ProtectControlGroups=no
 ProtectClock=yes
+ProtectProc=invisible
 RestrictSUIDSGID=yes
 RestrictRealtime=yes
 LockPersonality=yes
-CapabilityBoundingSet=
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID
 AmbientCapabilities=
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-ReadWritePaths=/var/lib/ai-native-paas /workspace /home/workspace-agent /var/tmp
-UMask=0077
+ReadWritePaths=/var/lib/ai-native-paas /workspace /home/workspace-agent /home/workspace-task /home/workspace-verified /var/tmp
+UMask=0027
 
 [Install]
 WantedBy=multi-user.target

@@ -24,6 +24,10 @@ func main() {
 		return
 	}
 	if len(os.Args) > 1 {
+		if err := workspaceagent.HardenVerifiedSubcommand(); err != nil {
+			logger.Error("workspace-agent subcommand identity handoff denied")
+			os.Exit(1)
+		}
 		var operationErr error
 		switch os.Args[1] {
 		case "verified-git-apply-patch":
@@ -55,6 +59,7 @@ func main() {
 		platformprofile.Prod("streaming-secret-redaction"),
 		platformprofile.Prod("remote-command-credential-broker"),
 		platformprofile.Prod("durable-remote-redacted-output"),
+		platformprofile.Prod("separate-command-runner-uid"),
 	)
 	if err != nil || profile != platformprofile.Production {
 		logger.Error("workspace-agent requires a valid production profile")
@@ -90,9 +95,12 @@ func main() {
 	agent := &workspaceagent.Agent{
 		WorkspaceID: config.WorkspaceID, Control: client, Journal: journal,
 		Resolver: workspaceagent.RemoteEnvironmentResolver{Control: client, Now: time.Now},
-		Executor: workspaceagent.Executor{WorkspaceRoot: config.WorkspaceRoot, Policy: workspace.DefaultCommandPolicy(), Now: time.Now, RequireCgroup: true},
-		Outputs:  workspaceagent.FileOutputSink{Directory: filepath.Join(config.JournalDirectory, "output")},
-		Policy:   workspace.DefaultCommandPolicy(), Now: time.Now,
+		Executor: workspaceagent.Executor{
+			WorkspaceRoot: config.WorkspaceRoot, Policy: workspace.DefaultCommandPolicy(), Now: time.Now, RequireCgroup: true,
+			RequireIdentitySeparation: true, TaskUID: 1001, TaskGID: 1001, VerifiedUID: 1002, VerifiedGID: 1002, IdentityConfig: config,
+		},
+		Outputs: workspaceagent.FileOutputSink{Directory: filepath.Join(config.JournalDirectory, "output")},
+		Policy:  workspace.DefaultCommandPolicy(), Now: time.Now,
 		SystemEnvironment: map[string]string{"HTTP_PROXY": proxy.URL(), "HTTPS_PROXY": proxy.URL(), "NO_PROXY": "127.0.0.1,localhost"},
 		Log:               func(message string, values ...any) { logger.Info(message, values...) },
 	}

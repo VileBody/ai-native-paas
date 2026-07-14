@@ -49,11 +49,12 @@ Evidence:
   was deleted immediately after the test.
 - Pivot matrix discovers executable evidence for S2, S3, S4, S5, S6, S7,
   S14 and S17; the complete matrix remains mapped at 157 requirements and now
-  discovers 877 Go test/fuzz targets.
+  discovers 881 Go test/fuzz targets.
 
 Remaining source gates:
 
 - GitLab.com live token isolation, rename/transfer, archive and 429 tests;
 - merge request plan-summary comments and branch cleanup intent;
-- command-runner UID separation so task processes cannot read the workspace
-  agent's long-lived-on-disk mTLS private key.
+- live signed-image proof for the implemented task-UID and command-scoped
+  identity-FD boundary; see
+  `docs/evidence/phase-3/workspace-command-identity-separation-2026-07-14.md`.

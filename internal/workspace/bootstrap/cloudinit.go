@@ -89,10 +89,10 @@ func (r CloudInitRenderer) Render(ctx context.Context, request workspace.Provide
 	document := cloudInitDocument{
 		Users: []string{}, SSHPassword: false, DisableRoot: true,
 		WriteFiles: []cloudInitFile{
-			encodedFile(agentConfigPath, "0400", config),
-			encodedFile(agentCertPath, "0400", bundle.Certificate),
-			encodedFile(agentKeyPath, "0400", bundle.PrivateKey),
-			encodedFile(agentCAPath, "0400", bundle.CAChain),
+			encodedFile(agentConfigPath, "0440", config),
+			encodedFile(agentCertPath, "0440", bundle.Certificate),
+			encodedFile(agentKeyPath, "0440", bundle.PrivateKey),
+			encodedFile(agentCAPath, "0440", bundle.CAChain),
 		},
 		RunCommands: [][]string{{"systemctl", "enable", "--now", agentUnit}},
 	}
@@ -112,5 +112,5 @@ func (r CloudInitRenderer) Render(ctx context.Context, request workspace.Provide
 }
 
 func encodedFile(path, permissions string, content []byte) cloudInitFile {
-	return cloudInitFile{Path: path, Owner: "workspace-agent:workspace-agent", Permissions: permissions, Encoding: "b64", Content: base64.StdEncoding.EncodeToString(content)}
+	return cloudInitFile{Path: path, Owner: "root:workspace-agent", Permissions: permissions, Encoding: "b64", Content: base64.StdEncoding.EncodeToString(content)}
 }

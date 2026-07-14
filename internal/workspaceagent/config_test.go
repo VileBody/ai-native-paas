@@ -32,6 +32,21 @@ func TestWorkspaceAgentConfig_RequiresClosedSecureProductionInput(t *testing.T) 
 	if err != nil || loaded != config {
 		t.Fatalf("loaded=%#v err=%v", loaded, err)
 	}
+	if err := os.Chmod(filename, 0o440); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadConfig(filename); err != nil {
+		t.Fatalf("root:workspace-agent 0440 identity rejected: %v", err)
+	}
+	if err := os.Chmod(filename, 0o460); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadConfig(filename); err == nil {
+		t.Fatal("group-writable workspace identity accepted")
+	}
+	if err := os.Chmod(filename, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filename, append(raw[:len(raw)-1], []byte(`,"unknown":true}`)...), 0o600); err != nil {
 		t.Fatal(err)
 	}
