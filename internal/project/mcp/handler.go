@@ -13,7 +13,9 @@ import (
 	kernelv2 "github.com/keir-research/ai-native-paas/contracts/kernel/v2"
 	"github.com/keir-research/ai-native-paas/internal/agent/enrollment"
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
+	"github.com/keir-research/ai-native-paas/internal/workspace"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
+	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
 type ProjectReader interface {
@@ -21,9 +23,19 @@ type ProjectReader interface {
 	GetRepositoryForProject(context.Context, string, string) (domain.Repository, error)
 }
 
+type WorkspaceCommands interface {
+	Create(context.Context, workspace.CreateRequest) (workspacev1.WorkspaceRef, error)
+	Get(context.Context, workspace.Scope, string) (workspacev1.WorkspaceRef, error)
+	Exec(context.Context, workspace.ExecRequest) (workspacev1.CommandView, error)
+	Destroy(context.Context, workspace.Scope, string) (workspacev1.WorkspaceRef, error)
+}
+
+var errInvalidWorkspaceArguments = errors.New("invalid workspace tool arguments")
+
 type Handler struct {
 	Enrollment   *enrollment.Service
 	Projects     ProjectReader
+	Workspaces   WorkspaceCommands
 	MaxBodyBytes int64
 }
 
@@ -64,10 +76,6 @@ func (h Handler) authenticate(r *http.Request, projectID string) (enrollment.Acc
 }
 
 func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollment.AccessClaims) {
-	if h.Projects == nil {
-		writeError(w, http.StatusServiceUnavailable, "UNAVAILABLE", "project MCP dependencies are unavailable")
-		return
-	}
 	var request agentv2.InvocationRequest
 	if err := decode(r, h.limit(), &request); err != nil || request.Validate() != nil {
 		writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid MCP v2 invocation")
@@ -91,9 +99,19 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 	)
 	switch request.Tool {
 	case agentv2.ToolProjectGet:
+		if h.Projects == nil {
+			err = errors.New("project reader is unavailable")
+			break
+		}
 		result, err = h.Projects.GetProject(r.Context(), verified.TenantID, verified.ProjectID)
 	case agentv2.ToolRepositoryStatus:
+		if h.Projects == nil {
+			err = errors.New("project reader is unavailable")
+			break
+		}
 		result, err = h.Projects.GetRepositoryForProject(r.Context(), verified.TenantID, verified.ProjectID)
+	case agentv2.ToolWorkspaceCreate, agentv2.ToolWorkspaceGet, agentv2.ToolWorkspaceExec, agentv2.ToolWorkspaceDestroy:
+		result, err = h.invokeWorkspace(r.Context(), verified, request)
 	default:
 		writeResponse(w, http.StatusNotImplemented, agentv2.InvocationResponse{
 			APIVersion: agentv2.APIVersion, InvocationID: "read-" + request.CorrelationID,
@@ -102,9 +120,20 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 		return
 	}
 	if err != nil {
-		writeResponse(w, http.StatusServiceUnavailable, agentv2.InvocationResponse{
+		status, code, message, retryable := http.StatusServiceUnavailable, "UNAVAILABLE", "project operation failed", true
+		switch {
+		case errors.Is(err, errInvalidWorkspaceArguments):
+			status, code, message, retryable = http.StatusBadRequest, "INVALID_ARGUMENT", "invalid workspace tool arguments", false
+		case errors.Is(err, workspace.ErrNotFound):
+			status, code, message, retryable = http.StatusNotFound, "NOT_FOUND", "workspace resource not found", false
+		case errors.Is(err, workspace.ErrConflict), errors.Is(err, workspace.ErrStatefulCommandBusy):
+			status, code, message, retryable = http.StatusConflict, "CONFLICT", "workspace operation conflicts with current state", false
+		case errors.Is(err, workspace.ErrPolicyDenied):
+			status, code, message, retryable = http.StatusForbidden, "POLICY_DENIED", "workspace command is denied by policy", false
+		}
+		writeResponse(w, status, agentv2.InvocationResponse{
 			APIVersion: agentv2.APIVersion, InvocationID: "read-" + request.CorrelationID,
-			Error: &kernelv2.PublicError{Code: "UNAVAILABLE", Message: "project read failed", Retryable: true},
+			Error: &kernelv2.PublicError{Code: code, Message: message, Retryable: retryable},
 		})
 		return
 	}
@@ -114,6 +143,94 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 		return
 	}
 	writeResponse(w, http.StatusOK, agentv2.InvocationResponse{APIVersion: agentv2.APIVersion, InvocationID: "read-" + request.CorrelationID, Result: raw})
+}
+
+type workspaceCreateArguments struct {
+	ImageDigest      string   `json:"image_digest"`
+	CPUMillis        int64    `json:"cpu_millis"`
+	MemoryMiB        int64    `json:"memory_mib"`
+	TTLSeconds       int64    `json:"ttl_seconds"`
+	NetworkProfile   string   `json:"network_profile"`
+	CredentialLeases []string `json:"credential_leases,omitempty"`
+}
+
+type workspaceGetArguments struct {
+	WorkspaceID string `json:"workspace_id"`
+}
+
+type workspaceExecArguments struct {
+	WorkspaceID      string            `json:"workspace_id"`
+	Argv             []string          `json:"argv"`
+	WorkingDir       string            `json:"working_dir"`
+	EnvironmentRefs  map[string]string `json:"environment_refs,omitempty"`
+	TimeoutSeconds   int64             `json:"timeout_seconds"`
+	OutputLimitBytes int64             `json:"output_limit_bytes"`
+	Kind             string            `json:"kind"`
+	SerializationKey string            `json:"serialization_key,omitempty"`
+	CredentialLeases []string          `json:"credential_leases,omitempty"`
+}
+
+func (h Handler) invokeWorkspace(ctx context.Context, verified agentv2.VerifiedInvocationContext, request agentv2.InvocationRequest) (any, error) {
+	if h.Workspaces == nil {
+		return nil, errors.New("workspace service is unavailable")
+	}
+	scope := workspace.Scope{TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID}
+	switch request.Tool {
+	case agentv2.ToolWorkspaceCreate:
+		var arguments workspaceCreateArguments
+		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil {
+			return nil, errInvalidWorkspaceArguments
+		}
+		spec := workspacev1.WorkspaceSpec{
+			ProjectID: verified.ProjectID, TaskID: request.TaskID, ImageDigest: arguments.ImageDigest,
+			CPUMillis: arguments.CPUMillis, MemoryMiB: arguments.MemoryMiB, TTLSeconds: arguments.TTLSeconds,
+			NetworkProfile: arguments.NetworkProfile, CredentialLeases: append([]string(nil), arguments.CredentialLeases...),
+		}
+		if spec.Validate() != nil {
+			return nil, errInvalidWorkspaceArguments
+		}
+		return h.Workspaces.Create(ctx, workspace.CreateRequest{Scope: scope, IdempotencyKey: request.IdempotencyKey, Spec: spec})
+	case agentv2.ToolWorkspaceGet:
+		var arguments workspaceGetArguments
+		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || strings.TrimSpace(arguments.WorkspaceID) == "" {
+			return nil, errInvalidWorkspaceArguments
+		}
+		return h.Workspaces.Get(ctx, scope, arguments.WorkspaceID)
+	case agentv2.ToolWorkspaceExec:
+		var arguments workspaceExecArguments
+		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil {
+			return nil, errInvalidWorkspaceArguments
+		}
+		spec := workspacev1.CommandSpec{Argv: append([]string(nil), arguments.Argv...), WorkingDir: arguments.WorkingDir,
+			EnvironmentRefs: cloneStringMap(arguments.EnvironmentRefs), TimeoutSeconds: arguments.TimeoutSeconds, OutputLimitBytes: arguments.OutputLimitBytes}
+		if strings.TrimSpace(arguments.WorkspaceID) == "" || strings.TrimSpace(arguments.Kind) == "" || spec.Validate() != nil {
+			return nil, errInvalidWorkspaceArguments
+		}
+		return h.Workspaces.Exec(ctx, workspace.ExecRequest{
+			Scope: scope, WorkspaceID: arguments.WorkspaceID, IdempotencyKey: request.IdempotencyKey,
+			Kind: arguments.Kind, SerializationKey: arguments.SerializationKey, CredentialLeases: append([]string(nil), arguments.CredentialLeases...),
+			Spec: spec,
+		})
+	case agentv2.ToolWorkspaceDestroy:
+		var arguments workspaceGetArguments
+		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || strings.TrimSpace(arguments.WorkspaceID) == "" {
+			return nil, errInvalidWorkspaceArguments
+		}
+		return h.Workspaces.Destroy(ctx, scope, arguments.WorkspaceID)
+	default:
+		return nil, errors.New("workspace tool is unavailable")
+	}
+}
+
+func cloneStringMap(value map[string]string) map[string]string {
+	if value == nil {
+		return nil
+	}
+	result := make(map[string]string, len(value))
+	for key, item := range value {
+		result[key] = item
+	}
+	return result
 }
 
 func route(value string) (string, string, bool) {

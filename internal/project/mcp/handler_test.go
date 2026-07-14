@@ -14,7 +14,9 @@ import (
 
 	"github.com/keir-research/ai-native-paas/internal/agent/enrollment"
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
+	"github.com/keir-research/ai-native-paas/internal/workspace"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
+	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
 type mcpClock struct{ now time.Time }
@@ -51,7 +53,30 @@ func (r projectReader) GetRepositoryForProject(_ context.Context, tenantID, proj
 	return r.repo, nil
 }
 
-func mcpFixture(t *testing.T, scopes []string) (Handler, string) {
+type workspaceCommands struct {
+	created workspace.CreateRequest
+	exec    workspace.ExecRequest
+	scope   workspace.Scope
+}
+
+func (w *workspaceCommands) Create(_ context.Context, request workspace.CreateRequest) (workspacev1.WorkspaceRef, error) {
+	w.created = request
+	return workspacev1.WorkspaceRef{WorkspaceID: "workspace-1", ProjectID: request.Scope.ProjectID, TaskID: request.Spec.TaskID, State: workspacev1.WorkspaceProvisioning}, nil
+}
+func (w *workspaceCommands) Get(_ context.Context, scope workspace.Scope, workspaceID string) (workspacev1.WorkspaceRef, error) {
+	w.scope = scope
+	return workspacev1.WorkspaceRef{WorkspaceID: workspaceID, ProjectID: scope.ProjectID, TaskID: "task-1", State: workspacev1.WorkspaceReady}, nil
+}
+func (w *workspaceCommands) Exec(_ context.Context, request workspace.ExecRequest) (workspacev1.CommandView, error) {
+	w.exec = request
+	return workspacev1.CommandView{CommandID: "command-1", WorkspaceID: request.WorkspaceID, State: workspacev1.CommandQueued}, nil
+}
+func (w *workspaceCommands) Destroy(_ context.Context, scope workspace.Scope, workspaceID string) (workspacev1.WorkspaceRef, error) {
+	w.scope = scope
+	return workspacev1.WorkspaceRef{WorkspaceID: workspaceID, ProjectID: scope.ProjectID, TaskID: "task-1", State: workspacev1.WorkspaceDestroying}, nil
+}
+
+func mcpFixture(t *testing.T, scopes []string) (Handler, string, *workspaceCommands) {
 	t.Helper()
 	clock := mcpClock{now: time.Date(2026, 7, 14, 5, 0, 0, 0, time.UTC)}
 	service := &enrollment.Service{
@@ -73,7 +98,8 @@ func mcpFixture(t *testing.T, scopes []string) (Handler, string) {
 	}
 	project, _ := domain.NewProject("project-1", "tenant-1", "booking", clock.now)
 	repository, _ := domain.NewRepository("repo-1", "tenant-1", project.ID, "gitlab", "corr-1", 77, clock.now)
-	return Handler{Enrollment: service, Projects: projectReader{project: project, repo: repository}}, access
+	workspaces := &workspaceCommands{}
+	return Handler{Enrollment: service, Projects: projectReader{project: project, repo: repository}, Workspaces: workspaces}, access, workspaces
 }
 
 func request(t *testing.T, handler http.Handler, method, path, token string, body any) *httptest.ResponseRecorder {
@@ -106,7 +132,7 @@ func invocation(tool agentv2.Tool) agentv2.InvocationRequest {
 }
 
 func TestProjectMCP_ToolCatalogAndReadsRequireProjectBoundAccess(t *testing.T) {
-	handler, access := mcpFixture(t, []string{"agent.tool:project_get", "agent.tool:repository_status"})
+	handler, access, _ := mcpFixture(t, []string{"agent.tool:project_get", "agent.tool:repository_status"})
 	tools := request(t, handler, http.MethodGet, "/projects/project-1/mcp/v2/tools", access, nil)
 	if tools.Code != http.StatusOK || !strings.Contains(tools.Body.String(), string(agentv2.ToolWorkspaceCreate)) {
 		t.Fatalf("tools status=%d body=%s", tools.Code, tools.Body.String())
@@ -122,13 +148,43 @@ func TestProjectMCP_ToolCatalogAndReadsRequireProjectBoundAccess(t *testing.T) {
 }
 
 func TestProjectMCP_EnforcesToolScopeAndReportsUnavailableAdapters(t *testing.T) {
-	handler, access := mcpFixture(t, []string{"agent.tool:project_get", "agent.tool:workspace_get"})
+	handler, access, _ := mcpFixture(t, []string{"agent.tool:project_get", "agent.tool:workspace_get"})
 	denied := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, invocation(agentv2.ToolRepositoryStatus))
 	if denied.Code != http.StatusForbidden {
 		t.Fatalf("scope status=%d body=%s", denied.Code, denied.Body.String())
 	}
-	unimplemented := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, invocation(agentv2.ToolWorkspaceGet))
-	if unimplemented.Code != http.StatusNotImplemented || !strings.Contains(unimplemented.Body.String(), "NOT_IMPLEMENTED") {
-		t.Fatalf("unimplemented status=%d body=%s", unimplemented.Code, unimplemented.Body.String())
+	invalid := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, invocation(agentv2.ToolWorkspaceGet))
+	if invalid.Code != http.StatusBadRequest || !strings.Contains(invalid.Body.String(), "INVALID_ARGUMENT") {
+		t.Fatalf("invalid workspace arguments status=%d body=%s", invalid.Code, invalid.Body.String())
+	}
+}
+
+func TestProjectMCP_WorkspaceToolsDeriveScopeAndProjectFromAccessCredential(t *testing.T) {
+	scopes := []string{"agent.tool:workspace_create", "agent.tool:workspace_get", "agent.tool:workspace_exec", "agent.tool:workspace_destroy"}
+	handler, access, workspaces := mcpFixture(t, scopes)
+	create := invocation(agentv2.ToolWorkspaceCreate)
+	create.Arguments = json.RawMessage(`{"image_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cpu_millis":2000,"memory_mib":4096,"ttl_seconds":900,"network_profile":"isolated-governed"}`)
+	created := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, create)
+	if created.Code != http.StatusOK || workspaces.created.Scope.TenantID != "tenant-1" || workspaces.created.Scope.ProjectID != "project-1" || workspaces.created.Scope.ActorID != "agent-1" || workspaces.created.Spec.ProjectID != "project-1" || workspaces.created.Spec.TaskID != "task-1" {
+		t.Fatalf("created status=%d body=%s request=%#v", created.Code, created.Body.String(), workspaces.created)
+	}
+
+	exec := invocation(agentv2.ToolWorkspaceExec)
+	exec.IdempotencyKey = "exec-1"
+	exec.Arguments = json.RawMessage(`{"workspace_id":"workspace-1","argv":["tofu","plan"],"working_dir":"infrastructure","timeout_seconds":60,"output_limit_bytes":4096,"kind":"infra_plan","serialization_key":"staging"}`)
+	executed := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, exec)
+	if executed.Code != http.StatusOK || workspaces.exec.Scope.ProjectID != "project-1" || workspaces.exec.WorkspaceID != "workspace-1" || workspaces.exec.Spec.Argv[0] != "tofu" {
+		t.Fatalf("exec status=%d body=%s request=%#v", executed.Code, executed.Body.String(), workspaces.exec)
+	}
+
+	// Scope-like arguments are not merely ignored: the closed schema rejects
+	// them before the workspace service can observe a request.
+	before := workspaces.created
+	crossScope := invocation(agentv2.ToolWorkspaceCreate)
+	crossScope.IdempotencyKey = "create-cross"
+	crossScope.Arguments = json.RawMessage(`{"project_id":"victim","image_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cpu_millis":2000,"memory_mib":4096,"ttl_seconds":900,"network_profile":"isolated-governed"}`)
+	rejected := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, crossScope)
+	if rejected.Code != http.StatusBadRequest || workspaces.created.IdempotencyKey != before.IdempotencyKey {
+		t.Fatalf("scope override status=%d body=%s request=%#v", rejected.Code, rejected.Body.String(), workspaces.created)
 	}
 }
