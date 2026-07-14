@@ -307,8 +307,8 @@ func loadConfig() (config, error) {
 	if settings.TimewebConfiguratorID, err = integer("TIMEWEB_WORKSPACE_CONFIGURATOR_ID", 0); err != nil || settings.TimewebConfiguratorID <= 0 {
 		return config{}, errors.New("TIMEWEB_WORKSPACE_CONFIGURATOR_ID must be a positive integer")
 	}
-	if settings.TimewebBandwidthMbps, err = integer("TIMEWEB_WORKSPACE_BANDWIDTH_MBPS", 100); err != nil || settings.TimewebBandwidthMbps <= 0 {
-		return config{}, errors.New("TIMEWEB_WORKSPACE_BANDWIDTH_MBPS must be a positive integer")
+	if settings.TimewebBandwidthMbps, err = integer("TIMEWEB_WORKSPACE_BANDWIDTH_MBPS", 1000); err != nil || settings.TimewebBandwidthMbps < 1000 {
+		return config{}, errors.New("TIMEWEB_WORKSPACE_BANDWIDTH_MBPS must be at least 1000")
 	}
 	if settings.TimewebSystemDiskMiB, err = integer("TIMEWEB_WORKSPACE_SYSTEM_DISK_MIB", 40960); err != nil || settings.TimewebSystemDiskMiB < 10240 {
 		return config{}, errors.New("TIMEWEB_WORKSPACE_SYSTEM_DISK_MIB is invalid")
