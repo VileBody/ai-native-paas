@@ -109,10 +109,7 @@ func (s *Store) Transact(ctx context.Context, fn func(application.Tx) error) err
 			return domain.Wrap(domain.CodeUnavailable, "begin agent transaction", err)
 		}
 		adapter := &txAdapter{tx: tx}
-		err = fn(adapter)
-		if err == nil && adapter.err != nil {
-			err = adapter.err
-		}
+		err = transactionError(fn(adapter), adapter.err)
 		if err != nil {
 			_ = tx.Rollback()
 			if !retryableDB(err) {
@@ -133,6 +130,17 @@ func (s *Store) Transact(ctx context.Context, fn func(application.Tx) error) err
 		}
 	}
 	return domain.Wrap(domain.CodeUnavailable, "serializable transaction retry budget exhausted", last)
+}
+
+func transactionError(callbackErr, capturedDBErr error) error {
+	// A callback can derive a domain denial from a zero value returned after a
+	// failed read. The adapter's first database error is therefore authoritative:
+	// preserving it is what lets serialization/deadlock handling retry instead
+	// of publishing a false permission or not-found result.
+	if capturedDBErr != nil {
+		return capturedDBErr
+	}
+	return callbackErr
 }
 
 func serializableRetryDelay(attempt int) time.Duration {
