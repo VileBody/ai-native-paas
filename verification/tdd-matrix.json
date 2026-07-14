@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 987,
-  "discovered_unique_test_name_count": 985,
+  "discovered_go_test_count": 989,
+  "discovered_unique_test_name_count": 987,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -488,10 +488,10 @@
       "id": "R2",
       "level": "integration/golden",
       "name": "TestGitOps_HelmRenderIsDeterministicForPinnedInputs",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/runtime_gitops_test.go",
+      "status": "REUSED",
+      "test_file": "test/pivot/runtime_gitops_helm_test.go",
       "test_name": "TestGitOps_HelmRenderIsDeterministicForPinnedInputs",
-      "test_ref": "test/pivot/runtime_gitops_test.go::TestGitOps_HelmRenderIsDeterministicForPinnedInputs"
+      "test_ref": "test/pivot/runtime_gitops_helm_test.go::TestGitOps_HelmRenderIsDeterministicForPinnedInputs"
     },
     {
       "family": "R",
@@ -1589,8 +1589,8 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 58,
-      "REUSED": 99
+      "LIVE_ONLY": 57,
+      "REUSED": 100
     },
     "unmapped": 0
   }

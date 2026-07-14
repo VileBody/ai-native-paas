@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **987**
-- Reused now: **99**
+- Discovered Go tests/fuzz targets: **989**
+- Reused now: **100**
 - New local/contract tests required: **0**
-- Live/provider/system tests required: **58**
+- Live/provider/system tests required: **57**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -62,7 +62,7 @@ A release gate may become green only after every referenced test exists and pass
 | `B14` | REUSED | registry integration | `internal/build/multiarch/multiarch_test.go::TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests` |
 | `B15` | REUSED | contract/crypto | `internal/build/provenance/provenance_test.go::TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest` |
 | `R1` | REUSED | application | `internal/runtime/gitops/policy_test.go::TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath` |
-| `R2` | LIVE_ONLY | integration/golden | `test/pivot/runtime_gitops_test.go::TestGitOps_HelmRenderIsDeterministicForPinnedInputs` |
+| `R2` | REUSED | integration/golden | `test/pivot/runtime_gitops_helm_test.go::TestGitOps_HelmRenderIsDeterministicForPinnedInputs` |
 | `R3` | REUSED | integration/fuzz | `internal/runtime/gitops/kustomize_test.go::TestGitOps_KustomizeRenderIsDeterministicAndPathSafe` |
 | `R4` | REUSED | policy | `internal/runtime/gitops/policy_test.go::TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit` |
 | `R5` | REUSED | policy | `internal/runtime/gitops/policy_test.go::TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource` |
