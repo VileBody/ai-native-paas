@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **944**
-- Reused now: **78**
-- New local/contract tests required: **13**
+- Discovered Go tests/fuzz targets: **945**
+- Reused now: **79**
+- New local/contract tests required: **12**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -116,7 +116,7 @@ A release gate may become green only after every referenced test exists and pass
 | `C3` | LIVE_ONLY | application | `test/pivot/commerce_v2_test.go::TestCost_HelmResourcesContributeRequestedRuntimeAllocation` |
 | `C4` | REUSED | domain | `test/pivot/commerce_v2_test.go::TestCost_ApprovalInvalidatedWhenPlanHashChanges` |
 | `C5` | LIVE_ONLY | cross-domain application | `test/pivot/commerce_v2_test.go::TestQuota_ReservationCommittedBeforeExternalApply` |
-| `C6` | NEW | PostgreSQL + race | `test/pivot/commerce_v2_test.go::TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget` |
+| `C6` | REUSED | PostgreSQL + race | `test/integration/postgres_commerce_test.go::TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget` |
 | `C7` | REUSED | domain/fake clock | `test/pivot/commerce_v2_test.go::TestQuota_ExpiredReservationCannotAuthorizeLateApply` |
 | `C8` | LIVE_ONLY | application/provider | `test/pivot/commerce_v2_test.go::TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder` |
 | `C9` | LIVE_ONLY | integration | `test/pivot/commerce_v2_test.go::TestUsage_ProviderReportReplayDoesNotDoubleCharge` |

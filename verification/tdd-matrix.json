@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 944,
-  "discovered_unique_test_name_count": 942,
+  "discovered_go_test_count": 945,
+  "discovered_unique_test_name_count": 943,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1028,10 +1028,10 @@
       "id": "C6",
       "level": "PostgreSQL + race",
       "name": "TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget",
-      "status": "NEW",
-      "test_file": "test/pivot/commerce_v2_test.go",
+      "status": "REUSED",
+      "test_file": "test/integration/postgres_commerce_test.go",
       "test_name": "TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget",
-      "test_ref": "test/pivot/commerce_v2_test.go::TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget"
+      "test_ref": "test/integration/postgres_commerce_test.go::TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget"
     },
     {
       "family": "C",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 13,
-      "REUSED": 78
+      "NEW": 12,
+      "REUSED": 79
     },
     "unmapped": 0
   }

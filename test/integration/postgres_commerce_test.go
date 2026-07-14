@@ -41,7 +41,11 @@ func commercePlanSpec() commercev1.PlanSpec {
 	return commercev1.PlanSpec{
 		Currency: "EUR",
 		Features: map[string]bool{"deploy": true, "managed.postgres": true},
-		Quotas:   map[string]int64{"runtime.units": 2, "managed.databases": 1},
+		Quotas: map[string]int64{
+			"runtime.units":        2,
+			"managed.databases":    1,
+			"project.budget.minor": 100,
+		},
 		Prices: map[commercev1.Meter]commercev1.Price{
 			commercev1.MeterRuntimeUnitSeconds:    {MinorUnits: 1, PerQuantity: 3600},
 			commercev1.MeterBuildCPUSeconds:       {MinorUnits: 2, PerQuantity: 60},
@@ -233,6 +237,66 @@ func TestPostgres_CommerceConcurrentQuotaReservationsCannotOversubscribe(t *test
 	}
 	if quantity != 2 {
 		t.Fatalf("reserved quantity=%d", quantity)
+	}
+}
+
+func TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget(t *testing.T) {
+	f := newPostgresCommerceFixture(t)
+	const (
+		workers     = 2
+		reservation = 80
+		budget      = 100
+	)
+	start := make(chan struct{})
+	results := make(chan error, workers)
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := f.svc.Reserve(context.Background(), commercev1.QuotaRequest{
+				TenantID:       "tenant-1",
+				Resource:       "project.budget.minor",
+				Quantity:       reservation,
+				IdempotencyKey: fmt.Sprintf("plan-budget-%d", i),
+				At:             f.clock.Now(),
+				ExpiresAt:      f.clock.Now().Add(time.Hour),
+			})
+			results <- err
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(results)
+
+	success, rejected := 0, 0
+	for err := range results {
+		switch {
+		case err == nil:
+			success++
+		case domain.HasCode(err, domain.CodeQuotaExceeded):
+			rejected++
+		default:
+			t.Fatalf("unexpected concurrent reservation error: %v", err)
+		}
+	}
+	if success != 1 || rejected != 1 {
+		t.Fatalf("success=%d rejected=%d", success, rejected)
+	}
+
+	var total int64
+	if err := f.db.QueryRow(`
+		SELECT coalesce(sum(quantity),0)
+		FROM commerce.quota_reservations
+		WHERE tenant_id='tenant-1'
+		  AND resource='project.budget.minor'
+		  AND state IN ('RESERVED','COMMITTED')`).Scan(&total); err != nil {
+		t.Fatal(err)
+	}
+	if total != reservation || total > budget {
+		t.Fatalf("reserved total=%d budget=%d", total, budget)
 	}
 }
 
