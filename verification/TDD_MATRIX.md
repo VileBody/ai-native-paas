@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **929**
-- Reused now: **64**
-- New local/contract tests required: **27**
+- Discovered Go tests/fuzz targets: **931**
+- Reused now: **65**
+- New local/contract tests required: **26**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -125,7 +125,7 @@ A release gate may become green only after every referenced test exists and pass
 | `C12` | NEW | workspace/commerce integration | `test/pivot/commerce_v2_test.go::TestBudget_WorkspaceCommandStoppedBeforeExceedingHardLimit` |
 | `C13` | NEW | Agent/Commerce | `test/pivot/commerce_v2_test.go::TestBudget_RepairLoopConsumesConfiguredNotUnlimitedBudget` |
 | `C14` | LIVE_ONLY | cross-domain | `test/pivot/commerce_v2_test.go::TestCommercial_SuspendedProjectIsReadOnlyAndRetainsData` |
-| `C15` | NEW | property/fuzz | `test/pivot/commerce_v2_test.go::TestRating_UsesExactArithmeticAcrossMicroUsageAndLargeQuantities` |
+| `C15` | REUSED | property/fuzz | `internal/commerce/application/commercial_tdd_test.go::TestRating_UsesExactArithmeticAcrossMicroUsageAndLargeQuantities` |
 | `C16` | REUSED | contract/golden | `test/pivot/commerce_v2_test.go::TestCost_ApprovalSummaryIncludesDestructionRiskAndMonthlyDelta` |
 | `C17` | LIVE_ONLY | reconciliation | `test/pivot/commerce_v2_test.go::TestUsage_ReconcilerCorrectsObservedResourceDriftOnce` |
 | `C18` | LIVE_ONLY | application | `test/pivot/commerce_v2_test.go::TestCommercial_CanceledBeforeExecutionCreatesNoUsageCharge` |

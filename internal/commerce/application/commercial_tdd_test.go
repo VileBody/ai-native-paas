@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -473,6 +475,59 @@ func TestRating_LargeQuantityDoesNotOverflow(t *testing.T) {
 	}
 }
 
+func TestRating_UsesExactArithmeticAcrossMicroUsageAndLargeQuantities(t *testing.T) {
+	testCases := [][3]int64{
+		{0, 1, 3}, {1, 1, 3}, {2, 1, 3}, {-2, 1, 3},
+		{math.MaxInt64, 1, math.MaxInt64},
+		{math.MinInt64, 1, math.MaxInt64},
+		{math.MaxInt64, math.MaxInt64, 1},
+	}
+	random := rand.New(rand.NewSource(20260714))
+	for range 5000 {
+		quantity := random.Int63()
+		if random.Intn(2) == 0 {
+			quantity = -quantity
+		}
+		testCases = append(testCases, [3]int64{quantity, random.Int63(), random.Int63n(math.MaxInt64) + 1})
+	}
+	for _, input := range testCases {
+		assertExactRating(t, input[0], input[1], input[2])
+	}
+}
+
+func assertExactRating(t testing.TB, quantity, minor, per int64) {
+	t.Helper()
+	want, fits := rationalRatingReference(quantity, minor, per)
+	got, err := application.RateQuantity(quantity, commercev1.Price{MinorUnits: minor, PerQuantity: per})
+	if !fits {
+		if !domain.HasCode(err, domain.CodeOverflow) {
+			t.Fatalf("quantity=%d minor=%d per=%d: got=%d err=%v, want overflow", quantity, minor, per, got, err)
+		}
+		return
+	}
+	if err != nil || got != want {
+		t.Fatalf("quantity=%d minor=%d per=%d: got=%d err=%v, want=%d", quantity, minor, per, got, err, want)
+	}
+}
+
+func rationalRatingReference(quantity, minor, per int64) (int64, bool) {
+	value := new(big.Rat).SetFrac(
+		new(big.Int).Mul(big.NewInt(quantity), big.NewInt(minor)),
+		big.NewInt(per),
+	)
+	numerator := new(big.Int).Abs(new(big.Int).Set(value.Num()))
+	denominator := new(big.Int).Set(value.Denom())
+	quotient, remainder := new(big.Int), new(big.Int)
+	quotient.QuoRem(numerator, denominator, remainder)
+	if new(big.Int).Lsh(remainder, 1).Cmp(denominator) >= 0 {
+		quotient.Add(quotient, big.NewInt(1))
+	}
+	if value.Sign() < 0 {
+		quotient.Neg(quotient)
+	}
+	return quotient.Int64(), quotient.IsInt64()
+}
+
 func TestInvoicePreview_IsDeterministic(t *testing.T) {
 	f := newFixture(t)
 	f.append(t, "u", commercev1.MeterRuntimeUnitSeconds, commercev1.UsageStandard, 3600, "")
@@ -746,5 +801,15 @@ func FuzzRateQuantityNoPanic(f *testing.F) {
 			per = 1
 		}
 		_, _ = application.RateQuantity(q, commercev1.Price{MinorUnits: minor, PerQuantity: per})
+	})
+}
+
+func FuzzRatingExactArithmeticMatchesRationalReference(f *testing.F) {
+	f.Add(int64(1), uint64(1), uint64(3))
+	f.Add(int64(math.MaxInt64), uint64(math.MaxInt64), uint64(1))
+	f.Fuzz(func(t *testing.T, quantity int64, minorRaw, perRaw uint64) {
+		minor := int64(minorRaw & uint64(math.MaxInt64))
+		per := int64(perRaw%uint64(math.MaxInt64)) + 1
+		assertExactRating(t, quantity, minor, per)
 	})
 }
