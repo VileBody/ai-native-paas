@@ -346,7 +346,7 @@ func readToken(filename string) ([]byte, error) {
 	}
 	defer file.Close()
 	info, err := file.Stat()
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || info.Size() < 16 || info.Size() > 16<<10 {
+	if err != nil || !secureTokenMode(info.Mode()) || info.Size() < 16 || info.Size() > 16<<10 {
 		return nil, errors.New("OpenBao workload token file is insecure")
 	}
 	token, err := io.ReadAll(io.LimitReader(file, (16<<10)+1))
@@ -358,6 +358,14 @@ func readToken(filename string) ([]byte, error) {
 		return nil, errors.New("OpenBao workload token is invalid")
 	}
 	return token, nil
+}
+
+func secureTokenMode(mode os.FileMode) bool {
+	if !mode.IsRegular() {
+		return false
+	}
+	permissions := mode.Perm()
+	return permissions&0o400 != 0 && permissions&0o137 == 0
 }
 
 func hasUsage(values []x509.ExtKeyUsage, target x509.ExtKeyUsage) bool {

@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 973,
-  "discovered_unique_test_name_count": 971,
+  "discovered_go_test_count": 979,
+  "discovered_unique_test_name_count": 977,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -708,10 +708,10 @@
       "id": "A5.6",
       "level": "OpenBao adapter",
       "name": "TestCredential_RevokePrefixFailsClosedWhenBackendCannotGuaranteeIt",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/attachments/openbao/httpbackend_test.go",
       "test_name": "TestCredential_RevokePrefixFailsClosedWhenBackendCannotGuaranteeIt",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestCredential_RevokePrefixFailsClosedWhenBackendCannotGuaranteeIt"
+      "test_ref": "internal/attachments/openbao/httpbackend_test.go::TestCredential_RevokePrefixFailsClosedWhenBackendCannotGuaranteeIt"
     },
     {
       "family": "A5",
@@ -1589,8 +1589,8 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 66,
-      "REUSED": 91
+      "LIVE_ONLY": 65,
+      "REUSED": 92
     },
     "unmapped": 0
   }

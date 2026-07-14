@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **973**
-- Reused now: **91**
+- Discovered Go tests/fuzz targets: **979**
+- Reused now: **92**
 - New local/contract tests required: **0**
-- Live/provider/system tests required: **66**
+- Live/provider/system tests required: **65**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -84,7 +84,7 @@ A release gate may become green only after every referenced test exists and pass
 | `A5.3` | LIVE_ONLY | PostgreSQL + redaction | `test/pivot/attachments_v2_test.go::TestSecret_ValueAbsentFromControlPlanePersistenceAndEvents` |
 | `A5.4` | LIVE_ONLY | credential broker integration | `test/pivot/attachments_v2_test.go::TestCredential_LeaseIsShortLivedProjectScopedAndSinglePurpose` |
 | `A5.5` | LIVE_ONLY | application/system | `test/pivot/attachments_v2_test.go::TestCredential_RotationCutsOverBeforeRevokingOldVersion` |
-| `A5.6` | LIVE_ONLY | OpenBao adapter | `test/pivot/attachments_v2_test.go::TestCredential_RevokePrefixFailsClosedWhenBackendCannotGuaranteeIt` |
+| `A5.6` | REUSED | OpenBao adapter | `internal/attachments/openbao/httpbackend_test.go::TestCredential_RevokePrefixFailsClosedWhenBackendCannotGuaranteeIt` |
 | `A5.7` | LIVE_ONLY | cross-domain acceptance | `test/pivot/attachments_v2_test.go::TestSecret_GitWorkspacePlanAndBuildNeverContainValue` |
 | `A5.8` | REUSED | domain + PostgreSQL + crypto | `test/integration/postgres_attachments_test.go::TestRecipe_ActivatedVersionIsImmutableAndSigned` |
 | `A5.9` | REUSED | application | `internal/attachments/recipe/registry_test.go::TestRecipe_ResolutionPinsExactVersionAndArtifactDigests` |
