@@ -382,12 +382,38 @@ func (s *Service) DeleteSecret(ctx context.Context, r DeleteSecretRequest) (atta
 	}
 	return attachmentsv1.AttachmentSnapshotRef{SnapshotID: snap.Value.SnapshotID, EnvironmentID: snap.Value.EnvironmentID, Version: snap.Value.Version}, nil
 }
-func (s *Service) ResolveBuildSecretRefs(ctx context.Context, tenant, env string, phase attachmentsv1.SecretPhase) (map[string]string, error) {
-	if phase != attachmentsv1.SecretPhaseBuild && phase != attachmentsv1.SecretPhaseDetect {
-		return nil, domain.NewError(domain.CodeInvalidArgument, "invalid build phase")
+
+// ResolveProjectBuildSecretRefs resolves build-time secret references after
+// binding the environment to the application/project identity from the
+// verified caller scope. The returned values are provider references, never
+// plaintext secret material.
+func (s *Service) ResolveProjectBuildSecretRefs(ctx context.Context, tenant, applicationID, env string, phase attachmentsv1.SecretPhase) (map[string]string, error) {
+	if strings.TrimSpace(applicationID) == "" {
+		return nil, domain.NewError(domain.CodeInvalidArgument, "application required")
 	}
+	environment, err := s.env(ctx, tenant, env)
+	if err != nil {
+		return nil, err
+	}
+	if environment.ApplicationID != applicationID {
+		return nil, domain.NewError(domain.CodeForbidden, "application mismatch")
+	}
+	return s.resolveBuildSecretRefs(ctx, tenant, env, phase)
+}
+
+// ResolveBuildSecretRefs is retained for the v1 in-process compatibility
+// surface. Deprecated: production adapters must use
+// ResolveProjectBuildSecretRefs with a verified project/application scope.
+func (s *Service) ResolveBuildSecretRefs(ctx context.Context, tenant, env string, phase attachmentsv1.SecretPhase) (map[string]string, error) {
 	if _, err := s.env(ctx, tenant, env); err != nil {
 		return nil, err
+	}
+	return s.resolveBuildSecretRefs(ctx, tenant, env, phase)
+}
+
+func (s *Service) resolveBuildSecretRefs(ctx context.Context, tenant, env string, phase attachmentsv1.SecretPhase) (map[string]string, error) {
+	if phase != attachmentsv1.SecretPhaseBuild && phase != attachmentsv1.SecretPhaseDetect {
+		return nil, domain.NewError(domain.CodeInvalidArgument, "invalid build phase")
 	}
 	out := map[string]string{}
 	err := s.Store.Transact(ctx, func(tx Tx) error {

@@ -86,3 +86,29 @@ func TestArchitecture_AttachmentsMigrationsHaveNoSecretValueColumns(t *testing.T
 		}
 	}
 }
+
+func TestArchitecture_ProductionDoesNotUseUnboundBuildSecretResolver(t *testing.T) {
+	root := repositoryRootFromCWD(t)
+	legacyCall := ".ResolveBuildSecretRefs("
+	for _, directory := range []string{"adapters", "cmd", "internal"} {
+		err := filepath.WalkDir(filepath.Join(root, directory), func(path string, entry os.DirEntry, err error) error {
+			if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return err
+			}
+			if path == filepath.Join(root, "internal", "attachments", "application", "service.go") {
+				return nil
+			}
+			raw, readErr := os.ReadFile(path)
+			if readErr != nil {
+				return readErr
+			}
+			if strings.Contains(string(raw), legacyCall) {
+				t.Errorf("%s uses the project-unbound v1 build secret resolver", path)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}

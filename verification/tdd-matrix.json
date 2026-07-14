@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 980,
-  "discovered_unique_test_name_count": 978,
+  "discovered_go_test_count": 982,
+  "discovered_unique_test_name_count": 980,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -668,10 +668,10 @@
       "id": "A5.2",
       "level": "domain + OpenBao integration",
       "name": "TestSecret_ProjectAndEnvironmentScopesAreIsolated",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/attachments/openbao/project_isolation_test.go",
       "test_name": "TestSecret_ProjectAndEnvironmentScopesAreIsolated",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestSecret_ProjectAndEnvironmentScopesAreIsolated"
+      "test_ref": "internal/attachments/openbao/project_isolation_test.go::TestSecret_ProjectAndEnvironmentScopesAreIsolated"
     },
     {
       "family": "A5",
@@ -1589,8 +1589,8 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 64,
-      "REUSED": 93
+      "LIVE_ONLY": 63,
+      "REUSED": 94
     },
     "unmapped": 0
   }
