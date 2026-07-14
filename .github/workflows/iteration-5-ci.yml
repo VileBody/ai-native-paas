@@ -59,7 +59,10 @@ jobs:
 
   test-runner-image:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: [verify, postgres]
+    # Build the immutable diagnostic image after static/unit verification even
+    # when the ephemeral PostgreSQL job fails. That image is what reproduces
+    # the same SHA against the managed admin database; it is not a release tag.
+    needs: [verify]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -83,7 +86,5 @@ jobs:
           file: Dockerfile.test
           push: true
           tags: |
-            ghcr.io/vilebody/ai-native-paas-tests:iteration-5
             ghcr.io/vilebody/ai-native-paas-tests:${{ github.sha }}
-            ${{ secrets.TWC_REGISTRY_HOST }}/ai-native-paas-tests:iteration-5
             ${{ secrets.TWC_REGISTRY_HOST }}/ai-native-paas-tests:${{ github.sha }}

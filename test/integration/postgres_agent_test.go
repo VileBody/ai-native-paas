@@ -163,21 +163,25 @@ func TestPostgres_AgentConcurrentBudgetCannotOversubscribe(t *testing.T) {
 	f := newPGAgentFixture(t)
 	var wg sync.WaitGroup
 	success := 0
+	failures := map[string]int{}
 	var mu sync.Mutex
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			if _, err := f.svc.Invoke(context.Background(), pgInvocation(agentv1.ToolRequestBuild, pgBuildArgs(), fmt.Sprintf("b-%d", i))); err == nil {
-				mu.Lock()
+			_, invokeErr := f.svc.Invoke(context.Background(), pgInvocation(agentv1.ToolRequestBuild, pgBuildArgs(), fmt.Sprintf("b-%d", i)))
+			mu.Lock()
+			if invokeErr == nil {
 				success++
-				mu.Unlock()
+			} else {
+				failures[invokeErr.Error()]++
 			}
+			mu.Unlock()
 		}(i)
 	}
 	wg.Wait()
 	if success != 3 {
-		t.Fatalf("success=%d", success)
+		t.Fatalf("success=%d failures=%v", success, failures)
 	}
 	v, err := f.svc.GetTask(context.Background(), "tenant-1", "task-1")
 	if err != nil || v.BudgetUsage.BuildCount != 3 {
