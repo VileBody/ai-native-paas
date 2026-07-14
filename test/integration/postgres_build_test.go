@@ -365,3 +365,63 @@ func TestPostgres_V2BuildSpecRoundTripsAndRemainsImmutable(t *testing.T) {
 		t.Fatal("persisted v2 build spec mutation unexpectedly succeeded")
 	}
 }
+
+func TestBuild_TrustChainRequiredBeforeArtifactReleasable(t *testing.T) {
+	db, store := migratedBuildStore(t)
+	ctx := context.Background()
+	build := pgBuild(t, "build-trust-gate")
+	artifact, err := domain.NewArtifact("artifact-trust-gate", build.TenantID, build.ID, "registry.test/tenants/tenant-pg/apps/project-pg", "sha256:"+strings.Repeat("1", 64), "application/vnd.oci.image.manifest.v1+json", build.CreatedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := artifact.Quarantine(build.CreatedAt); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Transact(ctx, func(tx application.Tx) error {
+		if err := tx.InsertBuild(build); err != nil {
+			return err
+		}
+		return tx.InsertArtifact(artifact)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	service := &application.Service{Store: store}
+	assertDenied := func(stage string) {
+		t.Helper()
+		decision, err := service.EvaluateArtifact(ctx, build.TenantID, artifact.ID)
+		if err != nil || decision.Allowed {
+			t.Fatalf("%s decision=%+v err=%v", stage, decision, err)
+		}
+	}
+	assertDenied("digest only")
+	if _, err := db.ExecContext(ctx, `UPDATE build.artifacts SET state='RELEASABLE',version=version+1 WHERE id=$1`, artifact.ID); err == nil {
+		t.Fatal("database allowed releasable artifact without trust records")
+	}
+	persist := func(mutate func(*domain.Artifact) error) {
+		t.Helper()
+		expected := artifact.Version
+		if err := mutate(&artifact); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.Transact(ctx, func(tx application.Tx) error { return tx.UpdateArtifact(artifact, expected) }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	persist(func(value *domain.Artifact) error {
+		return value.AttachSBOM("sha256:"+strings.Repeat("2", 64), "application/spdx+json", build.CreatedAt.Add(time.Second))
+	})
+	assertDenied("SBOM only")
+	persist(func(value *domain.Artifact) error {
+		return value.ApplyScan(domain.ScanResult{Scanner: "scanner", PolicyVersion: "policy-v1", Passed: true, FindingsDigest: "sha256:" + strings.Repeat("3", 64), ScannedAt: build.CreatedAt.Add(2 * time.Second)}, build.CreatedAt.Add(2*time.Second))
+	})
+	assertDenied("SBOM and scan")
+	persist(func(value *domain.Artifact) error {
+		return value.AttachSignature(domain.SignatureRecord{Issuer: "platform", Algorithm: "ed25519", Digest: value.Digest, Signature: "signature", AttachmentDigest: "sha256:" + strings.Repeat("4", 64), SignedAt: build.CreatedAt.Add(3 * time.Second)}, build.CreatedAt.Add(3*time.Second))
+	})
+	assertDenied("complete records before release transition")
+	persist(func(value *domain.Artifact) error { return value.MarkReleasable(build.CreatedAt.Add(4 * time.Second)) })
+	decision, err := service.EvaluateArtifact(ctx, build.TenantID, artifact.ID)
+	if err != nil || !decision.Allowed {
+		t.Fatalf("complete trust chain decision=%+v err=%v", decision, err)
+	}
+}

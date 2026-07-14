@@ -128,11 +128,11 @@ func cloneRequest(r application.BuildExecutionRequest) application.BuildExecutio
 }
 
 type Registry struct {
-	Published                 application.PublishedArtifact
-	PublishErr, AttachmentErr error
-	PublishCalls              int
-	Attachments               map[string][]byte
-	mu                        sync.Mutex
+	Published                             application.PublishedArtifact
+	PublishErr, ResolveErr, AttachmentErr error
+	PublishCalls, ResolveCalls            int
+	Attachments                           map[string][]byte
+	mu                                    sync.Mutex
 }
 
 func (r *Registry) Publish(context.Context, string, string, application.BuildOutput) (application.PublishedArtifact, error) {
@@ -142,7 +142,10 @@ func (r *Registry) Publish(context.Context, string, string, application.BuildOut
 	return r.Published, r.PublishErr
 }
 func (r *Registry) Resolve(context.Context, string, string) (application.PublishedArtifact, error) {
-	return r.Published, nil
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.ResolveCalls++
+	return r.Published, r.ResolveErr
 }
 func (r *Registry) StoreAttachment(_ context.Context, _ string, _ string, mediaType string, raw []byte) (string, error) {
 	r.mu.Lock()

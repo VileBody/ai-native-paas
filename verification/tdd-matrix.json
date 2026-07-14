@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 914,
-  "discovered_unique_test_name_count": 912,
+  "discovered_go_test_count": 916,
+  "discovered_unique_test_name_count": 914,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -408,20 +408,20 @@
       "id": "B9",
       "level": "registry integration",
       "name": "TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery",
-      "status": "NEW",
-      "test_file": "test/pivot/build_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/build/registry/local_test.go",
       "test_name": "TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery",
-      "test_ref": "test/pivot/build_v2_test.go::TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery"
+      "test_ref": "internal/build/registry/local_test.go::TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery"
     },
     {
       "family": "B",
       "id": "B10",
       "level": "domain + PostgreSQL",
       "name": "TestBuild_TrustChainRequiredBeforeArtifactReleasable",
-      "status": "NEW",
-      "test_file": "test/pivot/build_v2_test.go",
+      "status": "REUSED",
+      "test_file": "test/integration/postgres_build_test.go",
       "test_name": "TestBuild_TrustChainRequiredBeforeArtifactReleasable",
-      "test_ref": "test/pivot/build_v2_test.go::TestBuild_TrustChainRequiredBeforeArtifactReleasable"
+      "test_ref": "test/integration/postgres_build_test.go::TestBuild_TrustChainRequiredBeforeArtifactReleasable"
     },
     {
       "family": "B",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 41,
-      "REUSED": 50
+      "NEW": 39,
+      "REUSED": 52
     },
     "unmapped": 0
   }

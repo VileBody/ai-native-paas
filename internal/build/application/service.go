@@ -385,7 +385,20 @@ func (s *Service) RunBuild(ctx context.Context, tenantID, actorID, buildID strin
 	}
 	published, err := s.Registry.Publish(ctx, build.TenantID, repository, output)
 	if err != nil {
-		return s.fail(ctx, actorID, build, artifact, err)
+		if !buildv1.ValidDigest(output.ManifestDigest) {
+			return s.fail(ctx, actorID, build, artifact, err)
+		}
+		recovered, resolveErr := s.Registry.Resolve(ctx, build.TenantID, repository+"@"+output.ManifestDigest)
+		if resolveErr != nil {
+			return s.fail(ctx, actorID, build, artifact, err)
+		}
+		if recovered.Repository != repository || recovered.Digest != output.ManifestDigest || !buildv1.ValidDigest(recovered.Digest) || strings.TrimSpace(recovered.MediaType) == "" {
+			return s.fail(ctx, actorID, build, artifact, domain.NewError(domain.CodePlatformFailure, "registry recovery returned a mismatched immutable artifact"))
+		}
+		if recordErr := s.recordRegistryRecovery(ctx, actorID, build, recovered); recordErr != nil {
+			return s.fail(ctx, actorID, build, artifact, recordErr)
+		}
+		published = recovered
 	}
 	created, err := domain.NewArtifact(s.IDs.NewID("art"), build.TenantID, build.ID, published.Repository, published.Digest, published.MediaType, s.Clock.Now())
 	if err != nil {
@@ -622,6 +635,17 @@ func (s *Service) updateBuild(ctx context.Context, build *domain.Build, mutate f
 }
 func (s *Service) insertArtifact(ctx context.Context, artifact domain.Artifact) error {
 	return s.Store.Transact(ctx, func(tx Tx) error { return tx.InsertArtifact(artifact) })
+}
+
+func (s *Service) recordRegistryRecovery(ctx context.Context, actorID string, build domain.Build, artifact PublishedArtifact) error {
+	payload, _ := json.Marshal(map[string]any{"build_id": build.ID, "repository": artifact.Repository, "digest": artifact.Digest, "recovery": "digest-discovery"})
+	return s.Store.Transact(ctx, func(tx Tx) error {
+		now := s.Clock.Now()
+		if err := tx.AppendOutbox(OutboxRecord{ID: s.IDs.NewID("evt"), Topic: "build.registry_publish_recovered.v2", AggregateID: build.ID, Payload: payload, CreatedAt: now}); err != nil {
+			return err
+		}
+		return tx.AppendAudit(AuditRecord{ID: s.IDs.NewID("aud"), TenantID: build.TenantID, ActorID: actorID, Action: "registry.publish.recover", ResourceType: "build", ResourceID: build.ID, Data: payload, CreatedAt: now})
+	})
 }
 func (s *Service) updateArtifact(ctx context.Context, artifact *domain.Artifact, mutate func(*domain.Artifact) error) error {
 	expected := artifact.Version

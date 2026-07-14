@@ -2,15 +2,23 @@ package registry_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/keir-research/ai-native-paas/internal/build/application"
 	"github.com/keir-research/ai-native-paas/internal/build/domain"
 	"github.com/keir-research/ai-native-paas/internal/build/localoci"
+	"github.com/keir-research/ai-native-paas/internal/build/logs"
+	"github.com/keir-research/ai-native-paas/internal/build/memory"
 	"github.com/keir-research/ai-native-paas/internal/build/registry"
+	"github.com/keir-research/ai-native-paas/internal/build/testkit"
+	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
 	sourcev1 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v1"
 )
 
@@ -89,4 +97,82 @@ func TestRegistryAdapter_RejectsInvalidBuilderDigestWithoutLayout(t *testing.T) 
 	if !domain.HasCode(err, domain.CodeInvalidArgument) {
 		t.Fatalf("err=%v", err)
 	}
+}
+
+type lostResponseRegistry struct {
+	inner                      *registry.Local
+	publishCalls, resolveCalls int
+}
+
+func (r *lostResponseRegistry) Publish(ctx context.Context, tenantID, repository string, output application.BuildOutput) (application.PublishedArtifact, error) {
+	r.publishCalls++
+	if _, err := r.inner.Publish(ctx, tenantID, repository, output); err != nil {
+		return application.PublishedArtifact{}, err
+	}
+	return application.PublishedArtifact{}, domain.Retryable(domain.CodePlatformFailure, "registry response lost", errors.New("connection reset"))
+}
+func (r *lostResponseRegistry) Resolve(ctx context.Context, tenantID, reference string) (application.PublishedArtifact, error) {
+	r.resolveCalls++
+	return r.inner.Resolve(ctx, tenantID, reference)
+}
+func (r *lostResponseRegistry) StoreAttachment(ctx context.Context, tenantID, repository, mediaType string, raw []byte) (string, error) {
+	return r.inner.StoreAttachment(ctx, tenantID, repository, mediaType, raw)
+}
+
+func TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery(t *testing.T) {
+	output := makeOutput(t)
+	registryWithLostResponse := &lostResponseRegistry{inner: registry.NewLocal(t.TempDir())}
+	clock := &testkit.Clock{T: time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)}
+	store := memory.New()
+	service := &application.Service{
+		Store: store, Fetcher: &testkit.Fetcher{Snapshot: application.SourceSnapshot{Path: t.TempDir()}},
+		Detector:   &testkit.Detector{Detection: application.Detection{Runtime: "go", Backend: application.BackendBuildpacks, BuildpackID: "paketo/go"}},
+		Buildpacks: &testkit.Builder{Output: output}, Registry: registryWithLostResponse,
+		SBOM:     testkit.SBOM{Result: application.SBOMResult{Digest: rawDigest([]byte("sbom")), MediaType: "application/spdx+json", Document: []byte("sbom")}},
+		Scanner:  testkit.Scanner{Result: domain.ScanResult{Scanner: "scanner", PolicyVersion: "v1", Passed: true, FindingsDigest: "sha256:" + strings.Repeat("d", 64), ScannedAt: clock.Now()}},
+		Signer:   testkit.Signer{Record: domain.SignatureRecord{Issuer: "platform", Algorithm: "ed25519", Digest: output.ManifestDigest, Signature: "signature", SignedAt: clock.Now()}},
+		Verifier: &testkit.Verifier{}, Logs: logs.New(), Clock: clock, IDs: &testkit.IDs{}, RepositoryBase: "registry.test/tenants",
+	}
+	requested, err := service.RequestBuild(context.Background(), application.RequestBuildCommand{
+		TenantID: "t1", ActorID: "u1", CorrelationID: "correlation-1", IdempotencyKey: "request-1",
+		Source:        sourcev1.SourceRevision{ProjectID: "p1", RepositoryID: "r1", Branch: "main", CommitSHA: strings.Repeat("a", 40)},
+		BuilderDigest: "sha256:" + strings.Repeat("b", 64), RunImageDigest: "sha256:" + strings.Repeat("c", 64), PlatformVersion: "v2",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, artifact, err := service.RunBuild(context.Background(), "t1", "u1", requested.Build.ID)
+	if err != nil || completed.State != buildv1.BuildSucceeded || artifact == nil || artifact.Digest != output.ManifestDigest {
+		t.Fatalf("build=%+v artifact=%+v err=%v", completed, artifact, err)
+	}
+	_, artifacts, outbox, audit := store.Snapshot()
+	if registryWithLostResponse.publishCalls != 1 || registryWithLostResponse.resolveCalls != 1 || len(artifacts) != 1 {
+		t.Fatalf("publish=%d resolve=%d artifacts=%d", registryWithLostResponse.publishCalls, registryWithLostResponse.resolveCalls, len(artifacts))
+	}
+	if !hasTopic(outbox, "build.registry_publish_recovered.v2") || !hasAction(audit, "registry.publish.recover") {
+		t.Fatalf("outbox=%+v audit=%+v", outbox, audit)
+	}
+}
+
+func rawDigest(raw []byte) string {
+	sum := sha256.Sum256(raw)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func hasTopic(records []application.OutboxRecord, topic string) bool {
+	for _, record := range records {
+		if record.Topic == topic {
+			return true
+		}
+	}
+	return false
+}
+
+func hasAction(records []application.AuditRecord, action string) bool {
+	for _, record := range records {
+		if record.Action == action {
+			return true
+		}
+	}
+	return false
 }

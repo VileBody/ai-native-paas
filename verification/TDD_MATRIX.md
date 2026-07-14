@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **914**
-- Reused now: **50**
-- New local/contract tests required: **41**
+- Discovered Go tests/fuzz targets: **916**
+- Reused now: **52**
+- New local/contract tests required: **39**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -54,8 +54,8 @@ A release gate may become green only after every referenced test exists and pass
 | `B6` | LIVE_ONLY | system | `test/pivot/build_v2_test.go::TestBuild_ResourceLimitsTerminateForkBombAndOversizedContext` |
 | `B7` | NEW | integration | `test/pivot/build_v2_test.go::TestBuild_SecretsNeverEnterLayerLogOrProvenance` |
 | `B8` | NEW | integration | `test/pivot/build_v2_test.go::TestBuild_CacheIsProjectScopedForUntrustedLayers` |
-| `B9` | NEW | registry integration | `test/pivot/build_v2_test.go::TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery` |
-| `B10` | NEW | domain + PostgreSQL | `test/pivot/build_v2_test.go::TestBuild_TrustChainRequiredBeforeArtifactReleasable` |
+| `B9` | REUSED | registry integration | `internal/build/registry/local_test.go::TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery` |
+| `B10` | REUSED | domain + PostgreSQL | `test/integration/postgres_build_test.go::TestBuild_TrustChainRequiredBeforeArtifactReleasable` |
 | `B11` | NEW | policy | `test/pivot/build_v2_test.go::TestBuild_MutableBaseOrOutputTagCannotDefineProductionArtifact` |
 | `B12` | NEW | PostgreSQL + concurrency | `test/pivot/build_v2_test.go::TestBuild_SameIdentityConcurrentRequestsExecuteOnce` |
 | `B13` | LIVE_ONLY | application/system | `test/pivot/build_v2_test.go::TestBuild_CancelStopsExecutionAndRevokesBuildCredentials` |

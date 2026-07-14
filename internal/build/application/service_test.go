@@ -261,6 +261,7 @@ func TestBuild_BuildSecretIsAbsentFromLogs(t *testing.T) {
 func TestBuild_DependencyRegistryTimeoutIsRetryablePlatformFailure(t *testing.T) {
 	s, _, registry, _, _ := setup(t)
 	registry.PublishErr = domain.Retryable(domain.CodePlatformFailure, "registry timeout", errors.New("timeout"))
+	registry.ResolveErr = domain.NewError(domain.CodeNotFound, "artifact not found")
 	requested, _ := s.RequestBuild(context.Background(), command("k1"))
 	build, _, err := s.RunBuild(context.Background(), "t1", "u1", requested.Build.ID)
 	if err == nil || build.State != buildv1.BuildFailedPlatform || !build.Retryable {
