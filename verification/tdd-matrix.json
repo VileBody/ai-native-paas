@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 931,
-  "discovered_unique_test_name_count": 929,
+  "discovered_go_test_count": 932,
+  "discovered_unique_test_name_count": 930,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -78,10 +78,10 @@
       "id": "K8",
       "level": "PostgreSQL + broker integration",
       "name": "TestKernel_OutboxCommitThenCrashPublishesExactlyOnceEffect",
-      "status": "NEW",
-      "test_file": "test/pivot/kernel_v2_test.go",
+      "status": "REUSED",
+      "test_file": "test/integration/postgres_kernel_test.go",
       "test_name": "TestKernel_OutboxCommitThenCrashPublishesExactlyOnceEffect",
-      "test_ref": "test/pivot/kernel_v2_test.go::TestKernel_OutboxCommitThenCrashPublishesExactlyOnceEffect"
+      "test_ref": "test/integration/postgres_kernel_test.go::TestKernel_OutboxCommitThenCrashPublishesExactlyOnceEffect"
     },
     {
       "family": "K",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 26,
-      "REUSED": 65
+      "NEW": 25,
+      "REUSED": 66
     },
     "unmapped": 0
   }

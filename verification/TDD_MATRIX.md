@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **931**
-- Reused now: **65**
-- New local/contract tests required: **26**
+- Discovered Go tests/fuzz targets: **932**
+- Reused now: **66**
+- New local/contract tests required: **25**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -21,7 +21,7 @@ A release gate may become green only after every referenced test exists and pass
 | `K5` | REUSED | application | `internal/kernel/execution/execution_tdd_test.go::TestKernel_ParentCancellationPropagatesToCancelableChildren` |
 | `K6` | REUSED | application + concurrency | `internal/kernel/execution/execution_tdd_test.go::TestKernel_IdempotentCommandReturnsOriginalOperationGraph` |
 | `K7` | REUSED | domain | `internal/kernel/execution/execution_tdd_test.go::TestKernel_IdempotencyPayloadMismatchCannotReuseApproval` |
-| `K8` | NEW | PostgreSQL + broker integration | `test/pivot/kernel_v2_test.go::TestKernel_OutboxCommitThenCrashPublishesExactlyOnceEffect` |
+| `K8` | REUSED | PostgreSQL + broker integration | `test/integration/postgres_kernel_test.go::TestKernel_OutboxCommitThenCrashPublishesExactlyOnceEffect` |
 | `K9` | REUSED | application | `internal/security/redact/redact_tdd_test.go::TestKernel_AuditRedactsWorkspaceCommandSecrets` |
 | `K10` | REUSED | domain | `internal/kernel/execution/execution_tdd_test.go::TestKernel_ServicePrincipalCannotApproveHumanAction` |
 | `K11` | REUSED | HTTP integration | `internal/identity/httpauth/middleware_test.go::TestKernel_ProductionProfileRejectsDevelopmentIdentityHeaders` |

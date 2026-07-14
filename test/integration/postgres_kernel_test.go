@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -138,6 +139,101 @@ func TestPostgres_CreateOrganizationAndOutboxAreAtomic(t *testing.T) {
 			t.Fatalf("%s count after commit = %d", table, count)
 		}
 	}
+}
+
+func TestKernel_OutboxCommitThenCrashPublishesExactlyOnceEffect(t *testing.T) {
+	db, store := migratedStore(t)
+	ctx := context.Background()
+	now := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	organization, err := kernel.NewOrganization("org_outbox_crash", "Outbox crash", "owner", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, _ := json.Marshal(map[string]any{"organization_id": organization.ID})
+	event := kernelv1.DomainEventEnvelope[json.RawMessage]{
+		EventID: "evt_outbox_crash", Type: kernel.EventOrganizationCreated, Version: 1,
+		TenantID: organization.ID, AggregateID: string(organization.ID),
+		CorrelationID: "cor_outbox_crash", OccurredAt: now, Payload: payload,
+	}
+	if err := store.Transact(ctx, func(tx kernel.Tx) error {
+		if err := tx.InsertOrganization(ctx, organization); err != nil {
+			return err
+		}
+		return tx.AppendOutbox(ctx, kernel.OutboxRecord{Event: event, State: kernel.OutboxPending, CreatedAt: now})
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The process that committed the aggregate is gone. A restarted dispatcher
+	// delivers the durable event, then loses its database acknowledgement.
+	clock := kernel.NewFixedClock(now)
+	broker := &postgresInboxBroker{processor: kernel.InboxProcessor{Store: store, Clock: clock}}
+	crashingStore := &failKernelMarkPublishedStore{Store: store}
+	crashingStore.failNext.Store(true)
+	dispatcher := kernel.OutboxDispatcher{Store: crashingStore, Publisher: broker, Clock: clock, Lease: time.Second}
+	if count, err := dispatcher.Dispatch(ctx, 1); err == nil || count != 0 {
+		t.Fatalf("dispatch before simulated crash = %d, %v", count, err)
+	}
+
+	// A second process takes over the expired lease and redelivers. The
+	// PostgreSQL inbox turns at-least-once transport into exactly-once effect.
+	clock.Advance(2 * time.Second)
+	restarted := kernel.OutboxDispatcher{Store: store, Publisher: broker, Clock: clock, Lease: time.Second}
+	if count, err := restarted.Dispatch(ctx, 1); err != nil || count != 1 {
+		t.Fatalf("restart dispatch = %d, %v", count, err)
+	}
+	if broker.deliveries.Load() != 2 || broker.effects.Load() != 1 {
+		t.Fatalf("deliveries=%d effects=%d", broker.deliveries.Load(), broker.effects.Load())
+	}
+	for query, want := range map[string]int{
+		`SELECT count(*) FROM kernel.inbox_events WHERE event_id='evt_outbox_crash'`:                               1,
+		`SELECT count(*) FROM kernel.outbox_events WHERE event_id='evt_outbox_crash' AND state='PUBLISHED'`:        1,
+		`SELECT count(*) FROM kernel.organizations WHERE id='org_outbox_crash'`:                                    1,
+		`SELECT count(*) FROM kernel.outbox_events WHERE event_id='evt_outbox_crash' AND published_at IS NOT NULL`: 1,
+	} {
+		var got int
+		if err := db.QueryRowContext(ctx, query).Scan(&got); err != nil || got != want {
+			t.Fatalf("query=%q got=%d want=%d err=%v", query, got, want, err)
+		}
+	}
+}
+
+type postgresInboxBroker struct {
+	processor  kernel.InboxProcessor
+	deliveries atomic.Int32
+	effects    atomic.Int32
+}
+
+func (b *postgresInboxBroker) Publish(ctx context.Context, event kernelv1.DomainEventEnvelope[json.RawMessage]) error {
+	b.deliveries.Add(1)
+	_, err := b.processor.Process(ctx, event, func(context.Context, kernel.Tx, kernelv1.DomainEventEnvelope[json.RawMessage]) error {
+		b.effects.Add(1)
+		return nil
+	})
+	return err
+}
+
+type failKernelMarkPublishedStore struct {
+	kernel.Store
+	failNext atomic.Bool
+}
+
+func (s *failKernelMarkPublishedStore) Transact(ctx context.Context, fn func(kernel.Tx) error) error {
+	return s.Store.Transact(ctx, func(tx kernel.Tx) error {
+		return fn(&failKernelMarkPublishedTx{Tx: tx, parent: s})
+	})
+}
+
+type failKernelMarkPublishedTx struct {
+	kernel.Tx
+	parent *failKernelMarkPublishedStore
+}
+
+func (tx *failKernelMarkPublishedTx) MarkOutboxPublished(ctx context.Context, eventID string, now time.Time) error {
+	if tx.parent.failNext.CompareAndSwap(true, false) {
+		return errors.New("simulated crash after broker delivery")
+	}
+	return tx.Tx.MarkOutboxPublished(ctx, eventID, now)
 }
 
 func TestPostgres_ConcurrentIdempotencyUsesSingleWinner(t *testing.T) {
