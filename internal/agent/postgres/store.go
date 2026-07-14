@@ -156,7 +156,7 @@ func retryableDB(err error) bool {
 		parts = append(parts, current.Error())
 	}
 	value := strings.ToLower(strings.Join(parts, " "))
-	return strings.Contains(value, "40001") || strings.Contains(value, "40p01") || strings.Contains(value, "serialization") || strings.Contains(value, "deadlock") || strings.Contains(value, "23505") || strings.Contains(value, "duplicate key")
+	return strings.Contains(value, "40001") || strings.Contains(value, "40p01") || strings.Contains(value, "serialization") || strings.Contains(value, "deadlock") || strings.Contains(value, "23505") || strings.Contains(value, "duplicate key") || strings.Contains(value, "version is stale")
 }
 func mapDB(err error) error {
 	if err == nil {

@@ -143,7 +143,7 @@ func serializableRetryDelay(attempt int) time.Duration {
 
 func retryableDB(err error) bool {
 	v := strings.ToLower(fmt.Sprint(err))
-	return strings.Contains(v, "40001") || strings.Contains(v, "40p01") || strings.Contains(v, "serialization") || strings.Contains(v, "deadlock") || strings.Contains(v, "23505") || strings.Contains(v, "duplicate key")
+	return strings.Contains(v, "40001") || strings.Contains(v, "40p01") || strings.Contains(v, "serialization") || strings.Contains(v, "deadlock") || strings.Contains(v, "23505") || strings.Contains(v, "duplicate key") || strings.Contains(v, "version is stale")
 }
 
 type txAdapter struct {
