@@ -3,6 +3,7 @@ package application_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -161,5 +162,126 @@ func TestProjectRename_DoesNotMutateNumericProviderIdentity(t *testing.T) {
 	after, err := s.GetRepository(context.Background(), "t1", r.Repository.ID)
 	if err != nil || after.ProviderProjectID != ready.ProviderProjectID {
 		t.Fatalf("before=%d after=%d err=%v", ready.ProviderProjectID, after.ProviderProjectID, err)
+	}
+}
+
+func TestSource_CreateMergeRequestBindsExactRemoteHeadAndIsIdempotent(t *testing.T) {
+	s, store, provider, _, _ := setupService()
+	created := create(t, s, "Booking", "project-1")
+	repository, err := s.ProvisionRepository(context.Background(), application.ProvisionRepositoryCommand{TenantID: "t1", ActorID: "u1", RepositoryID: created.Repository.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	head := strings.Repeat("b", 40)
+	provider.SetHead(repository.ProviderProjectID, "agent/task-1", head)
+	command := application.CreateMergeRequestCommand{
+		TenantID: "t1", ActorID: "agent-1", RepositoryID: repository.ID,
+		SourceBranch: "agent/task-1", TargetBranch: "main", ExpectedHeadSHA: head,
+		SourcePlanHash: "sha256:" + strings.Repeat("c", 64), TaskID: "task-1", CorrelationID: "corr-1",
+		Title: "Implement governed change", IdempotencyKey: "mr-1",
+	}
+	first, err := s.CreateMergeRequest(context.Background(), command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := s.CreateMergeRequest(context.Background(), command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ProviderIID != second.ProviderIID || first.HeadSHA != head || first.TargetBranch != repository.DefaultBranch || provider.MergeRequestCalls != 1 {
+		t.Fatalf("first=%+v second=%+v calls=%d", first, second, provider.MergeRequestCalls)
+	}
+	if provider.LastMergeRequest.ProjectID != repository.ProviderProjectID || !strings.Contains(provider.LastMergeRequest.Description, command.SourcePlanHash) || strings.Contains(provider.LastMergeRequest.Description, provider.Token) {
+		t.Fatalf("provider request was not governed: %+v", provider.LastMergeRequest)
+	}
+	_, _, outbox, audit := store.Snapshot()
+	if outbox[len(outbox)-1].Topic != "source.merge_request_created.v2" || audit[len(audit)-1].Action != "source.merge_request.create" || strings.Contains(string(audit[len(audit)-1].Data), provider.Token) {
+		t.Fatalf("outbox=%+v audit=%+v", outbox, audit)
+	}
+}
+
+func TestSource_CreateMergeRequestRejectsAttestedHeadDriftBeforeProviderMutation(t *testing.T) {
+	s, _, provider, _, _ := setupService()
+	created := create(t, s, "Booking", "project-1")
+	repository, err := s.ProvisionRepository(context.Background(), application.ProvisionRepositoryCommand{TenantID: "t1", ActorID: "u1", RepositoryID: created.Repository.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider.SetHead(repository.ProviderProjectID, "agent/task-1", strings.Repeat("d", 40))
+	_, err = s.CreateMergeRequest(context.Background(), application.CreateMergeRequestCommand{
+		TenantID: "t1", ActorID: "agent-1", RepositoryID: repository.ID,
+		SourceBranch: "agent/task-1", TargetBranch: "main", ExpectedHeadSHA: strings.Repeat("b", 40),
+		SourcePlanHash: "sha256:" + strings.Repeat("c", 64), TaskID: "task-1", CorrelationID: "corr-1",
+		Title: "Implement governed change", IdempotencyKey: "mr-drift",
+	})
+	if !domain.HasCode(err, domain.CodeConflict) || provider.MergeRequestCalls != 0 {
+		t.Fatalf("err=%v calls=%d", err, provider.MergeRequestCalls)
+	}
+}
+
+func TestSource_CreateMergeRequestRecoversLostProviderResponseWithoutDuplicate(t *testing.T) {
+	s, _, provider, _, _ := setupService()
+	created := create(t, s, "Booking", "project-1")
+	repository, err := s.ProvisionRepository(context.Background(), application.ProvisionRepositoryCommand{TenantID: "t1", ActorID: "u1", RepositoryID: created.Repository.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	head := strings.Repeat("b", 40)
+	provider.SetHead(repository.ProviderProjectID, "agent/task-1", head)
+	provider.MergeRequestLostResponseOnce = true
+	result, err := s.CreateMergeRequest(context.Background(), application.CreateMergeRequestCommand{
+		TenantID: "t1", ActorID: "agent-1", RepositoryID: repository.ID,
+		SourceBranch: "agent/task-1", TargetBranch: "main", ExpectedHeadSHA: head,
+		SourcePlanHash: "sha256:" + strings.Repeat("c", 64), TaskID: "task-1", CorrelationID: "corr-1",
+		Title: "Implement governed change", IdempotencyKey: "mr-lost",
+	})
+	if err != nil || result.ProviderIID == 0 || provider.MergeRequestCalls != 1 {
+		t.Fatalf("result=%+v err=%v calls=%d", result, err, provider.MergeRequestCalls)
+	}
+}
+
+func TestSource_CreateMergeRequestConcurrentRetryConvergesOnOneProviderMR(t *testing.T) {
+	s, _, provider, _, _ := setupService()
+	created := create(t, s, "Booking", "project-1")
+	repository, err := s.ProvisionRepository(context.Background(), application.ProvisionRepositoryCommand{TenantID: "t1", ActorID: "u1", RepositoryID: created.Repository.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	head := strings.Repeat("b", 40)
+	provider.SetHead(repository.ProviderProjectID, "agent/task-1", head)
+	command := application.CreateMergeRequestCommand{
+		TenantID: "t1", ActorID: "agent-1", RepositoryID: repository.ID,
+		SourceBranch: "agent/task-1", TargetBranch: "main", ExpectedHeadSHA: head,
+		SourcePlanHash: "sha256:" + strings.Repeat("c", 64), TaskID: "task-1", CorrelationID: "corr-1",
+		Title: "Implement governed change", IdempotencyKey: "mr-concurrent",
+	}
+	const invocations = 16
+	var wait sync.WaitGroup
+	errorsFound := make(chan error, invocations)
+	providerIIDs := make(chan int64, invocations)
+	for index := 0; index < invocations; index++ {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			result, callErr := s.CreateMergeRequest(context.Background(), command)
+			errorsFound <- callErr
+			providerIIDs <- result.ProviderIID
+		}()
+	}
+	wait.Wait()
+	close(errorsFound)
+	close(providerIIDs)
+	for callErr := range errorsFound {
+		if callErr != nil {
+			t.Fatal(callErr)
+		}
+	}
+	for iid := range providerIIDs {
+		if iid != 1 {
+			t.Fatalf("provider iid=%d", iid)
+		}
+	}
+	if provider.MergeRequestCalls != 1 {
+		t.Fatalf("provider create calls=%d", provider.MergeRequestCalls)
 	}
 }

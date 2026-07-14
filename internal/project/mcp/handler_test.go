@@ -3,6 +3,9 @@ package mcp
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,6 +18,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/agent/enrollment"
 	infraapp "github.com/keir-research/ai-native-paas/internal/infrastructure/application"
 	inframemory "github.com/keir-research/ai-native-paas/internal/infrastructure/memory"
+	sourceapp "github.com/keir-research/ai-native-paas/internal/source/application"
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
@@ -59,11 +63,21 @@ func (r projectReader) GetRepositoryForProject(_ context.Context, tenantID, proj
 }
 
 type workspaceCommands struct {
-	created  workspace.CreateRequest
-	exec     workspace.ExecRequest
-	scope    workspace.Scope
-	revision sourcev2.SourceRevision
-	receipt  sourcev2.AgentCommitReceipt
+	created      workspace.CreateRequest
+	exec         workspace.ExecRequest
+	scope        workspace.Scope
+	revision     sourcev2.SourceRevision
+	receipt      sourcev2.AgentCommitReceipt
+	mergeRequest sourceapp.CreateMergeRequestCommand
+}
+
+func (w *workspaceCommands) CreateMergeRequest(_ context.Context, command sourceapp.CreateMergeRequestCommand) (sourceapp.CreateMergeRequestResult, error) {
+	w.mergeRequest = command
+	return sourceapp.CreateMergeRequestResult{
+		RepositoryID: command.RepositoryID, ProviderIID: 7, SourceBranch: command.SourceBranch,
+		TargetBranch: command.TargetBranch, HeadSHA: command.ExpectedHeadSHA, WebURL: "https://gitlab.com/beta/booking/-/merge_requests/7",
+		SourcePlanHash: command.SourcePlanHash,
+	}, nil
 }
 
 func (w *workspaceCommands) GetCommitReceipt(_ context.Context, _ workspace.Scope, _ string) (sourcev2.AgentCommitReceipt, error) {
@@ -127,7 +141,7 @@ func mcpFixture(t *testing.T, scopes []string) (Handler, string, *workspaceComma
 		},
 	}
 	sourceChanges := &workspace.Service{Store: workspace.NewMemoryStore(), Clock: clock, IDs: &mcpIDs{}}
-	return Handler{Enrollment: service, Projects: projectReader{project: project, repo: repository}, Workspaces: workspaces, Infrastructure: infrastructure, SourceChanges: sourceChanges}, access, workspaces
+	return Handler{Enrollment: service, Projects: projectReader{project: project, repo: repository}, Workspaces: workspaces, Infrastructure: infrastructure, SourceChanges: sourceChanges, MergeRequests: workspaces}, access, workspaces
 }
 
 func TestProjectMCP_ExactPlanApprovalGatesVerifiedWorkspaceApply(t *testing.T) {
@@ -243,7 +257,7 @@ func TestProjectMCP_GenericExecCannotBypassGovernedGitMutation(t *testing.T) {
 
 func TestProjectMCP_GovernedRepositoryCommandsUseVerifiedBindings(t *testing.T) {
 	handler, access, workspaces := mcpFixture(t, []string{
-		"agent.tool:repository_create_branch", "agent.tool:repository_apply_patch", "agent.tool:repository_commit", "agent.tool:repository_push",
+		"agent.tool:repository_create_branch", "agent.tool:repository_apply_patch", "agent.tool:repository_commit", "agent.tool:repository_push", "agent.tool:repository_create_merge_request",
 	})
 	create := invocation(agentv2.ToolRepositoryCreateBranch)
 	create.IdempotencyKey = "source-checkout-1"
@@ -296,6 +310,52 @@ func TestProjectMCP_GovernedRepositoryCommandsUseVerifiedBindings(t *testing.T) 
 	response = request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, push)
 	if response.Code != http.StatusOK || workspaces.exec.Kind != "repository_push" || workspaces.exec.Spec.Argv[8] != "absent" || workspaces.exec.Spec.Argv[5] != strings.Repeat("a", 40) || workspaces.exec.Spec.Argv[7] != patchResult.Plan.PlanHash {
 		t.Fatalf("push status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
+	}
+
+	forgedStatement := sourcev2.CommitStatement{
+		RepositoryID: "repo-1", BaseSHA: strings.Repeat("a", 40), CommitSHA: strings.Repeat("b", 40),
+		Branch: "agent/task-1", AgentID: "agent-1", TaskID: "task-1", CorrelationID: "forged-correlation",
+		SourcePlanHash: patchResult.Plan.PlanHash, IssuedAt: time.Date(2026, 7, 14, 5, 0, 1, 0, time.UTC),
+	}
+	workspaces.receipt = validMCPCommitReceipt(t, forgedStatement, "command-1")
+	merge := invocation(agentv2.ToolRepositoryCreateMergeRequest)
+	merge.IdempotencyKey = "source-mr-forged"
+	merge.Arguments = json.RawMessage(`{
+		"workspace_id":"workspace-1","change_plan_id":"` + patchResult.Plan.PlanID + `","commit_command_id":"command-1",
+		"source_branch":"agent/task-1","title":"Implement governed change"
+	}`)
+	response = request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, merge)
+	if response.Code != http.StatusForbidden || workspaces.mergeRequest.RepositoryID != "" {
+		t.Fatalf("forged receipt status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.mergeRequest)
+	}
+	forgedStatement.CorrelationID = "corr-1"
+	workspaces.receipt = validMCPCommitReceipt(t, forgedStatement, "command-1")
+	merge.IdempotencyKey = "source-mr-1"
+	response = request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, merge)
+	if response.Code != http.StatusOK || workspaces.mergeRequest.RepositoryID != "repo-1" || workspaces.mergeRequest.TargetBranch != "main" || workspaces.mergeRequest.ExpectedHeadSHA != strings.Repeat("b", 40) || workspaces.mergeRequest.SourcePlanHash != patchResult.Plan.PlanHash || workspaces.mergeRequest.ActorID != "agent-1" {
+		t.Fatalf("merge request status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.mergeRequest)
+	}
+}
+
+func validMCPCommitReceipt(t *testing.T, statement sourcev2.CommitStatement, commandID string) sourcev2.AgentCommitReceipt {
+	t.Helper()
+	canonical, err := statement.Canonical()
+	if err != nil {
+		t.Fatal(err)
+	}
+	statementDigest := sha256.Sum256(canonical)
+	signature := []byte("test-signature")
+	signatureDigest := sha256.Sum256(signature)
+	return sourcev2.AgentCommitReceipt{
+		SessionID: "session-1", ExecutionSessionID: "session-1", CommandID: commandID,
+		Statement: statement,
+		Attestation: sourcev2.CommitAttestation{
+			RepositoryID: statement.RepositoryID, CommitSHA: statement.CommitSHA, AgentID: statement.AgentID,
+			TaskID: statement.TaskID, CorrelationID: statement.CorrelationID,
+			StatementDigest: "sha256:" + hex.EncodeToString(statementDigest[:]),
+			SignatureDigest: "sha256:" + hex.EncodeToString(signatureDigest[:]), IssuedAt: statement.IssuedAt,
+		},
+		Signature: base64.StdEncoding.EncodeToString(signature), CertificateFingerprint: "sha256:" + strings.Repeat("c", 64),
 	}
 }
 

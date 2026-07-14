@@ -36,17 +36,24 @@ type Provider struct {
 	Repositories                                            map[int64]application.ProviderRepository
 	Correlations                                            map[string]int64
 	Heads                                                   map[string]string
+	MergeRequests                                           map[string]application.ProviderMergeRequest
 	CreateCalls, ProtectCalls, CredentialCalls, RevokeCalls int
+	MergeRequestCalls                                       int
+	LastMergeRequest                                        application.CreateMergeRequestRequest
 	LostResponseOnce                                        bool
+	MergeRequestLostResponseOnce                            bool
 	ProtectError                                            error
 	RevokeError                                             error
 	Token                                                   string
 }
 
 func NewProvider() *Provider {
-	return &Provider{NextID: 100, Repositories: map[int64]application.ProviderRepository{}, Correlations: map[string]int64{}, Heads: map[string]string{}, Token: "super-secret-token"}
+	return &Provider{NextID: 100, Repositories: map[int64]application.ProviderRepository{}, Correlations: map[string]int64{}, Heads: map[string]string{}, MergeRequests: map[string]application.ProviderMergeRequest{}, Token: "super-secret-token"}
 }
 func key(id int64, branch string) string { return fmt.Sprintf("%d:%s", id, branch) }
+func mergeRequestKey(id int64, source, target string) string {
+	return fmt.Sprintf("%d:%s:%s", id, source, target)
+}
 func (p *Provider) CreateRepository(_ context.Context, r application.CreateRepositoryRequest) (application.ProviderRepository, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -111,7 +118,30 @@ func (p *Provider) RevokeCredential(_ context.Context, _ int64, _ string) error 
 	return nil
 }
 func (p *Provider) CreateMergeRequest(_ context.Context, r application.CreateMergeRequestRequest) (application.ProviderMergeRequest, error) {
-	return application.ProviderMergeRequest{IID: 1, State: "opened", SourceBranch: r.SourceBranch, TargetBranch: r.TargetBranch, HeadSHA: strings40("b")}, nil
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	mrKey := mergeRequestKey(r.ProjectID, r.SourceBranch, r.TargetBranch)
+	if _, exists := p.MergeRequests[mrKey]; exists {
+		return application.ProviderMergeRequest{}, errors.New("open merge request already exists")
+	}
+	p.MergeRequestCalls++
+	p.LastMergeRequest = r
+	value := application.ProviderMergeRequest{
+		IID: int64(p.MergeRequestCalls), State: "opened", SourceBranch: r.SourceBranch, TargetBranch: r.TargetBranch,
+		HeadSHA: p.Heads[key(r.ProjectID, r.SourceBranch)], WebURL: fmt.Sprintf("https://git.example/mr/%d", p.MergeRequestCalls), Description: r.Description,
+	}
+	p.MergeRequests[mrKey] = value
+	if p.MergeRequestLostResponseOnce {
+		p.MergeRequestLostResponseOnce = false
+		return application.ProviderMergeRequest{}, errors.New("lost response after merge request create")
+	}
+	return value, nil
+}
+func (p *Provider) FindOpenMergeRequest(_ context.Context, projectID int64, sourceBranch, targetBranch string) (application.ProviderMergeRequest, bool, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	value, ok := p.MergeRequests[mergeRequestKey(projectID, sourceBranch, targetBranch)]
+	return value, ok, nil
 }
 func (p *Provider) SetHead(id int64, branch, sha string) {
 	p.mu.Lock()

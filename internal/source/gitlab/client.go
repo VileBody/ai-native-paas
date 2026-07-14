@@ -202,11 +202,37 @@ func (c *Client) CreateMergeRequest(ctx context.Context, r application.CreateMer
 		TargetBranch string `json:"target_branch"`
 		WebURL       string `json:"web_url"`
 		SHA          string `json:"sha"`
+		Description  string `json:"description"`
 	}
 	if err := c.do(ctx, http.MethodPost, "/projects/"+strconv.FormatInt(r.ProjectID, 10)+"/merge_requests", body, &mr); err != nil {
 		return application.ProviderMergeRequest{}, err
 	}
-	return application.ProviderMergeRequest{IID: mr.IID, State: mr.State, SourceBranch: mr.SourceBranch, TargetBranch: mr.TargetBranch, HeadSHA: mr.SHA, WebURL: mr.WebURL}, nil
+	return application.ProviderMergeRequest{IID: mr.IID, State: mr.State, SourceBranch: mr.SourceBranch, TargetBranch: mr.TargetBranch, HeadSHA: mr.SHA, WebURL: mr.WebURL, Description: mr.Description}, nil
+}
+
+func (c *Client) FindOpenMergeRequest(ctx context.Context, projectID int64, sourceBranch, targetBranch string) (application.ProviderMergeRequest, bool, error) {
+	path := "/projects/" + strconv.FormatInt(projectID, 10) + "/merge_requests?state=opened&source_branch=" + url.QueryEscape(sourceBranch) + "&target_branch=" + url.QueryEscape(targetBranch) + "&per_page=2"
+	var values []struct {
+		IID          int64  `json:"iid"`
+		State        string `json:"state"`
+		SourceBranch string `json:"source_branch"`
+		TargetBranch string `json:"target_branch"`
+		WebURL       string `json:"web_url"`
+		SHA          string `json:"sha"`
+		Description  string `json:"description"`
+	}
+	if err := c.do(ctx, http.MethodGet, path, nil, &values); err != nil {
+		return application.ProviderMergeRequest{}, false, err
+	}
+	for _, value := range values {
+		if value.SourceBranch == sourceBranch && value.TargetBranch == targetBranch {
+			return application.ProviderMergeRequest{
+				IID: value.IID, State: value.State, SourceBranch: value.SourceBranch,
+				TargetBranch: value.TargetBranch, HeadSHA: value.SHA, WebURL: value.WebURL, Description: value.Description,
+			}, true, nil
+		}
+	}
+	return application.ProviderMergeRequest{}, false, nil
 }
 
 func (c *Client) BootstrapRepository(ctx context.Context, request application.BootstrapRepositoryRequest) (string, error) {

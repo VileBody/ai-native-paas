@@ -143,7 +143,7 @@ func main() {
 
 	projectHandler := projecthttp.Handler{Projects: projects, Infrastructure: infrastructureService, SourceChanges: workspaceService, MaxBodyBytes: 64 << 10}
 	enrollmentHandler := enrollmenthttp.Handler{Enrollment: enrollmentService, MaxBodyBytes: 64 << 10}
-	mcpHandler := projectmcp.Handler{Enrollment: enrollmentService, Projects: source, Workspaces: workspaceService, Infrastructure: infrastructureService, SourceChanges: workspaceService, MaxBodyBytes: agentv2.MaximumArgumentsBytes + (64 << 10)}
+	mcpHandler := projectmcp.Handler{Enrollment: enrollmentService, Projects: source, Workspaces: workspaceService, Infrastructure: infrastructureService, SourceChanges: workspaceService, MergeRequests: source, MaxBodyBytes: agentv2.MaximumArgumentsBytes + (64 << 10)}
 	humanHandler := (httpauth.Middleware{
 		Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}},
 	}).Wrap(projectHandler)

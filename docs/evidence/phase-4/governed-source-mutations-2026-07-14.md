@@ -24,10 +24,21 @@ Implemented:
   authorized; identical lost-response replay is idempotent.
 - The special commit and push paths recompute the actual Git tree change set
   and require it to equal the authorized plan hash.
+- `repository_create_merge_request` accepts no provider project ID, target
+  branch or commit SHA from the agent. It binds the tenant-scoped numeric
+  GitLab identity and default branch to the authorized source plan and exact
+  signed commit receipt, then verifies that the remote source branch still
+  points to the attested SHA before creating the MR.
+- Merge request descriptions are generated only from bounded plan hash, SHA,
+  task, correlation and actor metadata. Lost-response and concurrent retries
+  recover only a provider MR with that exact description and source/target
+  pair, so a pre-existing human MR cannot be mistaken for platform evidence.
 
 Evidence:
 
 - `go test ./...` passed after the source slice.
+- `go vet ./internal/source/... ./internal/project/mcp/... ./cmd/project-api/...`
+  and race tests for source application, GitLab adapter and Project MCP passed.
 - Real local Git gates pass for exact checkout after mutable branch movement,
   concurrent expected-base push conflict, submodule policy, credential
   non-persistence, secret sentinel blocking and signed attestation.
@@ -37,11 +48,12 @@ Evidence:
   `TestPostgres_WorkspaceCommitReceiptMigrationAndRoundTrip` passed. The pod
   was deleted immediately after the test.
 - Pivot matrix discovers executable evidence for S2, S3, S4, S5, S6, S7,
-  S14 and S17.
+  S14 and S17; the complete matrix remains mapped at 157 requirements and now
+  discovers 877 Go test/fuzz targets.
 
 Remaining source gates:
 
 - GitLab.com live token isolation, rename/transfer, archive and 429 tests;
-- merge request creation/comment adapter and branch cleanup intent;
+- merge request plan-summary comments and branch cleanup intent;
 - command-runner UID separation so task processes cannot read the workspace
   agent's long-lived-on-disk mTLS private key.

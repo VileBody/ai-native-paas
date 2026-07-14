@@ -16,6 +16,7 @@ import (
 	kernelv2 "github.com/keir-research/ai-native-paas/contracts/kernel/v2"
 	"github.com/keir-research/ai-native-paas/internal/agent/enrollment"
 	infraapp "github.com/keir-research/ai-native-paas/internal/infrastructure/application"
+	sourceapp "github.com/keir-research/ai-native-paas/internal/source/application"
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
@@ -52,6 +53,10 @@ type SourceChangeCommands interface {
 	AuthorizeSourceCommit(context.Context, workspace.AuthorizeSourceCommitRequest) (workspace.SourceChangePlan, error)
 }
 
+type RepositoryMergeRequests interface {
+	CreateMergeRequest(context.Context, sourceapp.CreateMergeRequestCommand) (sourceapp.CreateMergeRequestResult, error)
+}
+
 var errInvalidWorkspaceArguments = errors.New("invalid workspace tool arguments")
 var errInvalidInfrastructureArguments = errors.New("invalid infrastructure tool arguments")
 var errInvalidRepositoryArguments = errors.New("invalid repository tool arguments")
@@ -63,6 +68,7 @@ type Handler struct {
 	Workspaces     WorkspaceCommands
 	Infrastructure InfrastructureCommands
 	SourceChanges  SourceChangeCommands
+	MergeRequests  RepositoryMergeRequests
 	MaxBodyBytes   int64
 }
 
@@ -137,7 +143,7 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 			break
 		}
 		result, err = h.Projects.GetRepositoryForProject(r.Context(), verified.TenantID, verified.ProjectID)
-	case agentv2.ToolRepositoryDiff, agentv2.ToolRepositoryApplyPatch, agentv2.ToolRepositoryCreateBranch, agentv2.ToolRepositoryCommit, agentv2.ToolRepositoryPush:
+	case agentv2.ToolRepositoryDiff, agentv2.ToolRepositoryApplyPatch, agentv2.ToolRepositoryCreateBranch, agentv2.ToolRepositoryCommit, agentv2.ToolRepositoryPush, agentv2.ToolRepositoryCreateMergeRequest:
 		result, err = h.invokeRepository(r.Context(), verified, request)
 	case agentv2.ToolWorkspaceCreate, agentv2.ToolWorkspaceGet, agentv2.ToolWorkspaceExec, agentv2.ToolWorkspaceDestroy:
 		result, err = h.invokeWorkspace(r.Context(), verified, request)
@@ -175,6 +181,12 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 			status, code, message, retryable = http.StatusConflict, "CONFLICT", "workspace operation conflicts with current state", false
 		case errors.Is(err, workspace.ErrPolicyDenied):
 			status, code, message, retryable = http.StatusForbidden, "POLICY_DENIED", "workspace command is denied by policy", false
+		case domain.HasCode(err, domain.CodeInvalidArgument):
+			status, code, message, retryable = http.StatusBadRequest, "INVALID_ARGUMENT", "source operation is invalid", false
+		case domain.HasCode(err, domain.CodeNotFound):
+			status, code, message, retryable = http.StatusNotFound, "NOT_FOUND", "source resource not found", false
+		case domain.HasCode(err, domain.CodeConflict), domain.HasCode(err, domain.CodeStaleVersion):
+			status, code, message, retryable = http.StatusConflict, "CONFLICT", "source operation conflicts with current repository state", false
 		}
 		writeResponse(w, status, agentv2.InvocationResponse{
 			APIVersion: agentv2.APIVersion, InvocationID: "read-" + request.CorrelationID,
@@ -239,6 +251,14 @@ type repositoryPushArguments struct {
 	CredentialLeases  []string          `json:"credential_leases"`
 	TimeoutSeconds    int64             `json:"timeout_seconds,omitempty"`
 	OutputLimitBytes  int64             `json:"output_limit_bytes,omitempty"`
+}
+
+type repositoryMergeRequestArguments struct {
+	WorkspaceID     string `json:"workspace_id"`
+	ChangePlanID    string `json:"change_plan_id"`
+	CommitCommandID string `json:"commit_command_id"`
+	SourceBranch    string `json:"source_branch"`
+	Title           string `json:"title"`
 }
 
 func (h Handler) invokeRepository(ctx context.Context, verified agentv2.VerifiedInvocationContext, request agentv2.InvocationRequest) (any, error) {
@@ -407,6 +427,38 @@ func (h Handler) invokeRepository(ctx context.Context, verified agentv2.Verified
 		return queue(arguments.WorkspaceID, request.IdempotencyKey, "repository_push", "repository:"+repository.ID,
 			[]string{"workspace-agent", "verified-git-push", repository.ID, strings.TrimRight(repository.WebURL, "/") + ".git", arguments.Branch, revision.CommitSHA, arguments.CommitSHA, plan.PlanHash, arguments.ExpectedRemoteSHA},
 			revision.SourceRoot, arguments.EnvironmentRefs, arguments.CredentialLeases, arguments.TimeoutSeconds, arguments.OutputLimitBytes)
+	case agentv2.ToolRepositoryCreateMergeRequest:
+		if h.MergeRequests == nil {
+			return nil, errors.New("merge request service is unavailable")
+		}
+		var arguments repositoryMergeRequestArguments
+		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || strings.TrimSpace(arguments.WorkspaceID) == "" || strings.TrimSpace(arguments.ChangePlanID) == "" || strings.TrimSpace(arguments.CommitCommandID) == "" || !sourcev2.ValidBranch(arguments.SourceBranch) || !validMergeRequestTitle(arguments.Title) {
+			return nil, errInvalidRepositoryArguments
+		}
+		revision, err := revisionFor(arguments.WorkspaceID)
+		if err != nil {
+			return nil, err
+		}
+		plan, err := h.SourceChanges.GetSourceChangePlan(ctx, verified.TenantID, verified.ProjectID, arguments.ChangePlanID)
+		if err != nil {
+			return nil, err
+		}
+		receipt, err := h.Workspaces.GetCommitReceipt(ctx, scope, arguments.CommitCommandID)
+		if err != nil {
+			return nil, err
+		}
+		statement := receipt.Statement
+		if plan.WorkspaceID != arguments.WorkspaceID || plan.RepositoryID != repository.ID || plan.BaseSHA != revision.CommitSHA || plan.TargetBranch != arguments.SourceBranch || plan.ActorID != verified.AgentID || plan.TaskID != request.TaskID || plan.AuthorizedAt.IsZero() ||
+			statement.RepositoryID != repository.ID || statement.BaseSHA != revision.CommitSHA || statement.Branch != arguments.SourceBranch || statement.AgentID != verified.AgentID || statement.TaskID != request.TaskID || statement.CorrelationID != request.CorrelationID || statement.SourcePlanHash != plan.PlanHash || receipt.CommandID != arguments.CommitCommandID {
+			return nil, workspace.ErrPolicyDenied
+		}
+		return h.MergeRequests.CreateMergeRequest(ctx, sourceapp.CreateMergeRequestCommand{
+			TenantID: verified.TenantID, ActorID: verified.AgentID, RepositoryID: repository.ID,
+			SourceBranch: arguments.SourceBranch, TargetBranch: repository.DefaultBranch,
+			ExpectedHeadSHA: statement.CommitSHA, SourcePlanHash: plan.PlanHash,
+			TaskID: request.TaskID, CorrelationID: request.CorrelationID, Title: arguments.Title,
+			IdempotencyKey: request.IdempotencyKey,
+		})
 	default:
 		return nil, errors.New("repository tool is unavailable")
 	}
@@ -433,6 +485,10 @@ func protectedSourcePath(value string) bool {
 
 func validCommitMessage(value string) bool {
 	return value != "" && value == strings.TrimSpace(value) && len(value) <= 256 && !strings.ContainsAny(value, "\r\n\x00")
+}
+
+func validMergeRequestTitle(value string) bool {
+	return value != "" && value == strings.TrimSpace(value) && len(value) <= 200 && !strings.ContainsAny(value, "\r\n\x00")
 }
 
 func validCommitSHA(value string) bool {

@@ -116,13 +116,28 @@ func TestGitLab_CreateCredentialReturnsTokenOnlyFromResponse(t *testing.T) {
 }
 func TestGitLab_CreateMergeRequestMapsSnakeCaseFields(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, `{"iid":9,"state":"opened","source_branch":"feature","target_branch":"main","sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","web_url":"https://git/mr/9"}`)
+		_, _ = io.WriteString(w, `{"iid":9,"state":"opened","source_branch":"feature","target_branch":"main","sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","web_url":"https://git/mr/9","description":"governed"}`)
 	}))
 	defer server.Close()
 	c := gitlab.Client{BaseURL: server.URL}
 	mr, err := c.CreateMergeRequest(context.Background(), application.CreateMergeRequestRequest{ProjectID: 42, SourceBranch: "feature", TargetBranch: "main", Title: "Feature"})
 	if err != nil || mr.IID != 9 || mr.SourceBranch != "feature" || mr.TargetBranch != "main" || mr.WebURL == "" {
 		t.Fatalf("mr=%+v err=%v", mr, err)
+	}
+}
+
+func TestGitLab_FindOpenMergeRequestUsesExactSourceAndTarget(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/v4/projects/42/merge_requests" || r.URL.Query().Get("state") != "opened" || r.URL.Query().Get("source_branch") != "agent/task-1" || r.URL.Query().Get("target_branch") != "main" {
+			t.Fatalf("unexpected request %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
+		}
+		_, _ = io.WriteString(w, `[{"iid":9,"state":"opened","source_branch":"agent/task-1","target_branch":"main","sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","web_url":"https://git/mr/9","description":"governed"}]`)
+	}))
+	defer server.Close()
+	c := gitlab.Client{BaseURL: server.URL}
+	mr, found, err := c.FindOpenMergeRequest(context.Background(), 42, "agent/task-1", "main")
+	if err != nil || !found || mr.IID != 9 || mr.HeadSHA != strings.Repeat("b", 40) {
+		t.Fatalf("mr=%+v found=%v err=%v", mr, found, err)
 	}
 }
 
