@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"context"
+	"crypto/ed25519"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -16,9 +17,11 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/attachments/application"
 	"github.com/keir-research/ai-native-paas/internal/attachments/domain"
 	attachmentspostgres "github.com/keir-research/ai-native-paas/internal/attachments/postgres"
+	"github.com/keir-research/ai-native-paas/internal/attachments/recipe"
 	"github.com/keir-research/ai-native-paas/internal/attachments/testkit"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
 	attachmentsv2 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v2"
+	recipesv1 "github.com/keir-research/ai-native-paas/pkg/contracts/recipes/v1"
 )
 
 func migratedAttachmentsStore(t *testing.T) (*sql.DB, *attachmentspostgres.Store) {
@@ -57,10 +60,10 @@ func TestPostgres_AttachmentsMigrationsCleanInstallAndUpgrade(t *testing.T) {
 	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM attachments.schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 5 {
-		t.Fatalf("migration count=%d want=5", count)
+	if count != 6 {
+		t.Fatalf("migration count=%d want=6", count)
 	}
-	for _, table := range []string{"secret_sets", "secrets", "service_plans", "service_instances", "service_bindings", "domain_claims", "snapshots", "environment_inputs_snapshots", "idempotency", "outbox", "audit"} {
+	for _, table := range []string{"secret_sets", "secrets", "service_plans", "service_instances", "service_bindings", "domain_claims", "snapshots", "environment_inputs_snapshots", "recipe_versions", "idempotency", "outbox", "audit"} {
 		var exists bool
 		if err := db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='attachments' AND table_name=$1)`, table).Scan(&exists); err != nil {
 			t.Fatal(err)
@@ -117,6 +120,57 @@ func TestInputsSnapshot_IsImmutableAndContainsReferencesOnly(t *testing.T) {
 	}
 	if strings.Contains(persisted, "plaintext-secret-sentinel") || strings.Contains(persisted, `"value"`) || strings.Contains(persisted, `"password"`) {
 		t.Fatalf("snapshot payload contains plaintext-shaped data: %s", persisted)
+	}
+}
+
+func TestRecipe_ActivatedVersionIsImmutableAndSigned(t *testing.T) {
+	db, store := migratedAttachmentsStore(t)
+	ctx := context.Background()
+	publicKey, privateKey, err := ed25519.GenerateKey(strings.NewReader(strings.Repeat("r", ed25519.SeedSize)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	unsigned := recipesv1.RecipeVersion{
+		RecipeID: "postgresql", Version: "1.0.0", Kind: "stateful-service", Driver: "cozystack",
+		SchemaDigest: "sha256:" + strings.Repeat("a", 64), Stateful: true,
+		Capabilities: recipesv1.LifecycleCapabilities{Plan: true, Apply: true, Discover: true, Update: true, Retain: true, Purge: true, Backup: true, Restore: true},
+		Artifacts:    []recipesv1.ArtifactPin{{Name: "module", Kind: "opentofu", Reference: "registry.example/modules/postgresql", Digest: "sha256:" + strings.Repeat("b", 64)}},
+		Permissions:  []recipesv1.ResourcePermission{{APIGroup: "apps", Kind: "StatefulSet", Scope: recipesv1.PermissionNamespaced}},
+		Procedures:   recipesv1.LifecycleProcedures{HealthCheck: "ready-v1", Backup: "backup-v1", Restore: "restore-v1", Upgrade: "upgrade-v1", Removal: "remove-v1", Retention: "retain-until-approved"},
+	}
+	signed, err := recipe.Sign(unsigned, "beta-recipe-key", privateKey)
+	if err != nil || recipe.Verify(signed, publicKey) != nil {
+		t.Fatalf("sign err=%v verify=%v", err, recipe.Verify(signed, publicKey))
+	}
+	registry := recipe.Registry{Store: store, Keys: map[string]ed25519.PublicKey{"beta-recipe-key": publicKey}}
+	activated, err := registry.Activate(ctx, signed)
+	if err != nil || activated.ContentDigest != signed.ContentDigest {
+		t.Fatalf("activated=%+v err=%v", activated, err)
+	}
+	if replay, replayErr := registry.Activate(ctx, signed); replayErr != nil || replay.ContentDigest != signed.ContentDigest {
+		t.Fatalf("replay=%+v err=%v", replay, replayErr)
+	}
+
+	modified := unsigned
+	modified.Artifacts = append([]recipesv1.ArtifactPin(nil), unsigned.Artifacts...)
+	modified.Artifacts[0].Digest = "sha256:" + strings.Repeat("c", 64)
+	modified, err = recipe.Sign(modified, "beta-recipe-key", privateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = registry.Activate(ctx, modified); !attachmentErrorCode(err, domain.CodeConflict) {
+		t.Fatalf("activated recipe version was mutated: %v", err)
+	}
+	if _, err = db.ExecContext(ctx, `UPDATE attachments.recipe_versions SET content_digest=$1 WHERE recipe_id=$2 AND version=$3`, "sha256:"+strings.Repeat("d", 64), signed.RecipeID, signed.Version); err == nil {
+		t.Fatal("direct active recipe update was accepted")
+	}
+	if _, err = db.ExecContext(ctx, `DELETE FROM attachments.recipe_versions WHERE recipe_id=$1 AND version=$2`, signed.RecipeID, signed.Version); err == nil {
+		t.Fatal("direct active recipe deletion was accepted")
+	}
+	tampered := signed
+	tampered.Driver = "untrusted-driver"
+	if recipe.Verify(tampered, publicKey) == nil {
+		t.Fatal("tampered canonical recipe content retained a valid signature")
 	}
 }
 

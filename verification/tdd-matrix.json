@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 936,
-  "discovered_unique_test_name_count": 934,
+  "discovered_go_test_count": 942,
+  "discovered_unique_test_name_count": 940,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -588,10 +588,10 @@
       "id": "R12",
       "level": "policy",
       "name": "TestRuntime_ProductOperatorCRAllowedOnlyByRecipePolicy",
-      "status": "NEW",
-      "test_file": "test/pivot/runtime_gitops_test.go",
+      "status": "REUSED",
+      "test_file": "internal/attachments/recipe/registry_test.go",
       "test_name": "TestRuntime_ProductOperatorCRAllowedOnlyByRecipePolicy",
-      "test_ref": "test/pivot/runtime_gitops_test.go::TestRuntime_ProductOperatorCRAllowedOnlyByRecipePolicy"
+      "test_ref": "internal/attachments/recipe/registry_test.go::TestRuntime_ProductOperatorCRAllowedOnlyByRecipePolicy"
     },
     {
       "family": "R",
@@ -728,20 +728,20 @@
       "id": "A5.8",
       "level": "domain + PostgreSQL + crypto",
       "name": "TestRecipe_ActivatedVersionIsImmutableAndSigned",
-      "status": "NEW",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "test/integration/postgres_attachments_test.go",
       "test_name": "TestRecipe_ActivatedVersionIsImmutableAndSigned",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_ActivatedVersionIsImmutableAndSigned"
+      "test_ref": "test/integration/postgres_attachments_test.go::TestRecipe_ActivatedVersionIsImmutableAndSigned"
     },
     {
       "family": "A5",
       "id": "A5.9",
       "level": "application",
       "name": "TestRecipe_ResolutionPinsExactVersionAndArtifactDigests",
-      "status": "NEW",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/attachments/recipe/registry_test.go",
       "test_name": "TestRecipe_ResolutionPinsExactVersionAndArtifactDigests",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_ResolutionPinsExactVersionAndArtifactDigests"
+      "test_ref": "internal/attachments/recipe/registry_test.go::TestRecipe_ResolutionPinsExactVersionAndArtifactDigests"
     },
     {
       "family": "A5",
@@ -768,30 +768,30 @@
       "id": "A5.12",
       "level": "policy integration",
       "name": "TestRecipe_DeclaredPermissionsMatchRenderedResources",
-      "status": "NEW",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/attachments/recipe/registry_test.go",
       "test_name": "TestRecipe_DeclaredPermissionsMatchRenderedResources",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_DeclaredPermissionsMatchRenderedResources"
+      "test_ref": "internal/attachments/recipe/registry_test.go::TestRecipe_DeclaredPermissionsMatchRenderedResources"
     },
     {
       "family": "A5",
       "id": "A5.13",
       "level": "contract",
       "name": "TestRecipe_HealthBackupUpgradeAndRemovalProceduresAreComplete",
-      "status": "NEW",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/attachments/recipe/registry_test.go",
       "test_name": "TestRecipe_HealthBackupUpgradeAndRemovalProceduresAreComplete",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_HealthBackupUpgradeAndRemovalProceduresAreComplete"
+      "test_ref": "internal/attachments/recipe/registry_test.go::TestRecipe_HealthBackupUpgradeAndRemovalProceduresAreComplete"
     },
     {
       "family": "A5",
       "id": "A5.14",
       "level": "application",
       "name": "TestRecipe_CustomAdHocInstallIsAllowedWithinStricterPolicy",
-      "status": "NEW",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/attachments/recipe/registry_test.go",
       "test_name": "TestRecipe_CustomAdHocInstallIsAllowedWithinStricterPolicy",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_CustomAdHocInstallIsAllowedWithinStricterPolicy"
+      "test_ref": "internal/attachments/recipe/registry_test.go::TestRecipe_CustomAdHocInstallIsAllowedWithinStricterPolicy"
     },
     {
       "family": "A5",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 21,
-      "REUSED": 70
+      "NEW": 15,
+      "REUSED": 76
     },
     "unmapped": 0
   }

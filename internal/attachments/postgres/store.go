@@ -21,6 +21,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/attachments/domain"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
 	attachmentsv2 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v2"
+	recipesv1 "github.com/keir-research/ai-native-paas/pkg/contracts/recipes/v1"
 )
 
 //go:embed migrations/*.sql
@@ -82,6 +83,81 @@ func (s *Store) GetEnvironmentInputsSnapshot(ctx context.Context, projectID, sna
 		return attachmentsv2.EnvironmentInputsSnapshot{}, err
 	}
 	return attachmentsv2.DecodeEnvironmentInputsSnapshot(raw)
+}
+
+func (s *Store) PutActiveRecipe(ctx context.Context, version recipesv1.RecipeVersion) (recipesv1.RecipeVersion, error) {
+	if s == nil || s.DB == nil || version.Validate() != nil {
+		return recipesv1.RecipeVersion{}, domain.NewError(domain.CodeInvalidArgument, "invalid active recipe")
+	}
+	raw, err := json.Marshal(version)
+	if err != nil {
+		return recipesv1.RecipeVersion{}, err
+	}
+	result, err := s.DB.ExecContext(ctx, `
+		INSERT INTO attachments.recipe_versions(recipe_id,version,content_digest,signature_digest,signing_key_id,payload)
+		VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(recipe_id,version) DO NOTHING`,
+		version.RecipeID, version.Version, version.ContentDigest, version.SignatureDigest, version.SigningKeyID, raw)
+	if err != nil {
+		return recipesv1.RecipeVersion{}, mapDB(err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return recipesv1.RecipeVersion{}, err
+	}
+	if rows == 1 {
+		return version, nil
+	}
+	stored, err := s.GetActiveRecipe(ctx, version.RecipeID, version.Version)
+	if err != nil {
+		return recipesv1.RecipeVersion{}, err
+	}
+	storedRaw, _ := json.Marshal(stored)
+	if !bytes.Equal(storedRaw, raw) {
+		return recipesv1.RecipeVersion{}, domain.NewError(domain.CodeConflict, "active recipe version is immutable")
+	}
+	return stored, nil
+}
+
+func (s *Store) GetActiveRecipe(ctx context.Context, recipeID, version string) (recipesv1.RecipeVersion, error) {
+	var raw []byte
+	if s == nil || s.DB == nil {
+		return recipesv1.RecipeVersion{}, errors.New("postgres db is nil")
+	}
+	if err := s.DB.QueryRowContext(ctx, `SELECT payload FROM attachments.recipe_versions WHERE recipe_id=$1 AND version=$2`, recipeID, version).Scan(&raw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return recipesv1.RecipeVersion{}, domain.NewError(domain.CodeNotFound, "active recipe not found")
+		}
+		return recipesv1.RecipeVersion{}, mapDB(err)
+	}
+	var stored recipesv1.RecipeVersion
+	if err := json.Unmarshal(raw, &stored); err != nil || stored.Validate() != nil {
+		return recipesv1.RecipeVersion{}, domain.NewError(domain.CodeInternal, "stored recipe is invalid")
+	}
+	return stored, nil
+}
+
+func (s *Store) ListActiveRecipes(ctx context.Context, recipeID string) ([]recipesv1.RecipeVersion, error) {
+	if s == nil || s.DB == nil {
+		return nil, errors.New("postgres db is nil")
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT payload FROM attachments.recipe_versions WHERE recipe_id=$1 ORDER BY version`, recipeID)
+	if err != nil {
+		return nil, mapDB(err)
+	}
+	defer rows.Close()
+	versions := []recipesv1.RecipeVersion{}
+	for rows.Next() {
+		var raw []byte
+		var version recipesv1.RecipeVersion
+		if err := rows.Scan(&raw); err != nil {
+			return nil, mapDB(err)
+		}
+		if err := json.Unmarshal(raw, &version); err != nil || version.Validate() != nil {
+			return nil, domain.NewError(domain.CodeInternal, "stored recipe is invalid")
+		}
+		versions = append(versions, version)
+	}
+	return versions, rows.Err()
 }
 
 var _ application.Store = (*Store)(nil)

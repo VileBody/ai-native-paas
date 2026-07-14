@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **936**
-- Reused now: **70**
-- New local/contract tests required: **21**
+- Discovered Go tests/fuzz targets: **942**
+- Reused now: **76**
+- New local/contract tests required: **15**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -72,7 +72,7 @@ A release gate may become green only after every referenced test exists and pass
 | `R9` | LIVE_ONLY | system | `test/pivot/runtime_gitops_test.go::TestRuntime_DriftIsReportedAndSelfHealFollowsPolicy` |
 | `R10` | LIVE_ONLY | Kubernetes system | `test/pivot/runtime_gitops_test.go::TestRuntime_NamespaceAndServiceAccountIsolation` |
 | `R11` | LIVE_ONLY | system | `test/pivot/runtime_gitops_test.go::TestRuntime_HPAAndGitOpsDoNotFightOverReplicas` |
-| `R12` | NEW | policy | `test/pivot/runtime_gitops_test.go::TestRuntime_ProductOperatorCRAllowedOnlyByRecipePolicy` |
+| `R12` | REUSED | policy | `internal/attachments/recipe/registry_test.go::TestRuntime_ProductOperatorCRAllowedOnlyByRecipePolicy` |
 | `R13` | NEW | operator contract | `test/pivot/runtime_gitops_test.go::TestRuntime_PaaSAppFastPathProducesEquivalentStandardResources` |
 | `R14` | LIVE_ONLY | real Argo/ApplicationSet | `test/pivot/runtime_gitops_test.go::TestRuntime_PreviewApplicationSetCreatedAndRemovedFromBranchLifecycle` |
 | `R15` | LIVE_ONLY | Kubernetes/Gateway system | `test/pivot/runtime_gitops_test.go::TestRuntime_FailedNewRevisionKeepsPreviousTrafficWhereStrategySupportsIt` |
@@ -86,13 +86,13 @@ A release gate may become green only after every referenced test exists and pass
 | `A5.5` | LIVE_ONLY | application/system | `test/pivot/attachments_v2_test.go::TestCredential_RotationCutsOverBeforeRevokingOldVersion` |
 | `A5.6` | LIVE_ONLY | OpenBao adapter | `test/pivot/attachments_v2_test.go::TestCredential_RevokePrefixFailsClosedWhenBackendCannotGuaranteeIt` |
 | `A5.7` | LIVE_ONLY | cross-domain acceptance | `test/pivot/attachments_v2_test.go::TestSecret_GitWorkspacePlanAndBuildNeverContainValue` |
-| `A5.8` | NEW | domain + PostgreSQL + crypto | `test/pivot/attachments_v2_test.go::TestRecipe_ActivatedVersionIsImmutableAndSigned` |
-| `A5.9` | NEW | application | `test/pivot/attachments_v2_test.go::TestRecipe_ResolutionPinsExactVersionAndArtifactDigests` |
+| `A5.8` | REUSED | domain + PostgreSQL + crypto | `test/integration/postgres_attachments_test.go::TestRecipe_ActivatedVersionIsImmutableAndSigned` |
+| `A5.9` | REUSED | application | `internal/attachments/recipe/registry_test.go::TestRecipe_ResolutionPinsExactVersionAndArtifactDigests` |
 | `A5.10` | LIVE_ONLY | domain | `test/pivot/attachments_v2_test.go::TestRecipe_DependencyGraphRejectsCyclesAndVersionConflict` |
 | `A5.11` | LIVE_ONLY | application | `test/pivot/attachments_v2_test.go::TestRecipe_PlanIsPureAndCreatesNoExternalResource` |
-| `A5.12` | NEW | policy integration | `test/pivot/attachments_v2_test.go::TestRecipe_DeclaredPermissionsMatchRenderedResources` |
-| `A5.13` | NEW | contract | `test/pivot/attachments_v2_test.go::TestRecipe_HealthBackupUpgradeAndRemovalProceduresAreComplete` |
-| `A5.14` | NEW | application | `test/pivot/attachments_v2_test.go::TestRecipe_CustomAdHocInstallIsAllowedWithinStricterPolicy` |
+| `A5.12` | REUSED | policy integration | `internal/attachments/recipe/registry_test.go::TestRecipe_DeclaredPermissionsMatchRenderedResources` |
+| `A5.13` | REUSED | contract | `internal/attachments/recipe/registry_test.go::TestRecipe_HealthBackupUpgradeAndRemovalProceduresAreComplete` |
+| `A5.14` | REUSED | application | `internal/attachments/recipe/registry_test.go::TestRecipe_CustomAdHocInstallIsAllowedWithinStricterPolicy` |
 | `A5.15` | LIVE_ONLY | cross-domain application | `test/pivot/attachments_v2_test.go::TestProviderResource_EntitlementAndReservationPrecedeApply` |
 | `A5.16` | LIVE_ONLY | provider contract | `test/pivot/attachments_v2_test.go::TestProviderResource_LostApplyResponseRecoveredByExternalIdentity` |
 | `A5.17` | LIVE_ONLY | application | `test/pivot/attachments_v2_test.go::TestProviderResource_ObservedReadyCreatesBindingsAndUsageOnce` |
