@@ -179,6 +179,133 @@ func attachmentErrorCode(err error, code domain.Code) bool {
 	return errors.As(err, &typed) && typed.Code == code
 }
 
+func TestSecret_ValueAbsentFromControlPlanePersistenceAndEvents(t *testing.T) {
+	db, store := migratedAttachmentsStore(t)
+	ctx := context.Background()
+	clock := testkit.NewClock()
+	vault := testkit.NewVault()
+	runtime := testkit.NewRuntime()
+	logger := &testkit.Logger{}
+	service := &application.Service{
+		Store: store,
+		Environments: &testkit.Environments{Values: map[string]application.EnvironmentRef{
+			"env-a": {TenantID: "tenant-a", ApplicationID: "app-a", EnvironmentID: "env-a", Name: "production", Ready: true},
+		}},
+		Secrets: vault, Runtime: runtime, Logger: logger, Clock: clock, IDs: &application.SequentialIDs{},
+	}
+	const (
+		first  = "a5-3-first-plaintext-secret-sentinel"
+		second = "a5-3-rotated-plaintext-secret-sentinel"
+	)
+
+	metadata, snapshot, err := service.SetSecret(ctx, application.SetSecretRequest{
+		TenantID: "tenant-a", ApplicationID: "app-a", EnvironmentID: "env-a", Name: "API_TOKEN",
+		Scope: attachmentsv1.SecretScopeRuntime, Phase: attachmentsv1.SecretPhaseRuntime,
+		Value: []byte(first), ActorID: "user-a", IdempotencyKey: "set-first",
+	})
+	if err != nil || metadata.Name != "API_TOKEN" || snapshot.SnapshotID == "" || !vault.Contains(first) {
+		t.Fatalf("set metadata=%#v snapshot=%#v vault=%t err=%v", metadata, snapshot, vault.Contains(first), err)
+	}
+	var secretID string
+	if err := store.Transact(ctx, func(tx application.Tx) error {
+		set, ok := tx.FindSecretSet("tenant-a", "env-a")
+		if !ok {
+			return errors.New("secret set missing after write")
+		}
+		stored, ok := tx.FindSecret(set.ID, "API_TOKEN", attachmentsv1.SecretScopeRuntime)
+		if !ok {
+			return errors.New("secret metadata missing after write")
+		}
+		secretID = stored.ID
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	assertAttachmentsControlPlaneExcludes(t, db, logger, runtime, first, second)
+
+	rotated, rotatedSnapshot, err := service.SetSecret(ctx, application.SetSecretRequest{
+		TenantID: "tenant-a", ApplicationID: "app-a", EnvironmentID: "env-a", Name: "API_TOKEN",
+		Scope: attachmentsv1.SecretScopeRuntime, Phase: attachmentsv1.SecretPhaseRuntime,
+		Value: []byte(second), ActorID: "user-a", IdempotencyKey: "set-rotated",
+	})
+	if err != nil || rotated.Version <= metadata.Version || rotatedSnapshot.Version <= snapshot.Version || !vault.Contains(second) {
+		t.Fatalf("rotate metadata=%#v snapshot=%#v vault=%t err=%v", rotated, rotatedSnapshot, vault.Contains(second), err)
+	}
+	assertAttachmentsControlPlaneExcludes(t, db, logger, runtime, first, second)
+
+	deletedSnapshot, err := service.DeleteSecret(ctx, application.DeleteSecretRequest{
+		TenantID: "tenant-a", EnvironmentID: "env-a", SecretID: secretID,
+		ActorID: "user-a", IdempotencyKey: "delete-secret",
+	})
+	if err != nil || deletedSnapshot.Version <= rotatedSnapshot.Version || vault.Contains(first) || vault.Contains(second) {
+		t.Fatalf("delete snapshot=%#v first=%t second=%t err=%v", deletedSnapshot, vault.Contains(first), vault.Contains(second), err)
+	}
+	assertAttachmentsControlPlaneExcludes(t, db, logger, runtime, first, second)
+}
+
+func assertAttachmentsControlPlaneExcludes(t *testing.T, db *sql.DB, logger *testkit.Logger, runtime *testkit.Runtime, sentinels ...string) {
+	t.Helper()
+	rows, err := db.Query(`SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='attachments' ORDER BY tablename`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tables []string
+	for rows.Next() {
+		var table string
+		if err := rows.Scan(&table); err != nil {
+			rows.Close()
+			t.Fatal(err)
+		}
+		tables = append(tables, table)
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	for _, table := range tables {
+		identifier := `"` + strings.ReplaceAll(table, `"`, `""`) + `"`
+		values, err := db.Query(`SELECT row_to_json(stored_row)::text FROM attachments.` + identifier + ` AS stored_row`)
+		if err != nil {
+			t.Fatalf("inspect attachments.%s: %v", table, err)
+		}
+		for values.Next() {
+			var value string
+			if err := values.Scan(&value); err != nil {
+				values.Close()
+				t.Fatal(err)
+			}
+			for _, sentinel := range sentinels {
+				if strings.Contains(value, sentinel) {
+					values.Close()
+					t.Fatalf("attachments.%s persisted plaintext sentinel", table)
+				}
+			}
+		}
+		if err := values.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := values.Err(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, sentinel := range sentinels {
+		if logger.Contains(sentinel) {
+			t.Fatalf("structured logs contain plaintext sentinel")
+		}
+	}
+	rawSnapshots, err := json.Marshal(runtime.Snapshots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sentinel := range sentinels {
+		if strings.Contains(string(rawSnapshots), sentinel) {
+			t.Fatalf("runtime snapshot contains plaintext sentinel")
+		}
+	}
+}
+
 func TestPostgres_AttachmentMutationAndOutboxCommitAtomically(t *testing.T) {
 	db, store := migratedAttachmentsStore(t)
 	ctx := context.Background()

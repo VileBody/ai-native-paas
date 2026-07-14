@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 979,
-  "discovered_unique_test_name_count": 977,
+  "discovered_go_test_count": 980,
+  "discovered_unique_test_name_count": 978,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -678,10 +678,10 @@
       "id": "A5.3",
       "level": "PostgreSQL + redaction",
       "name": "TestSecret_ValueAbsentFromControlPlanePersistenceAndEvents",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "test/integration/postgres_attachments_test.go",
       "test_name": "TestSecret_ValueAbsentFromControlPlanePersistenceAndEvents",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestSecret_ValueAbsentFromControlPlanePersistenceAndEvents"
+      "test_ref": "test/integration/postgres_attachments_test.go::TestSecret_ValueAbsentFromControlPlanePersistenceAndEvents"
     },
     {
       "family": "A5",
@@ -1589,8 +1589,8 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 65,
-      "REUSED": 92
+      "LIVE_ONLY": 64,
+      "REUSED": 93
     },
     "unmapped": 0
   }
