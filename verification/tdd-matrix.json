@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 995,
-  "discovered_unique_test_name_count": 993,
+  "discovered_go_test_count": 997,
+  "discovered_unique_test_name_count": 995,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1138,20 +1138,20 @@
       "id": "C17",
       "level": "reconciliation",
       "name": "TestUsage_ReconcilerCorrectsObservedResourceDriftOnce",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/commerce_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/commerce/application/commercial_tdd_test.go",
       "test_name": "TestUsage_ReconcilerCorrectsObservedResourceDriftOnce",
-      "test_ref": "test/pivot/commerce_v2_test.go::TestUsage_ReconcilerCorrectsObservedResourceDriftOnce"
+      "test_ref": "internal/commerce/application/commercial_tdd_test.go::TestUsage_ReconcilerCorrectsObservedResourceDriftOnce"
     },
     {
       "family": "C",
       "id": "C18",
       "level": "application",
       "name": "TestCommercial_CanceledBeforeExecutionCreatesNoUsageCharge",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/commerce_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/commerce/application/commercial_tdd_test.go",
       "test_name": "TestCommercial_CanceledBeforeExecutionCreatesNoUsageCharge",
-      "test_ref": "test/pivot/commerce_v2_test.go::TestCommercial_CanceledBeforeExecutionCreatesNoUsageCharge"
+      "test_ref": "internal/commerce/application/commercial_tdd_test.go::TestCommercial_CanceledBeforeExecutionCreatesNoUsageCharge"
     },
     {
       "family": "G",
@@ -1589,8 +1589,8 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 51,
-      "REUSED": 106
+      "LIVE_ONLY": 49,
+      "REUSED": 108
     },
     "unmapped": 0
   }

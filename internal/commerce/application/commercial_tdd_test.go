@@ -400,6 +400,33 @@ func TestBuildRating_CanceledBeforeStartIsNotCharged(t *testing.T) {
 		t.Fatal("canceled build charged")
 	}
 }
+func TestCommercial_CanceledBeforeExecutionCreatesNoUsageCharge(t *testing.T) {
+	f := newFixture(t)
+	in := buildUsage(commercev1.BuildCanceled)
+	in.FinishedAt = in.StartedAt
+
+	// Report deliberately non-zero counters to prove the pre-execution outcome,
+	// rather than untrusted resource counters, controls whether usage is charged.
+	in.CPUSeconds = 999
+	in.MemoryGiBSeconds = 999
+	in.DockerVMSeconds = 999
+	if err := f.svc.RecordBuildUsage(f.ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.RecordBuildUsage(f.ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	if events := f.store.Usage("tenant-1", f.period.ID); len(events) != 0 {
+		t.Fatalf("pre-execution cancellation created usage: %+v", events)
+	}
+	preview, err := f.svc.PreviewInvoice(f.ctx, "tenant-1", f.period.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(preview.Lines) != 0 || preview.TotalMinorUnits != 0 {
+		t.Fatalf("pre-execution cancellation was billed: %+v", preview)
+	}
+}
 func TestBuildRating_DockerVMUsesSeparateMeter(t *testing.T) {
 	f := newFixture(t)
 	if err := f.svc.RecordBuildUsage(f.ctx, buildUsage(commercev1.BuildSucceeded)); err != nil {
@@ -776,6 +803,47 @@ func TestUsageReconciler_DriftAboveThresholdRaisesAlert(t *testing.T) {
 	}
 	if len(f.store.Alerts("tenant-1", f.period.ID)) != 1 {
 		t.Fatal("alert missing")
+	}
+}
+func TestUsage_ReconcilerCorrectsObservedResourceDriftOnce(t *testing.T) {
+	f := newFixture(t)
+	f.append(t, "drift-base", commercev1.MeterRuntimeUnitSeconds, commercev1.UsageStandard, 3000, "")
+
+	first, err := f.svc.ReconcileUsage(f.ctx, reconcileCommand(3600))
+	if err != nil || first != 600 {
+		t.Fatalf("first correction=%d err=%v", first, err)
+	}
+	outboxAfterFirst := len(f.store.Outbox())
+	alertsAfterFirst := len(f.store.Alerts("tenant-1", f.period.ID))
+
+	second, err := f.svc.ReconcileUsage(f.ctx, reconcileCommand(3600))
+	if err != nil || second != 0 {
+		t.Fatalf("replayed correction=%d err=%v", second, err)
+	}
+
+	events := f.store.Usage("tenant-1", f.period.ID)
+	var corrections int
+	var total int64
+	for _, event := range events {
+		if event.Meter != commercev1.MeterRuntimeUnitSeconds {
+			continue
+		}
+		total += event.Quantity
+		if event.Kind == commercev1.UsageCorrection {
+			corrections++
+			if event.Quantity != 600 {
+				t.Fatalf("correction quantity=%d", event.Quantity)
+			}
+		}
+	}
+	if total != 3600 || corrections != 1 {
+		t.Fatalf("total=%d corrections=%d events=%+v", total, corrections, events)
+	}
+	if alertsAfterFirst != 1 || len(f.store.Alerts("tenant-1", f.period.ID)) != alertsAfterFirst {
+		t.Fatalf("alerts first=%d after replay=%d", alertsAfterFirst, len(f.store.Alerts("tenant-1", f.period.ID)))
+	}
+	if len(f.store.Outbox()) != outboxAfterFirst {
+		t.Fatal("replayed reconciliation emitted another outbox record")
 	}
 }
 func reconcileCommand(q int64) application.ReconcileUsageCommand {
