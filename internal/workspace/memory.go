@@ -2,9 +2,12 @@ package workspace
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"sync"
 	"time"
+
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 )
 
 type MemoryStore struct {
@@ -15,13 +18,44 @@ type MemoryStore struct {
 	commands       map[string]Command
 	commandIdem    map[string]string
 	serializations map[string]string
+	commitReceipts map[string]sourcev2.AgentCommitReceipt
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
 		workspaces: make(map[string]Workspace), workspaceIdem: make(map[string]string), workspaceTasks: make(map[string]string),
-		commands: make(map[string]Command), commandIdem: make(map[string]string), serializations: make(map[string]string),
+		commands: make(map[string]Command), commandIdem: make(map[string]string), serializations: make(map[string]string), commitReceipts: make(map[string]sourcev2.AgentCommitReceipt),
 	}
+}
+
+func (s *MemoryStore) PutCommitReceipt(_ context.Context, scope CommitReceiptScope, receipt sourcev2.AgentCommitReceipt) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	command, ok := s.commands[scope.CommandID]
+	if !ok || command.TenantID != scope.TenantID || command.ProjectID != scope.ProjectID || command.WorkspaceID != scope.WorkspaceID || command.TaskID != scope.TaskID || command.ActorID != scope.ActorID || receipt.Validate() != nil {
+		return ErrNotFound
+	}
+	if existing, ok := s.commitReceipts[scope.CommandID]; ok {
+		existingRaw, _ := json.Marshal(existing)
+		candidateRaw, _ := json.Marshal(receipt)
+		if string(existingRaw) != string(candidateRaw) {
+			return ErrConflict
+		}
+		return nil
+	}
+	s.commitReceipts[scope.CommandID] = receipt
+	return nil
+}
+
+func (s *MemoryStore) GetCommitReceipt(_ context.Context, tenantID, projectID, commandID string) (sourcev2.AgentCommitReceipt, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	receipt, ok := s.commitReceipts[commandID]
+	command := s.commands[commandID]
+	if !ok || command.TenantID != tenantID || command.ProjectID != projectID {
+		return sourcev2.AgentCommitReceipt{}, ErrNotFound
+	}
+	return receipt, nil
 }
 
 func (s *MemoryStore) CreateWorkspace(_ context.Context, candidate Workspace) (Workspace, bool, error) {

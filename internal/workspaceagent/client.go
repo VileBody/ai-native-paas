@@ -22,6 +22,7 @@ import (
 	"time"
 
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -171,6 +172,13 @@ func (c *Client) SubmitPlanReceipt(ctx context.Context, receipt infrastructurev1
 		return errors.New("workspace plan receipt is invalid")
 	}
 	return c.doJSON(ctx, http.MethodPost, "/api/v1/workspace-agent/plan-receipts", receipt, http.StatusNoContent, nil)
+}
+
+func (c *Client) SubmitCommitReceipt(ctx context.Context, receipt sourcev2.AgentCommitReceipt) error {
+	if receipt.Validate() != nil {
+		return errors.New("workspace commit receipt is invalid")
+	}
+	return c.doJSON(ctx, http.MethodPost, "/api/v1/workspace-agent/commit-receipts", receipt, http.StatusNoContent, nil)
 }
 
 func (c *Client) Rotate(ctx context.Context, sessionID string) error {

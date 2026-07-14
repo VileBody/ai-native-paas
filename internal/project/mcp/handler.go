@@ -4,6 +4,7 @@ package mcp
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -32,6 +33,7 @@ type WorkspaceCommands interface {
 	Create(context.Context, workspace.CreateRequest) (workspacev1.WorkspaceRef, error)
 	Get(context.Context, workspace.Scope, string) (workspacev1.WorkspaceRef, error)
 	GetSourceRevision(context.Context, workspace.Scope, string) (sourcev2.SourceRevision, error)
+	GetCommitReceipt(context.Context, workspace.Scope, string) (sourcev2.AgentCommitReceipt, error)
 	Exec(context.Context, workspace.ExecRequest) (workspacev1.CommandView, error)
 	Destroy(context.Context, workspace.Scope, string) (workspacev1.WorkspaceRef, error)
 }
@@ -45,6 +47,8 @@ type InfrastructureCommands interface {
 
 var errInvalidWorkspaceArguments = errors.New("invalid workspace tool arguments")
 var errInvalidInfrastructureArguments = errors.New("invalid infrastructure tool arguments")
+var errInvalidRepositoryArguments = errors.New("invalid repository tool arguments")
+var errSourceApprovalRequired = errors.New("source approval required")
 
 type Handler struct {
 	Enrollment     *enrollment.Service
@@ -125,6 +129,8 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 			break
 		}
 		result, err = h.Projects.GetRepositoryForProject(r.Context(), verified.TenantID, verified.ProjectID)
+	case agentv2.ToolRepositoryDiff, agentv2.ToolRepositoryApplyPatch, agentv2.ToolRepositoryCreateBranch, agentv2.ToolRepositoryCommit, agentv2.ToolRepositoryPush:
+		result, err = h.invokeRepository(r.Context(), verified, request)
 	case agentv2.ToolWorkspaceCreate, agentv2.ToolWorkspaceGet, agentv2.ToolWorkspaceExec, agentv2.ToolWorkspaceDestroy:
 		result, err = h.invokeWorkspace(r.Context(), verified, request)
 	case agentv2.ToolInfraPlan, agentv2.ToolInfraGetPlan, agentv2.ToolInfraApply, agentv2.ToolApprovalRequest, agentv2.ToolApprovalGet:
@@ -139,6 +145,10 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 	if err != nil {
 		status, code, message, retryable := http.StatusServiceUnavailable, "UNAVAILABLE", "project operation failed", true
 		switch {
+		case errors.Is(err, errInvalidRepositoryArguments):
+			status, code, message, retryable = http.StatusBadRequest, "INVALID_ARGUMENT", "invalid repository tool arguments", false
+		case errors.Is(err, errSourceApprovalRequired):
+			status, code, message, retryable = http.StatusPreconditionRequired, "APPROVAL_REQUIRED", "production GitOps path requires an exact source approval", false
 		case errors.Is(err, errInvalidInfrastructureArguments):
 			status, code, message, retryable = http.StatusBadRequest, "INVALID_ARGUMENT", "invalid infrastructure tool arguments", false
 		case errors.Is(err, infraapp.ErrNotFound):
@@ -170,6 +180,225 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 		return
 	}
 	writeResponse(w, http.StatusOK, agentv2.InvocationResponse{APIVersion: agentv2.APIVersion, InvocationID: "read-" + request.CorrelationID, Result: raw})
+}
+
+type repositoryWorkspaceArguments struct {
+	WorkspaceID      string            `json:"workspace_id"`
+	WorkingDir       string            `json:"working_dir,omitempty"`
+	EnvironmentRefs  map[string]string `json:"environment_refs,omitempty"`
+	CredentialLeases []string          `json:"credential_leases,omitempty"`
+	TimeoutSeconds   int64             `json:"timeout_seconds,omitempty"`
+	OutputLimitBytes int64             `json:"output_limit_bytes,omitempty"`
+}
+
+type repositoryBranchArguments struct {
+	WorkspaceID      string            `json:"workspace_id"`
+	Branch           string            `json:"branch"`
+	WorkingDir       string            `json:"working_dir,omitempty"`
+	EnvironmentRefs  map[string]string `json:"environment_refs,omitempty"`
+	CredentialLeases []string          `json:"credential_leases,omitempty"`
+	TimeoutSeconds   int64             `json:"timeout_seconds,omitempty"`
+	OutputLimitBytes int64             `json:"output_limit_bytes,omitempty"`
+}
+
+type repositoryPatchArguments struct {
+	WorkspaceID      string                   `json:"workspace_id"`
+	Files            []sourcev2.PatchMutation `json:"files"`
+	WorkingDir       string                   `json:"working_dir,omitempty"`
+	TimeoutSeconds   int64                    `json:"timeout_seconds,omitempty"`
+	OutputLimitBytes int64                    `json:"output_limit_bytes,omitempty"`
+}
+
+type repositoryCommitArguments struct {
+	WorkspaceID      string `json:"workspace_id"`
+	Branch           string `json:"branch"`
+	Message          string `json:"message"`
+	WorkingDir       string `json:"working_dir,omitempty"`
+	TimeoutSeconds   int64  `json:"timeout_seconds,omitempty"`
+	OutputLimitBytes int64  `json:"output_limit_bytes,omitempty"`
+}
+
+type repositoryPushArguments struct {
+	WorkspaceID       string            `json:"workspace_id"`
+	Branch            string            `json:"branch"`
+	CommitSHA         string            `json:"commit_sha"`
+	ExpectedRemoteSHA string            `json:"expected_remote_sha"`
+	WorkingDir        string            `json:"working_dir,omitempty"`
+	EnvironmentRefs   map[string]string `json:"environment_refs"`
+	CredentialLeases  []string          `json:"credential_leases"`
+	TimeoutSeconds    int64             `json:"timeout_seconds,omitempty"`
+	OutputLimitBytes  int64             `json:"output_limit_bytes,omitempty"`
+}
+
+func (h Handler) invokeRepository(ctx context.Context, verified agentv2.VerifiedInvocationContext, request agentv2.InvocationRequest) (any, error) {
+	if h.Workspaces == nil || h.Projects == nil {
+		return nil, errors.New("repository workspace service is unavailable")
+	}
+	scope := workspace.Scope{TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID}
+	repository, err := h.Projects.GetRepositoryForProject(ctx, verified.TenantID, verified.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	queue := func(workspaceID, idempotencyKey, kind, serializationKey string, argv []string, workingDir string, environmentRefs map[string]string, leases []string, timeout, outputLimit int64) (workspacev1.CommandView, error) {
+		if timeout == 0 {
+			timeout = 300
+		}
+		if outputLimit == 0 {
+			outputLimit = 1 << 20
+		}
+		spec := workspacev1.CommandSpec{Argv: argv, WorkingDir: workingDir, EnvironmentRefs: cloneStringMap(environmentRefs), TimeoutSeconds: timeout, OutputLimitBytes: outputLimit}
+		if strings.TrimSpace(workspaceID) == "" || timeout > 600 || spec.Validate() != nil {
+			return workspacev1.CommandView{}, errInvalidRepositoryArguments
+		}
+		return h.Workspaces.Exec(ctx, workspace.ExecRequest{Scope: scope, WorkspaceID: workspaceID, IdempotencyKey: idempotencyKey, Kind: kind, SerializationKey: serializationKey, CredentialLeases: append([]string(nil), leases...), Spec: spec})
+	}
+	revisionFor := func(workspaceID string) (sourcev2.SourceRevision, error) {
+		revision, revisionErr := h.Workspaces.GetSourceRevision(ctx, scope, workspaceID)
+		if revisionErr != nil {
+			return sourcev2.SourceRevision{}, revisionErr
+		}
+		if revision.RepositoryID != repository.ID {
+			return sourcev2.SourceRevision{}, workspace.ErrPolicyDenied
+		}
+		return revision, nil
+	}
+	switch request.Tool {
+	case agentv2.ToolRepositoryCreateBranch:
+		var arguments repositoryBranchArguments
+		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || !sourcev2.ValidBranch(arguments.Branch) || !exactGitCredentialRefs(arguments.EnvironmentRefs, arguments.CredentialLeases) {
+			return nil, errInvalidRepositoryArguments
+		}
+		revision, err := revisionFor(arguments.WorkspaceID)
+		if err != nil {
+			return nil, err
+		}
+		if !matchesSourceRoot(arguments.WorkingDir, revision.SourceRoot) {
+			return nil, errInvalidRepositoryArguments
+		}
+		workingDir := revision.SourceRoot
+		return queue(arguments.WorkspaceID, request.IdempotencyKey, "repository_checkout", "repository:"+repository.ID,
+			[]string{"workspace-agent", "verified-git-checkout", repository.ID, strings.TrimRight(repository.WebURL, "/") + ".git", revision.CommitSHA, arguments.Branch},
+			workingDir, arguments.EnvironmentRefs, arguments.CredentialLeases, arguments.TimeoutSeconds, arguments.OutputLimitBytes)
+	case agentv2.ToolRepositoryDiff:
+		var arguments repositoryWorkspaceArguments
+		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil {
+			return nil, errInvalidRepositoryArguments
+		}
+		revision, err := revisionFor(arguments.WorkspaceID)
+		if err != nil {
+			return nil, err
+		}
+		if !matchesSourceRoot(arguments.WorkingDir, revision.SourceRoot) {
+			return nil, errInvalidRepositoryArguments
+		}
+		return queue(arguments.WorkspaceID, request.IdempotencyKey, "repository_diff", "", []string{"git", "diff", "--no-ext-diff", "--stat", "--"}, revision.SourceRoot, nil, nil, arguments.TimeoutSeconds, arguments.OutputLimitBytes)
+	case agentv2.ToolRepositoryApplyPatch:
+		var arguments repositoryPatchArguments
+		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || len(arguments.Files) == 0 || len(arguments.Files) > 126 {
+			return nil, errInvalidRepositoryArguments
+		}
+		revision, err := revisionFor(arguments.WorkspaceID)
+		if err != nil {
+			return nil, err
+		}
+		if !matchesSourceRoot(arguments.WorkingDir, revision.SourceRoot) {
+			return nil, errInvalidRepositoryArguments
+		}
+		argv := []string{"workspace-agent", "verified-git-apply-patch", revision.CommitSHA}
+		for _, file := range arguments.Files {
+			if file.Validate() != nil {
+				return nil, errInvalidRepositoryArguments
+			}
+			if protectedSourcePath(file.Path) {
+				return nil, errSourceApprovalRequired
+			}
+			raw, _ := json.Marshal(file)
+			encoded := base64.RawURLEncoding.EncodeToString(raw)
+			if len(encoded) > 4096 {
+				return nil, errInvalidRepositoryArguments
+			}
+			argv = append(argv, encoded)
+		}
+		return queue(arguments.WorkspaceID, request.IdempotencyKey, "repository_patch", "repository:"+repository.ID, argv, revision.SourceRoot, nil, nil, arguments.TimeoutSeconds, arguments.OutputLimitBytes)
+	case agentv2.ToolRepositoryCommit:
+		var arguments repositoryCommitArguments
+		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || !sourcev2.ValidBranch(arguments.Branch) || !validCommitMessage(arguments.Message) {
+			return nil, errInvalidRepositoryArguments
+		}
+		revision, err := revisionFor(arguments.WorkspaceID)
+		if err != nil {
+			return nil, err
+		}
+		if !matchesSourceRoot(arguments.WorkingDir, revision.SourceRoot) {
+			return nil, errInvalidRepositoryArguments
+		}
+		command, err := queue(arguments.WorkspaceID, request.IdempotencyKey, "repository_commit", "repository:"+repository.ID,
+			[]string{"workspace-agent", "verified-git-commit", repository.ID, revision.CommitSHA, arguments.Branch, verified.AgentID, request.TaskID, request.CorrelationID, arguments.Message},
+			revision.SourceRoot, nil, nil, arguments.TimeoutSeconds, arguments.OutputLimitBytes)
+		if err != nil {
+			return nil, err
+		}
+		receipt, receiptErr := h.Workspaces.GetCommitReceipt(ctx, scope, command.CommandID)
+		if receiptErr == nil {
+			return map[string]any{"command": command, "receipt": receipt}, nil
+		}
+		if !errors.Is(receiptErr, workspace.ErrNotFound) {
+			return nil, receiptErr
+		}
+		return map[string]any{"status": "WAITING_DEPENDENCY", "command": command}, nil
+	case agentv2.ToolRepositoryPush:
+		var arguments repositoryPushArguments
+		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || !sourcev2.ValidBranch(arguments.Branch) || !validCommitSHA(arguments.CommitSHA) || arguments.ExpectedRemoteSHA != "absent" && !validCommitSHA(arguments.ExpectedRemoteSHA) || !exactGitCredentialRefs(arguments.EnvironmentRefs, arguments.CredentialLeases) {
+			return nil, errInvalidRepositoryArguments
+		}
+		revision, err := revisionFor(arguments.WorkspaceID)
+		if err != nil {
+			return nil, err
+		}
+		if !matchesSourceRoot(arguments.WorkingDir, revision.SourceRoot) {
+			return nil, errInvalidRepositoryArguments
+		}
+		return queue(arguments.WorkspaceID, request.IdempotencyKey, "repository_push", "repository:"+repository.ID,
+			[]string{"workspace-agent", "verified-git-push", repository.ID, strings.TrimRight(repository.WebURL, "/") + ".git", arguments.Branch, revision.CommitSHA, arguments.CommitSHA, arguments.ExpectedRemoteSHA},
+			revision.SourceRoot, arguments.EnvironmentRefs, arguments.CredentialLeases, arguments.TimeoutSeconds, arguments.OutputLimitBytes)
+	default:
+		return nil, errors.New("repository tool is unavailable")
+	}
+}
+
+func exactGitCredentialRefs(refs map[string]string, leases []string) bool {
+	if len(refs) != 2 || len(leases) == 0 {
+		return false
+	}
+	for _, name := range []string{"GIT_USERNAME", "GIT_TOKEN"} {
+		if !strings.HasPrefix(refs[name], "credential://") {
+			return false
+		}
+	}
+	return true
+}
+
+func matchesSourceRoot(requested, bound string) bool { return requested == "" || requested == bound }
+
+func protectedSourcePath(value string) bool {
+	clean := filepath.ToSlash(filepath.Clean(value))
+	return clean == "deploy/environments/production" || strings.HasPrefix(clean, "deploy/environments/production/")
+}
+
+func validCommitMessage(value string) bool {
+	return value != "" && value == strings.TrimSpace(value) && len(value) <= 256 && !strings.ContainsAny(value, "\r\n\x00")
+}
+
+func validCommitSHA(value string) bool {
+	if len(value) != 40 && len(value) != 64 {
+		return false
+	}
+	for _, character := range value {
+		if character < '0' || character > '9' && character < 'a' || character > 'f' {
+			return false
+		}
+	}
+	return true
 }
 
 type workspaceCreateArguments struct {

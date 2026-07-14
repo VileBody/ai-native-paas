@@ -54,6 +54,7 @@ func main() {
 		platformprofile.Prod("workspace-postgres-intent-store"),
 		platformprofile.Prod("infrastructure-postgres-exact-plan-gate"),
 		platformprofile.Prod("versioned-beta-rate-card"),
+		platformprofile.Prod("governed-workspace-git-mutations"),
 	); err != nil {
 		log.Fatal(err)
 	}

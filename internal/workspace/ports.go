@@ -5,6 +5,7 @@ import (
 	"time"
 
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -24,6 +25,8 @@ type Store interface {
 	ListTimedOut(context.Context, time.Time, int) ([]Command, error)
 	AcquireSerialization(context.Context, string, string, string) (bool, error)
 	ReleaseSerialization(context.Context, string, string, string) error
+	PutCommitReceipt(context.Context, CommitReceiptScope, sourcev2.AgentCommitReceipt) error
+	GetCommitReceipt(context.Context, string, string, string) (sourcev2.AgentCommitReceipt, error)
 }
 
 type NetworkIsolation struct {
@@ -149,4 +152,13 @@ type PlanReceiptScope struct {
 
 type PlanReceiptStore interface {
 	PutPlanReceipt(context.Context, PlanReceiptScope, infrastructurev1.AgentPlanReceipt) error
+}
+
+type CommitReceiptScope struct {
+	TenantID    string
+	ProjectID   string
+	WorkspaceID string
+	TaskID      string
+	CommandID   string
+	ActorID     string
 }

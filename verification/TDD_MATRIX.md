@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **857**
-- Reused now: **30**
-- New local/contract tests required: **50**
-- Live/provider/system tests required: **77**
+- Discovered Go tests/fuzz targets: **870**
+- Reused now: **37**
+- New local/contract tests required: **47**
+- Live/provider/system tests required: **73**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -29,22 +29,22 @@ A release gate may become green only after every referenced test exists and pass
 | `K13` | REUSED | live PostgreSQL | `test/integration/postgres_migration_lock_test.go::TestPostgres_ConcurrentMigrationStartupUsesOneOwner` |
 | `K14` | LIVE_ONLY | chaos + PostgreSQL | `test/pivot/kernel_v2_test.go::TestKernel_OperationCheckpointSurvivesDatabaseFailover` |
 | `S1` | LIVE_ONLY | application + GitLab contract | `test/pivot/source_v2_test.go::TestSource_CreateProjectBootstrapsV2RepositoryLayout` |
-| `S2` | LIVE_ONLY | real local Git integration | `test/pivot/source_v2_test.go::TestSource_CheckoutUsesExactCommitNotMutableBranchHead` |
-| `S3` | LIVE_ONLY | fuzz + application | `test/pivot/source_v2_test.go::TestSource_PatchRejectsNonCanonicalAndGitInternalPaths` |
+| `S2` | REUSED | real local Git integration | `internal/workspaceagent/source_v2_test.go::TestSource_CheckoutUsesExactCommitNotMutableBranchHead` |
+| `S3` | REUSED | fuzz + application | `internal/workspaceagent/source_v2_test.go::TestSource_PatchRejectsNonCanonicalAndGitInternalPaths` |
 | `S4` | NEW | application | `test/pivot/source_v2_test.go::TestSource_ProductionGitOpsPathRequiresApprovalPolicy` |
-| `S5` | NEW | Git integration | `test/pivot/source_v2_test.go::TestSource_AgentCommitContainsSignedAttestationAndCorrelation` |
-| `S6` | NEW | Git integration + concurrency | `test/pivot/source_v2_test.go::TestSource_ConcurrentPushUsesExpectedBaseSHA` |
-| `S7` | LIVE_ONLY | application | `test/pivot/source_v2_test.go::TestSource_SecretScannerBlocksCredentialBeforeCommit` |
+| `S5` | REUSED | Git integration | `internal/workspaceagent/source_v2_test.go::TestSource_AgentCommitContainsSignedAttestationAndCorrelation` |
+| `S6` | REUSED | Git integration + concurrency | `internal/workspaceagent/source_v2_test.go::TestSource_ConcurrentPushUsesExpectedBaseSHA` |
+| `S7` | REUSED | application | `internal/workspaceagent/source_v2_test.go::TestSource_SecretScannerBlocksCredentialBeforeCommit` |
 | `S8` | LIVE_ONLY | real GitLab provider | `test/pivot/source_v2_test.go::TestSource_ProjectTokenCannotReadSiblingRepository` |
 | `S9` | LIVE_ONLY | application + provider fake | `test/pivot/source_v2_test.go::TestSource_MissedWebhookRecoveredByBranchReconciler` |
 | `S10` | NEW | application | `test/pivot/source_v2_test.go::TestSource_OutOfOrderWebhookCannotRegressObservedHead` |
 | `S11` | LIVE_ONLY | real GitLab provider | `test/pivot/source_v2_test.go::TestSource_RenameKeepsNumericProviderIdentity` |
 | `S12` | LIVE_ONLY | GitLab contract | `test/pivot/source_v2_test.go::TestSource_MergeRequestPublishesPlanSummaryWithoutSecrets` |
 | `S13` | NEW | application | `test/pivot/source_v2_test.go::TestSource_DeletedBranchProducesEnvironmentCleanupIntent` |
-| `S14` | NEW | integration | `test/pivot/source_v2_test.go::TestSource_SubmoduleAndLFSFollowExplicitPolicy` |
+| `S14` | REUSED | integration | `internal/workspaceagent/source_v2_test.go::TestSource_SubmoduleAndLFSFollowExplicitPolicy` |
 | `S15` | LIVE_ONLY | provider contract | `test/pivot/source_v2_test.go::TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency` |
 | `S16` | LIVE_ONLY | application + provider | `test/pivot/source_v2_test.go::TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge` |
-| `S17` | LIVE_ONLY | real Git integration | `test/pivot/source_v2_test.go::TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig` |
+| `S17` | REUSED | real Git integration | `internal/workspaceagent/source_v2_test.go::TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig` |
 | `S18` | LIVE_ONLY | reconciliation | `test/pivot/source_v2_test.go::TestSource_UnknownProviderProjectIsQuarantinedNotAdopted` |
 | `B1` | LIVE_ONLY | domain | `test/pivot/build_v2_test.go::TestBuild_IdentityIncludesCommitAndCanonicalBuildSpec` |
 | `B2` | NEW | application | `test/pivot/build_v2_test.go::TestBuild_ExplicitBuildSpecOverridesRuntimeDetection` |

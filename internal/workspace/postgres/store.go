@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/keir-research/ai-native-paas/internal/workspace"
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -307,6 +308,56 @@ func (s *Store) ReleaseSerialization(ctx context.Context, projectID, key, comman
 		return workspace.ErrConflict
 	}
 	return nil
+}
+
+func (s *Store) PutCommitReceipt(ctx context.Context, scope workspace.CommitReceiptScope, receipt sourcev2.AgentCommitReceipt) error {
+	if receipt.Validate() != nil {
+		return workspace.ErrPolicyDenied
+	}
+	raw, err := json.Marshal(receipt)
+	if err != nil {
+		return err
+	}
+	result, err := s.DB.ExecContext(ctx, `
+INSERT INTO workspace.commit_receipts(command_id,tenant_id,project_id,workspace_id,task_id,actor_id,receipt)
+SELECT $1,$2,$3,$4,$5,$6,$7
+WHERE EXISTS (
+    SELECT 1 FROM workspace.commands
+    WHERE id=$1 AND tenant_id=$2 AND project_id=$3 AND workspace_id=$4 AND task_id=$5 AND actor_id=$6
+)
+ON CONFLICT(command_id) DO NOTHING`, scope.CommandID, scope.TenantID, scope.ProjectID, scope.WorkspaceID, scope.TaskID, scope.ActorID, raw)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 1 {
+		return nil
+	}
+	existing, err := s.GetCommitReceipt(ctx, scope.TenantID, scope.ProjectID, scope.CommandID)
+	if err != nil {
+		return err
+	}
+	existingRaw, _ := json.Marshal(existing)
+	if string(existingRaw) != string(raw) {
+		return workspace.ErrConflict
+	}
+	return nil
+}
+
+func (s *Store) GetCommitReceipt(ctx context.Context, tenantID, projectID, commandID string) (sourcev2.AgentCommitReceipt, error) {
+	var raw []byte
+	err := s.DB.QueryRowContext(ctx, `SELECT receipt FROM workspace.commit_receipts WHERE tenant_id=$1 AND project_id=$2 AND command_id=$3`, tenantID, projectID, commandID).Scan(&raw)
+	if err != nil {
+		return sourcev2.AgentCommitReceipt{}, mapNotFound(err)
+	}
+	var receipt sourcev2.AgentCommitReceipt
+	if json.Unmarshal(raw, &receipt) != nil || receipt.Validate() != nil {
+		return sourcev2.AgentCommitReceipt{}, errors.New("stored workspace commit receipt is invalid")
+	}
+	return receipt, nil
 }
 
 // ClaimOutbox leases unpublished intents to one worker. The row locks exist

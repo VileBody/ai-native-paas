@@ -17,9 +17,23 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	if os.Getenv("WORKSPACE_AGENT_GIT_ASKPASS") == "1" {
+		if workspaceagent.ExecuteGitAskpass(os.Args[1:]) != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) > 1 {
 		var operationErr error
 		switch os.Args[1] {
+		case "verified-git-apply-patch":
+			operationErr = workspaceagent.ExecuteVerifiedGitApplyPatch(os.Args[2:])
+		case "verified-git-checkout":
+			operationErr = workspaceagent.ExecuteVerifiedGitCheckout(os.Args[2:])
+		case "verified-git-commit":
+			operationErr = workspaceagent.ExecuteVerifiedGitCommit(os.Args[2:])
+		case "verified-git-push":
+			operationErr = workspaceagent.ExecuteVerifiedGitPush(os.Args[2:])
 		case "verified-tofu-apply":
 			operationErr = workspaceagent.ExecuteVerifiedTofuApply(os.Args[2:])
 		case "verified-tofu-plan":
@@ -29,7 +43,7 @@ func main() {
 			os.Exit(2)
 		}
 		if operationErr != nil {
-			logger.Error("verified OpenTofu operation denied", "error", operationErr)
+			logger.Error("verified workspace operation denied", "error", operationErr)
 			os.Exit(1)
 		}
 		return

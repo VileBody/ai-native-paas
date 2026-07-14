@@ -63,6 +63,14 @@ type workspaceCommands struct {
 	exec     workspace.ExecRequest
 	scope    workspace.Scope
 	revision sourcev2.SourceRevision
+	receipt  sourcev2.AgentCommitReceipt
+}
+
+func (w *workspaceCommands) GetCommitReceipt(_ context.Context, _ workspace.Scope, _ string) (sourcev2.AgentCommitReceipt, error) {
+	if w.receipt.Validate() != nil {
+		return sourcev2.AgentCommitReceipt{}, workspace.ErrNotFound
+	}
+	return w.receipt, nil
 }
 
 func (w *workspaceCommands) Create(_ context.Context, request workspace.CreateRequest) (workspacev1.WorkspaceRef, error) {
@@ -108,6 +116,8 @@ func mcpFixture(t *testing.T, scopes []string) (Handler, string, *workspaceComma
 	}
 	project, _ := domain.NewProject("project-1", "tenant-1", "booking", clock.now)
 	repository, _ := domain.NewRepository("repo-1", "tenant-1", project.ID, "gitlab", "corr-1", 77, clock.now)
+	_ = repository.BeginProvisioning(clock.now)
+	_ = repository.AttachProvider(42, "beta/booking", "https://gitlab.com/beta/booking", "main", clock.now)
 	workspaces := &workspaceCommands{revision: sourcev2.SourceRevision{RepositoryID: repository.ID, CommitSHA: strings.Repeat("a", 40)}}
 	infrastructure := &infraapp.Service{
 		Store: inframemory.New(), Clock: clock, IDs: &mcpIDs{},
@@ -227,6 +237,62 @@ func TestProjectMCP_GenericExecCannotBypassGovernedGitMutation(t *testing.T) {
 		if response.Code != http.StatusBadRequest || workspaces.exec.WorkspaceID != "" {
 			t.Fatalf("governed git bypass status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
 		}
+	}
+}
+
+func TestProjectMCP_GovernedRepositoryCommandsUseVerifiedBindings(t *testing.T) {
+	handler, access, workspaces := mcpFixture(t, []string{
+		"agent.tool:repository_create_branch", "agent.tool:repository_apply_patch", "agent.tool:repository_commit", "agent.tool:repository_push",
+	})
+	create := invocation(agentv2.ToolRepositoryCreateBranch)
+	create.IdempotencyKey = "source-checkout-1"
+	create.Arguments = json.RawMessage(`{
+		"workspace_id":"workspace-1","branch":"agent/task-1",
+		"environment_refs":{"GIT_USERNAME":"credential://gitlab-project-1/username","GIT_TOKEN":"credential://gitlab-project-1/token"},
+		"credential_leases":["gitlab-project-1"]
+	}`)
+	response := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, create)
+	if response.Code != http.StatusOK || workspaces.exec.Kind != "repository_checkout" || workspaces.exec.Spec.Argv[2] != "repo-1" || workspaces.exec.Spec.Argv[3] != "https://gitlab.com/beta/booking.git" || workspaces.exec.Spec.Argv[4] != strings.Repeat("a", 40) {
+		t.Fatalf("checkout status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
+	}
+
+	commit := invocation(agentv2.ToolRepositoryCommit)
+	commit.IdempotencyKey = "source-commit-1"
+	commit.Arguments = json.RawMessage(`{"workspace_id":"workspace-1","branch":"agent/task-1","message":"Implement governed change"}`)
+	response = request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, commit)
+	if response.Code != http.StatusOK || workspaces.exec.Kind != "repository_commit" || workspaces.exec.Spec.Argv[5] != "agent-1" || workspaces.exec.Spec.Argv[6] != "task-1" || workspaces.exec.Spec.Argv[7] != "corr-1" || !strings.Contains(response.Body.String(), "WAITING_DEPENDENCY") {
+		t.Fatalf("commit status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
+	}
+
+	push := invocation(agentv2.ToolRepositoryPush)
+	push.IdempotencyKey = "source-push-1"
+	push.Arguments = json.RawMessage(`{
+		"workspace_id":"workspace-1","branch":"agent/task-1",
+		"commit_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","expected_remote_sha":"absent",
+		"environment_refs":{"GIT_USERNAME":"credential://gitlab-project-1/username","GIT_TOKEN":"credential://gitlab-project-1/token"},
+		"credential_leases":["gitlab-project-1"]
+	}`)
+	response = request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, push)
+	if response.Code != http.StatusOK || workspaces.exec.Kind != "repository_push" || workspaces.exec.Spec.Argv[7] != "absent" || workspaces.exec.Spec.Argv[5] != strings.Repeat("a", 40) {
+		t.Fatalf("push status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
+	}
+}
+
+func TestProjectMCP_ProductionPatchFailsClosedWithoutExactSourceApproval(t *testing.T) {
+	handler, access, workspaces := mcpFixture(t, []string{"agent.tool:repository_apply_patch"})
+	patch := invocation(agentv2.ToolRepositoryApplyPatch)
+	patch.Arguments = json.RawMessage(`{
+		"workspace_id":"workspace-1",
+		"files":[{"path":"deploy/environments/production/deployment.yaml","content_base64":"YXBpVmVyc2lvbjogdjEK"}]
+	}`)
+	response := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, patch)
+	if response.Code != http.StatusPreconditionRequired || workspaces.exec.Kind != "" || !strings.Contains(response.Body.String(), "APPROVAL_REQUIRED") {
+		t.Fatalf("production patch status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
+	}
+	patch.ApprovalGrantID = "forged-grant"
+	response = request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, patch)
+	if response.Code != http.StatusPreconditionRequired || workspaces.exec.Kind != "" {
+		t.Fatalf("forged approval status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
 	}
 }
 

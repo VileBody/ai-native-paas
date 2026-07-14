@@ -384,6 +384,34 @@ func (s *Service) RecordPlanReceipt(ctx context.Context, request CredentialResol
 	}, receipt)
 }
 
+func (s *Service) RecordCommitReceipt(ctx context.Context, request CredentialResolveRequest, receipt sourcev2.AgentCommitReceipt) error {
+	if s == nil || s.Store == nil || s.Clock == nil || receipt.Validate() != nil || receipt.CommandID != request.CommandID || receipt.ExecutionSessionID != request.AgentSessionID {
+		return errors.New("workspace commit receipt service is unavailable")
+	}
+	command, err := s.authorizeExecution(ctx, request)
+	if err != nil {
+		return err
+	}
+	workspaceValue, err := s.Store.GetWorkspace(ctx, command.TenantID, command.ProjectID, command.WorkspaceID)
+	if err != nil {
+		return err
+	}
+	if command.Kind != "repository_commit" || command.ActorID == "" || command.StartedAt == nil || workspaceValue.Spec.SourceRevision == nil || receipt.Statement.RepositoryID != workspaceValue.Spec.SourceRevision.RepositoryID || receipt.Statement.BaseSHA != workspaceValue.Spec.SourceRevision.CommitSHA || receipt.Statement.AgentID != command.ActorID || receipt.Statement.TaskID != command.TaskID || receipt.Attestation.IssuedAt.Before(*command.StartedAt) || receipt.Attestation.IssuedAt.After(s.Clock.Now().UTC().Add(time.Minute)) {
+		return ErrPolicyDenied
+	}
+	return s.Store.PutCommitReceipt(ctx, CommitReceiptScope{
+		TenantID: command.TenantID, ProjectID: command.ProjectID, WorkspaceID: command.WorkspaceID,
+		TaskID: command.TaskID, CommandID: command.ID, ActorID: command.ActorID,
+	}, receipt)
+}
+
+func (s *Service) GetCommitReceipt(ctx context.Context, scope Scope, commandID string) (sourcev2.AgentCommitReceipt, error) {
+	if s == nil || s.Store == nil || scope.validate() != nil || strings.TrimSpace(commandID) == "" {
+		return sourcev2.AgentCommitReceipt{}, ErrNotFound
+	}
+	return s.Store.GetCommitReceipt(ctx, scope.TenantID, scope.ProjectID, commandID)
+}
+
 func (s *Service) authorizeExecution(ctx context.Context, request CredentialResolveRequest) (Command, error) {
 	command, err := s.Store.GetCommand(ctx, request.TenantID, request.ProjectID, request.CommandID)
 	if err != nil {

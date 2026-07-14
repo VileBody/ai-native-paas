@@ -34,7 +34,9 @@ func TestArchitecture_WorkspaceAgentIsOutboundOnlyAndExecIsIsolatedToExecutor(t 
 			if filepath.Base(path) == "local_proxy.go" && (!strings.Contains(body, "IsLoopback()") || !strings.Contains(body, "net.SplitHostPort(address)")) {
 				t.Errorf("workspace local proxy is not constrained to a parsed loopback address: %s", path)
 			}
-			if strings.Contains(body, `"os/exec"`) && filepath.Base(path) != "executor.go" && !strings.HasPrefix(filepath.Base(path), "process_") {
+			trustedExecutors := map[string]struct{}{"executor.go": {}, "verified_git.go": {}}
+			_, trustedExecutor := trustedExecutors[filepath.Base(path)]
+			if strings.Contains(body, `"os/exec"`) && !trustedExecutor && !strings.HasPrefix(filepath.Base(path), "process_") {
 				t.Errorf("workspace command execution escaped the isolated executor: %s", path)
 			}
 			return nil

@@ -2,13 +2,18 @@ package workspace
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -240,6 +245,54 @@ func TestWorkspace_PlanReceiptRequiresRunningInfraPlanAndMTLSBinding(t *testing.
 	tampered.CommandID = "foreign-command"
 	if err := f.service.RecordPlanReceipt(context.Background(), request, tampered); err == nil {
 		t.Fatal("cross-command plan receipt was accepted")
+	}
+}
+
+func TestWorkspace_CommitReceiptRequiresRunningCommandAndSourceBinding(t *testing.T) {
+	f := newFixture()
+	f.spec.SourceRevision = &sourcev2.SourceRevision{RepositoryID: "repo-1", CommitSHA: strings.Repeat("a", 40)}
+	ready := f.ready(t)
+	view, err := f.service.Exec(context.Background(), ExecRequest{
+		Scope: f.scope, WorkspaceID: ready.WorkspaceID, Kind: "repository_commit", SerializationKey: "repository:repo-1", IdempotencyKey: "commit-receipt-1",
+		Spec: workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-git-commit"}, TimeoutSeconds: 300, OutputLimitBytes: 4096},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.service.Dispatch(context.Background(), f.scope, view.CommandID); err != nil {
+		t.Fatal(err)
+	}
+	statement := sourcev2.CommitStatement{
+		RepositoryID: "repo-1", BaseSHA: strings.Repeat("a", 40), CommitSHA: strings.Repeat("b", 40), Branch: "agent/task-1",
+		AgentID: "agent-1", TaskID: "task-1", CorrelationID: "corr-1", IssuedAt: f.clock.Now(),
+	}
+	canonical, _ := statement.Canonical()
+	statementDigest := sha256.Sum256(canonical)
+	signature := []byte("test-signature")
+	signatureDigest := sha256.Sum256(signature)
+	receipt := sourcev2.AgentCommitReceipt{
+		SessionID: "mtls-session-1", ExecutionSessionID: "mtls-session-1", CommandID: view.CommandID, Statement: statement,
+		Attestation: sourcev2.CommitAttestation{
+			RepositoryID: statement.RepositoryID, CommitSHA: statement.CommitSHA, AgentID: statement.AgentID, TaskID: statement.TaskID,
+			CorrelationID: statement.CorrelationID, StatementDigest: "sha256:" + hex.EncodeToString(statementDigest[:]), SignatureDigest: "sha256:" + hex.EncodeToString(signatureDigest[:]), IssuedAt: statement.IssuedAt,
+		},
+		Signature: base64.StdEncoding.EncodeToString(signature), CertificateFingerprint: "sha256:" + strings.Repeat("c", 64),
+	}
+	request := CredentialResolveRequest{
+		TenantID: f.scope.TenantID, ProjectID: f.scope.ProjectID, WorkspaceID: ready.WorkspaceID, TaskID: "task-1",
+		CommandID: view.CommandID, AgentSessionID: "mtls-session-1", VMID: "twc-vm-1",
+	}
+	if err := f.service.RecordCommitReceipt(context.Background(), request, receipt); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := f.service.GetCommitReceipt(context.Background(), f.scope, view.CommandID)
+	if err != nil || stored.Attestation.StatementDigest != receipt.Attestation.StatementDigest {
+		t.Fatalf("stored receipt=%#v err=%v", stored, err)
+	}
+	tampered := receipt
+	tampered.Statement.RepositoryID = "repo-2"
+	if err := f.service.RecordCommitReceipt(context.Background(), request, tampered); err == nil {
+		t.Fatal("cross-repository commit receipt was accepted")
 	}
 }
 

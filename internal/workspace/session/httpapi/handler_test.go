@@ -2,10 +2,18 @@ package httpapi
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -18,6 +26,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/workspace/bootstrap"
 	"github.com/keir-research/ai-native-paas/internal/workspace/session"
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -46,6 +55,16 @@ type outputWriter struct {
 type planReceiptWriter struct {
 	request workspace.CredentialResolveRequest
 	receipt infrastructurev1.AgentPlanReceipt
+}
+
+type commitReceiptWriter struct {
+	request workspace.CredentialResolveRequest
+	receipt sourcev2.AgentCommitReceipt
+}
+
+func (w *commitReceiptWriter) RecordCommitReceipt(_ context.Context, request workspace.CredentialResolveRequest, receipt sourcev2.AgentCommitReceipt) error {
+	w.request, w.receipt = request, receipt
+	return nil
 }
 
 func (w *planReceiptWriter) RecordPlanReceipt(_ context.Context, request workspace.CredentialResolveRequest, receipt infrastructurev1.AgentPlanReceipt) error {
@@ -191,6 +210,72 @@ func TestWorkspaceAgentHTTP_PlanReceiptScopeComesFromMTLSSession(t *testing.T) {
 	if denied.Code != http.StatusForbidden {
 		t.Fatalf("foreign receipt accepted: %d %s", denied.Code, denied.Body.String())
 	}
+}
+
+func TestWorkspaceAgentHTTP_CommitReceiptRequiresMTLSIdentitySignature(t *testing.T) {
+	handler, _, clock, _ := handlerFixture(t)
+	certificate, privateKey := signedClientCertificate(t, clock.now, "/tenant/tenant-1/project/project-1/workspace/workspace-1/task/task-1/agent/agent-1")
+	connected := connectAgent(t, handler, certificate)
+	writer := &commitReceiptWriter{}
+	handler.CommitReceipts = writer
+	statement := sourcev2.CommitStatement{
+		RepositoryID: "repo-1", BaseSHA: strings.Repeat("a", 40), CommitSHA: strings.Repeat("b", 40), Branch: "agent/task-1",
+		AgentID: "agent-1", TaskID: "task-1", CorrelationID: "corr-1", IssuedAt: clock.now,
+	}
+	canonical, _ := statement.Canonical()
+	statementDigest := sha256.Sum256(canonical)
+	signature, err := ecdsa.SignASN1(rand.Reader, privateKey, statementDigest[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	signatureDigest := sha256.Sum256(signature)
+	certificateDigest := sha256.Sum256(certificate.Raw)
+	receipt := sourcev2.AgentCommitReceipt{
+		SessionID: connected.SessionID, ExecutionSessionID: connected.SessionID, CommandID: "command-1", Statement: statement,
+		Attestation: sourcev2.CommitAttestation{
+			RepositoryID: statement.RepositoryID, CommitSHA: statement.CommitSHA, AgentID: statement.AgentID, TaskID: statement.TaskID,
+			CorrelationID: statement.CorrelationID, StatementDigest: "sha256:" + hex.EncodeToString(statementDigest[:]), SignatureDigest: "sha256:" + hex.EncodeToString(signatureDigest[:]), IssuedAt: statement.IssuedAt,
+		},
+		Signature: base64.StdEncoding.EncodeToString(signature), CertificateFingerprint: "sha256:" + hex.EncodeToString(certificateDigest[:]),
+	}
+	raw, _ := json.Marshal(receipt)
+	response := serve(handler, withCertificate(httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/commit-receipts", strings.NewReader(string(raw))), certificate))
+	if response.Code != http.StatusNoContent || writer.request.TenantID != "tenant-1" || writer.request.AgentSessionID != connected.SessionID || writer.receipt.Statement.CommitSHA != statement.CommitSHA {
+		t.Fatalf("commit receipt status=%d body=%s request=%#v receipt=%#v", response.Code, response.Body.String(), writer.request, writer.receipt)
+	}
+	receipt.Signature = base64.StdEncoding.EncodeToString([]byte("forged"))
+	forgedDigest := sha256.Sum256([]byte("forged"))
+	receipt.Attestation.SignatureDigest = "sha256:" + hex.EncodeToString(forgedDigest[:])
+	raw, _ = json.Marshal(receipt)
+	denied := serve(handler, withCertificate(httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/commit-receipts", strings.NewReader(string(raw))), certificate))
+	if denied.Code != http.StatusBadRequest {
+		t.Fatalf("forged commit receipt accepted: %d %s", denied.Code, denied.Body.String())
+	}
+}
+
+func signedClientCertificate(t *testing.T, now time.Time, path string) (*x509.Certificate, *ecdsa.PrivateKey) {
+	t.Helper()
+	identity, err := url.Parse("spiffe://workspace.platform.example.com" + path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "workspace"}, URIs: []*url.URL{identity},
+		NotBefore: now.Add(-time.Minute), NotAfter: now.Add(10 * time.Minute), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	certificate, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return certificate, key
 }
 
 func serve(handler Handler, request *http.Request) *httptest.ResponseRecorder {

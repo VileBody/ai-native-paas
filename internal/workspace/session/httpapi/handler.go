@@ -4,6 +4,10 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -15,20 +19,22 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/workspace/bootstrap"
 	"github.com/keir-research/ai-native-paas/internal/workspace/session"
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
 type Handler struct {
-	Registry     *session.Registry
-	Workspaces   *workspace.Service
-	Credentials  WorkspaceCredentialResolver
-	Outputs      WorkspaceOutputWriter
-	PlanReceipts WorkspacePlanReceiptWriter
-	Bindings     AgentBindingResolver
-	Certificates CertificateRotator
-	Principals   PrincipalResolver
-	MaxBodyBytes int64
-	LongPoll     time.Duration
+	Registry       *session.Registry
+	Workspaces     *workspace.Service
+	Credentials    WorkspaceCredentialResolver
+	Outputs        WorkspaceOutputWriter
+	PlanReceipts   WorkspacePlanReceiptWriter
+	CommitReceipts WorkspaceCommitReceiptWriter
+	Bindings       AgentBindingResolver
+	Certificates   CertificateRotator
+	Principals     PrincipalResolver
+	MaxBodyBytes   int64
+	LongPoll       time.Duration
 }
 
 type AgentBindingResolver interface {
@@ -49,6 +55,10 @@ type WorkspaceOutputWriter interface {
 
 type WorkspacePlanReceiptWriter interface {
 	RecordPlanReceipt(context.Context, workspace.CredentialResolveRequest, infrastructurev1.AgentPlanReceipt) error
+}
+
+type WorkspaceCommitReceiptWriter interface {
+	RecordCommitReceipt(context.Context, workspace.CredentialResolveRequest, sourcev2.AgentCommitReceipt) error
 }
 
 func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
@@ -74,9 +84,60 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		h.outputChunk(response, request)
 	case request.Method == http.MethodPost && request.URL.Path == "/api/v1/workspace-agent/plan-receipts":
 		h.planReceipt(response, request)
+	case request.Method == http.MethodPost && request.URL.Path == "/api/v1/workspace-agent/commit-receipts":
+		h.commitReceipt(response, request)
 	default:
 		writeError(response, http.StatusNotFound, "NOT_FOUND", "route not found")
 	}
+}
+
+func (h Handler) commitReceipt(response http.ResponseWriter, request *http.Request) {
+	principal, ok := h.authenticate(response, request)
+	if !ok {
+		return
+	}
+	if h.CommitReceipts == nil {
+		writeError(response, http.StatusServiceUnavailable, "UNAVAILABLE", "workspace commit receipt service unavailable")
+		return
+	}
+	var body sourcev2.AgentCommitReceipt
+	if decode(request, 64<<10, &body) != nil || body.Validate() != nil || body.Statement.AgentID != principal.AgentID || body.Statement.TaskID != principal.TaskID || body.CertificateFingerprint != principal.CertificateID || !verifyCommitSignature(request, body) {
+		writeError(response, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid workspace commit receipt")
+		return
+	}
+	bound, err := h.Registry.AuthorizeOutcomeFor(request.Context(), principal, body.SessionID, body.ExecutionSessionID)
+	if err != nil {
+		writeSessionError(response, err)
+		return
+	}
+	if err := h.CommitReceipts.RecordCommitReceipt(request.Context(), workspace.CredentialResolveRequest{
+		TenantID: bound.TenantID, ProjectID: bound.ProjectID, WorkspaceID: bound.WorkspaceID, TaskID: bound.TaskID,
+		CommandID: body.CommandID, AgentSessionID: bound.ID, VMID: bound.VMID,
+	}, body); err != nil {
+		writeError(response, http.StatusForbidden, "PERMISSION_DENIED", "workspace commit receipt is not command-scoped")
+		return
+	}
+	response.WriteHeader(http.StatusNoContent)
+}
+
+func verifyCommitSignature(request *http.Request, receipt sourcev2.AgentCommitReceipt) bool {
+	if request == nil || request.TLS == nil || len(request.TLS.PeerCertificates) == 0 {
+		return false
+	}
+	publicKey, ok := request.TLS.PeerCertificates[0].PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return false
+	}
+	canonical, err := receipt.Statement.Canonical()
+	if err != nil {
+		return false
+	}
+	digest := sha256.Sum256(canonical)
+	if receipt.Attestation.StatementDigest != "sha256:"+hex.EncodeToString(digest[:]) {
+		return false
+	}
+	signature, err := base64.StdEncoding.Strict().DecodeString(receipt.Signature)
+	return err == nil && ecdsa.VerifyASN1(publicKey, digest[:], signature)
 }
 
 func (h Handler) planReceipt(response http.ResponseWriter, request *http.Request) {

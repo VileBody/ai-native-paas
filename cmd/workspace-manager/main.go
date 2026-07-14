@@ -89,6 +89,7 @@ func main() {
 		platformprofile.Prod("client-encrypted-s3-command-logs"),
 		platformprofile.Prod("verified-spiffe-mtls"),
 		platformprofile.Prod("authenticated-opentofu-plan-receipts"),
+		platformprofile.Prod("mtls-signed-git-commit-receipts"),
 	)
 	if err != nil || profile != platformprofile.Production {
 		logger.Error("workspace-manager requires a valid production profile")
@@ -203,7 +204,7 @@ func main() {
 		os.Exit(1)
 	}
 	agentHandler := sessionhttp.Handler{
-		Registry: sessions, Workspaces: service, Credentials: service, Outputs: service, PlanReceipts: service, Bindings: service, Certificates: issuer,
+		Registry: sessions, Workspaces: service, Credentials: service, Outputs: service, PlanReceipts: service, CommitReceipts: service, Bindings: service, Certificates: issuer,
 		Principals: sessionhttp.SPIFFEResolver{TrustDomain: settings.TrustDomain}, MaxBodyBytes: 64 << 10,
 	}
 	handler := http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {

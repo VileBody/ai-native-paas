@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 857,
-  "discovered_unique_test_name_count": 855,
+  "discovered_go_test_count": 870,
+  "discovered_unique_test_name_count": 868,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -158,20 +158,20 @@
       "id": "S2",
       "level": "real local Git integration",
       "name": "TestSource_CheckoutUsesExactCommitNotMutableBranchHead",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/source_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspaceagent/source_v2_test.go",
       "test_name": "TestSource_CheckoutUsesExactCommitNotMutableBranchHead",
-      "test_ref": "test/pivot/source_v2_test.go::TestSource_CheckoutUsesExactCommitNotMutableBranchHead"
+      "test_ref": "internal/workspaceagent/source_v2_test.go::TestSource_CheckoutUsesExactCommitNotMutableBranchHead"
     },
     {
       "family": "S",
       "id": "S3",
       "level": "fuzz + application",
       "name": "TestSource_PatchRejectsNonCanonicalAndGitInternalPaths",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/source_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspaceagent/source_v2_test.go",
       "test_name": "TestSource_PatchRejectsNonCanonicalAndGitInternalPaths",
-      "test_ref": "test/pivot/source_v2_test.go::TestSource_PatchRejectsNonCanonicalAndGitInternalPaths"
+      "test_ref": "internal/workspaceagent/source_v2_test.go::TestSource_PatchRejectsNonCanonicalAndGitInternalPaths"
     },
     {
       "family": "S",
@@ -188,30 +188,30 @@
       "id": "S5",
       "level": "Git integration",
       "name": "TestSource_AgentCommitContainsSignedAttestationAndCorrelation",
-      "status": "NEW",
-      "test_file": "test/pivot/source_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspaceagent/source_v2_test.go",
       "test_name": "TestSource_AgentCommitContainsSignedAttestationAndCorrelation",
-      "test_ref": "test/pivot/source_v2_test.go::TestSource_AgentCommitContainsSignedAttestationAndCorrelation"
+      "test_ref": "internal/workspaceagent/source_v2_test.go::TestSource_AgentCommitContainsSignedAttestationAndCorrelation"
     },
     {
       "family": "S",
       "id": "S6",
       "level": "Git integration + concurrency",
       "name": "TestSource_ConcurrentPushUsesExpectedBaseSHA",
-      "status": "NEW",
-      "test_file": "test/pivot/source_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspaceagent/source_v2_test.go",
       "test_name": "TestSource_ConcurrentPushUsesExpectedBaseSHA",
-      "test_ref": "test/pivot/source_v2_test.go::TestSource_ConcurrentPushUsesExpectedBaseSHA"
+      "test_ref": "internal/workspaceagent/source_v2_test.go::TestSource_ConcurrentPushUsesExpectedBaseSHA"
     },
     {
       "family": "S",
       "id": "S7",
       "level": "application",
       "name": "TestSource_SecretScannerBlocksCredentialBeforeCommit",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/source_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspaceagent/source_v2_test.go",
       "test_name": "TestSource_SecretScannerBlocksCredentialBeforeCommit",
-      "test_ref": "test/pivot/source_v2_test.go::TestSource_SecretScannerBlocksCredentialBeforeCommit"
+      "test_ref": "internal/workspaceagent/source_v2_test.go::TestSource_SecretScannerBlocksCredentialBeforeCommit"
     },
     {
       "family": "S",
@@ -278,10 +278,10 @@
       "id": "S14",
       "level": "integration",
       "name": "TestSource_SubmoduleAndLFSFollowExplicitPolicy",
-      "status": "NEW",
-      "test_file": "test/pivot/source_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspaceagent/source_v2_test.go",
       "test_name": "TestSource_SubmoduleAndLFSFollowExplicitPolicy",
-      "test_ref": "test/pivot/source_v2_test.go::TestSource_SubmoduleAndLFSFollowExplicitPolicy"
+      "test_ref": "internal/workspaceagent/source_v2_test.go::TestSource_SubmoduleAndLFSFollowExplicitPolicy"
     },
     {
       "family": "S",
@@ -308,10 +308,10 @@
       "id": "S17",
       "level": "real Git integration",
       "name": "TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/source_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspaceagent/source_v2_test.go",
       "test_name": "TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig",
-      "test_ref": "test/pivot/source_v2_test.go::TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig"
+      "test_ref": "internal/workspaceagent/source_v2_test.go::TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig"
     },
     {
       "family": "S",
@@ -1589,9 +1589,9 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 77,
-      "NEW": 50,
-      "REUSED": 30
+      "LIVE_ONLY": 73,
+      "NEW": 47,
+      "REUSED": 37
     },
     "unmapped": 0
   }
