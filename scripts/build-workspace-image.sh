@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-for tool in curl jq sha256sum sha512sum tar unzip qemu-img guestfish virt-copy-out xz go; do
+for tool in curl docker jq sha256sum sha512sum tar unzip qemu-img guestfish virt-copy-out xz go; do
   command -v "$tool" >/dev/null || { echo "$tool is required" >&2; exit 1; }
 done
 
@@ -55,16 +55,31 @@ install -m 0755 "$cosign_binary" "$work_directory/root/usr/local/bin/cosign"
 install -m 0755 "$cosign_binary" "$output_directory/cosign"
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$work_directory/root/usr/local/bin/workspace-agent" ./cmd/workspace-agent
 
-upstream_dns="${WORKSPACE_IMAGE_DNS:-}"
-if [[ -z "$upstream_dns" ]]; then
-  upstream_dns="$(awk '$1 == "nameserver" && $2 !~ /^(127\.|::1$)/ { print $2; exit }' \
-    /run/systemd/resolve/resolv.conf /etc/resolv.conf 2>/dev/null || true)"
-fi
-upstream_dns="${upstream_dns:-1.1.1.1}"
-if [[ ! "$upstream_dns" =~ ^[0-9a-fA-F:.]+$ ]]; then
-  echo "WORKSPACE_IMAGE_DNS must be an IPv4 or IPv6 address" >&2
+package_resolver_image="$(jq -er '.package_resolver.image' "$lock")"
+package_downloads="$work_directory/debian-packages"
+package_status="$work_directory/base-package-status"
+mkdir -p "$package_downloads" "$package_status"
+virt-copy-out -a "$base" /var/lib/dpkg/status "$package_status"
+docker run --rm --platform linux/amd64 \
+  --mount "type=bind,source=$PWD/infra/images/workspace/debian-snapshot.sources,target=/etc/apt/sources.list.d/debian.sources,readonly" \
+  --mount "type=bind,source=$package_status/status,target=/var/lib/dpkg/status,readonly" \
+  --mount "type=bind,source=$package_downloads,target=/out" \
+  "$package_resolver_image" /bin/bash -euxo pipefail -c '
+    rm -f /etc/apt/sources.list
+    apt-get -o Acquire::Check-Valid-Until=false update
+    apt-get -q -y --download-only --reinstall install \
+      ca-certificates git jq make python3 ripgrep uidmap slirp4netns \
+      fuse-overlayfs runc
+    cp /var/cache/apt/archives/*.deb /out/
+  '
+if ! compgen -G "$package_downloads/*.deb" >/dev/null; then
+  echo "Debian package resolver produced no archives" >&2
   exit 1
 fi
+(
+  cd "$package_downloads"
+  sha256sum ./*.deb | sort -k2 > SHA256SUMS
+)
 
 provision="$work_directory/provision-workspace-image.sh"
 cat >"$provision" <<'PROVISION'
@@ -74,10 +89,7 @@ set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt_opts=(-q -y -o Dpkg::Options::=--force-confnew)
 rm -f /etc/apt/sources.list
-apt-get "${apt_opts[@]}" -o Acquire::Check-Valid-Until=false update
-apt-get "${apt_opts[@]}" install \
-  ca-certificates git jq make python3 ripgrep uidmap slirp4netns \
-  fuse-overlayfs runc
+apt-get "${apt_opts[@]}" --no-download install /tmp/debian-packages/*.deb
 apt-get "${apt_opts[@]}" purge openssh-server || true
 
 id workspace-agent >/dev/null 2>&1 || \
@@ -106,16 +118,17 @@ image="$work_directory/workspace.qcow2"
 cp "$base" "$image"
 qemu-img resize "$image" 40G >/dev/null
 
-guestfish --network --rw -a "$image" -i <<GUESTFISH
-debug sh "ip link set dev eth0 up; ip address replace 169.254.2.15/16 dev eth0; ip route replace default via 169.254.2.2 dev eth0; printf 'nameserver %s\\n' '$upstream_dns' > /etc/resolv.conf; getent ahostsv4 snapshot.debian.org"
+guestfish --rw -a "$image" -i <<GUESTFISH
 upload infra/images/workspace/debian-snapshot.sources /etc/apt/sources.list.d/debian.sources
 mkdir-p /usr/local/bin
-copy-in $work_directory/root/usr/local/bin /usr/local
+copy-in "$work_directory/root/usr/local/bin" /usr/local
 mkdir-p /usr/share/ai-native-paas
 upload infra/images/workspace/ai-native-paas-workspace-agent.service /etc/systemd/system/ai-native-paas-workspace-agent.service
 upload infra/images/workspace/ai-native-paas-buildkit.service /etc/systemd/system/ai-native-paas-buildkit.service
-upload $lock /usr/share/ai-native-paas/workspace-image-inputs.json
-upload $provision /tmp/provision-workspace-image.sh
+upload "$lock" /usr/share/ai-native-paas/workspace-image-inputs.json
+copy-in "$package_downloads" /tmp
+upload "$package_downloads/SHA256SUMS" /usr/share/ai-native-paas/debian-package-archives.sha256
+upload "$provision" /tmp/provision-workspace-image.sh
 sh "/bin/bash /tmp/provision-workspace-image.sh"
 rm-f /etc/resolv.conf
 sync

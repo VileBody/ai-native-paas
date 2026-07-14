@@ -6,6 +6,9 @@
     "sha512": "6c2607f1846ee86040830c87d0b723f0967da3e884ea4673d9db4aa8eee13a4b7c663524bfa42082c16fc6919f3aa1bf425c004d07ff06c53a319ad0c42647bb"
   },
   "debian_snapshot": "20260712T000000Z",
+  "package_resolver": {
+    "image": "docker.io/library/debian:bookworm-20260713-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818"
+  },
   "tools": {
     "opentofu": {
       "version": "1.12.4",
