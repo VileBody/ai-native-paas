@@ -12,6 +12,22 @@ import (
 type Clock interface{ Now() time.Time }
 type IDGenerator interface{ New(string) string }
 
+type CommandBudgetRequest struct {
+	TenantID, ProjectID, TaskID, WorkspaceID, CommandID string
+	RequestedSeconds                                    int64
+	RequestedAt                                         time.Time
+}
+
+type CommandBudgetLease struct {
+	ReservationID  string
+	GrantedSeconds int64
+	NotAfter       time.Time
+}
+
+type CommandBudgetGateway interface {
+	ReserveAndCommit(context.Context, CommandBudgetRequest) (CommandBudgetLease, error)
+}
+
 type Store interface {
 	CreateWorkspace(context.Context, Workspace) (Workspace, bool, error)
 	GetWorkspace(context.Context, string, string, string) (Workspace, error)
@@ -92,6 +108,7 @@ type CommandEnvelope struct {
 	TaskID           string
 	Spec             workspacev1.CommandSpec
 	CredentialLeases []string
+	BudgetLease      CommandBudgetLease
 }
 
 type DispatchReceipt struct {

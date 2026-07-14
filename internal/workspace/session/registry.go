@@ -81,7 +81,8 @@ func (r *Registry) Dispatch(ctx context.Context, envelope workspace.CommandEnvel
 	if err := r.require(); err != nil {
 		return workspace.DispatchReceipt{}, err
 	}
-	if strings.TrimSpace(envelope.CommandID) == "" || strings.TrimSpace(envelope.WorkspaceID) == "" || strings.TrimSpace(envelope.ProjectID) == "" || strings.TrimSpace(envelope.TaskID) == "" || envelope.Spec.Validate() != nil {
+	now := r.Clock.Now().UTC()
+	if strings.TrimSpace(envelope.CommandID) == "" || strings.TrimSpace(envelope.WorkspaceID) == "" || strings.TrimSpace(envelope.ProjectID) == "" || strings.TrimSpace(envelope.TaskID) == "" || envelope.Spec.Validate() != nil || strings.TrimSpace(envelope.BudgetLease.ReservationID) == "" || envelope.BudgetLease.GrantedSeconds != envelope.Spec.TimeoutSeconds || !envelope.BudgetLease.NotAfter.After(now) || envelope.BudgetLease.NotAfter.After(now.Add(time.Duration(envelope.Spec.TimeoutSeconds)*time.Second)) {
 		return workspace.DispatchReceipt{}, errors.New("workspace command envelope is invalid")
 	}
 	session, err := r.Store.ActiveForWorkspace(ctx, envelope.WorkspaceID, "", r.Clock.Now().UTC(), r.sessionIdleTTL())
@@ -92,7 +93,7 @@ func (r *Registry) Dispatch(ctx context.Context, envelope workspace.CommandEnvel
 		return workspace.DispatchReceipt{}, ErrConflict
 	}
 	spec := envelope.Spec
-	payload := workspacev1.AgentMessage{Kind: workspacev1.AgentMessageExec, CommandID: envelope.CommandID, WorkspaceID: envelope.WorkspaceID, Spec: &spec, CredentialLeases: append([]string(nil), envelope.CredentialLeases...)}
+	payload := workspacev1.AgentMessage{Kind: workspacev1.AgentMessageExec, CommandID: envelope.CommandID, WorkspaceID: envelope.WorkspaceID, Spec: &spec, CredentialLeases: append([]string(nil), envelope.CredentialLeases...), BudgetReservationID: envelope.BudgetLease.ReservationID, BudgetDeadline: envelope.BudgetLease.NotAfter.UTC()}
 	message, err := r.queue(ctx, payload)
 	if err != nil {
 		return workspace.DispatchReceipt{}, err

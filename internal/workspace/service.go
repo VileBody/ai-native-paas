@@ -24,6 +24,7 @@ type Service struct {
 	Credentials        CredentialSource
 	Outputs            CommandOutputStore
 	PlanReceipts       PlanReceiptStore
+	Budgets            CommandBudgetGateway
 	Clock              Clock
 	IDs                IDGenerator
 	Policy             CommandPolicy
@@ -466,6 +467,18 @@ func (s *Service) Dispatch(ctx context.Context, scope Scope, commandID string) (
 	if workspace.State != workspacev1.WorkspaceReady && workspace.State != workspacev1.WorkspaceBusy || !workspace.ExpiresAt.After(now) {
 		return workspacev1.CommandView{}, ErrConflict
 	}
+	budget, err := s.Budgets.ReserveAndCommit(ctx, CommandBudgetRequest{
+		TenantID: command.TenantID, ProjectID: command.ProjectID, TaskID: command.TaskID,
+		WorkspaceID: command.WorkspaceID, CommandID: command.ID,
+		RequestedSeconds: command.Spec.TimeoutSeconds, RequestedAt: now,
+	})
+	if err != nil {
+		return command.View(), err
+	}
+	maximumDeadline := now.Add(time.Duration(command.Spec.TimeoutSeconds) * time.Second)
+	if strings.TrimSpace(budget.ReservationID) == "" || budget.GrantedSeconds != command.Spec.TimeoutSeconds || !budget.NotAfter.After(now) || budget.NotAfter.After(maximumDeadline) || budget.NotAfter.After(workspace.ExpiresAt) {
+		return command.View(), ErrBudgetExceeded
+	}
 	if command.SerializationKey != "" {
 		acquired, acquireErr := s.Store.AcquireSerialization(ctx, command.ProjectID, command.SerializationKey, command.ID)
 		if acquireErr != nil {
@@ -475,7 +488,7 @@ func (s *Service) Dispatch(ctx context.Context, scope Scope, commandID string) (
 			return command.View(), ErrStatefulCommandBusy
 		}
 	}
-	receipt, err := s.Sessions.Dispatch(ctx, CommandEnvelope{CommandID: command.ID, WorkspaceID: command.WorkspaceID, ProjectID: command.ProjectID, TaskID: command.TaskID, Spec: command.Spec, CredentialLeases: command.CredentialLeases})
+	receipt, err := s.Sessions.Dispatch(ctx, CommandEnvelope{CommandID: command.ID, WorkspaceID: command.WorkspaceID, ProjectID: command.ProjectID, TaskID: command.TaskID, Spec: command.Spec, CredentialLeases: command.CredentialLeases, BudgetLease: budget})
 	if err != nil {
 		return command.View(), err
 	}
@@ -654,7 +667,7 @@ func (s *Service) requireReconciler() error {
 }
 
 func (s *Service) requireDispatcher() error {
-	if err := s.requireClockStore(); err != nil || s.Sessions == nil {
+	if err := s.requireClockStore(); err != nil || s.Sessions == nil || s.Budgets == nil {
 		return errors.New("workspace service dependencies are unavailable")
 	}
 	return nil

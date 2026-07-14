@@ -229,7 +229,8 @@ func TestPostgres_WorkspaceAgentAckSurvivesControlPlaneRestart(t *testing.T) {
 	}
 	envelope := workspace.CommandEnvelope{
 		CommandID: "command-pg", WorkspaceID: "workspace-pg", ProjectID: "project-pg", TaskID: "task-pg",
-		Spec: workspacev1.CommandSpec{Argv: []string{"tofu", "plan"}, WorkingDir: "infrastructure", TimeoutSeconds: 60, OutputLimitBytes: 4096},
+		Spec:        workspacev1.CommandSpec{Argv: []string{"tofu", "plan"}, WorkingDir: "infrastructure", TimeoutSeconds: 60, OutputLimitBytes: 4096},
+		BudgetLease: workspace.CommandBudgetLease{ReservationID: "budget-command-pg", GrantedSeconds: 60, NotAfter: now.Add(time.Minute)},
 	}
 	type dispatchResult struct {
 		receipt workspace.DispatchReceipt

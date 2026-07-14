@@ -25,6 +25,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	"github.com/keir-research/ai-native-paas/internal/workspace/bootstrap"
+	"github.com/keir-research/ai-native-paas/internal/workspace/commercebudget"
 	workspacelogstore "github.com/keir-research/ai-native-paas/internal/workspace/logstore"
 	workspaceopenbao "github.com/keir-research/ai-native-paas/internal/workspace/openbao"
 	workspacepostgres "github.com/keir-research/ai-native-paas/internal/workspace/postgres"
@@ -39,43 +40,47 @@ type managerIDs struct{ inner *agentsupport.IDs }
 func (i managerIDs) New(prefix string) string { return i.inner.NewID(prefix) }
 
 type config struct {
-	Address                string
-	DatabaseURL            string
-	ServerCertificateFile  string
-	ServerPrivateKeyFile   string
-	ClientCAFile           string
-	TrustDomain            string
-	OpenBaoAddress         string
-	OpenBaoCAFile          string
-	OpenBaoTokenFile       string
-	OpenBaoPKIMount        string
-	OpenBaoRole            string
-	OpenBaoTTL             time.Duration
-	OpenBaoCredentialMount string
-	OpenBaoCredentialTTL   time.Duration
-	TimewebAPIURL          string
-	TimewebTokenFile       string
-	TimewebProjectID       int64
-	TimewebConfiguratorID  int64
-	TimewebZone            string
-	TimewebBandwidthMbps   int64
-	TimewebSystemDiskMiB   int64
-	WorkspaceVPCID         string
-	WorkspaceImages        map[string]string
-	LogS3Endpoint          string
-	LogS3Region            string
-	LogS3Bucket            string
-	LogS3Prefix            string
-	LogS3AccessKeyFile     string
-	LogS3SecretKeyFile     string
-	LogEncryptionKeyFile   string
-	ControlPlaneURL        string
-	EgressGatewayURL       string
-	EgressGatewayPort      int
-	AllowedEgressHosts     []string
-	EgressGatewayCIDRs     []string
-	DNSResolverCIDRs       []string
-	DeniedCIDRs            []string
+	Address                 string
+	DatabaseURL             string
+	ServerCertificateFile   string
+	ServerPrivateKeyFile    string
+	ClientCAFile            string
+	TrustDomain             string
+	OpenBaoAddress          string
+	OpenBaoCAFile           string
+	OpenBaoTokenFile        string
+	OpenBaoPKIMount         string
+	OpenBaoRole             string
+	OpenBaoTTL              time.Duration
+	OpenBaoCredentialMount  string
+	OpenBaoCredentialTTL    time.Duration
+	TimewebAPIURL           string
+	TimewebTokenFile        string
+	TimewebProjectID        int64
+	TimewebConfiguratorID   int64
+	TimewebZone             string
+	TimewebBandwidthMbps    int64
+	TimewebSystemDiskMiB    int64
+	WorkspaceVPCID          string
+	WorkspaceImages         map[string]string
+	LogS3Endpoint           string
+	LogS3Region             string
+	LogS3Bucket             string
+	LogS3Prefix             string
+	LogS3AccessKeyFile      string
+	LogS3SecretKeyFile      string
+	LogEncryptionKeyFile    string
+	ControlPlaneURL         string
+	EgressGatewayURL        string
+	EgressGatewayPort       int
+	AllowedEgressHosts      []string
+	EgressGatewayCIDRs      []string
+	DNSResolverCIDRs        []string
+	DeniedCIDRs             []string
+	CommerceAddress         string
+	CommerceCAFile          string
+	CommerceCertificateFile string
+	CommercePrivateKeyFile  string
 }
 
 func main() {
@@ -90,6 +95,7 @@ func main() {
 		platformprofile.Prod("verified-spiffe-mtls"),
 		platformprofile.Prod("authenticated-opentofu-plan-receipts"),
 		platformprofile.Prod("mtls-signed-git-commit-receipts"),
+		platformprofile.Prod("commerce-command-budget-reservations"),
 	)
 	if err != nil || profile != platformprofile.Production {
 		logger.Error("workspace-manager requires a valid production profile")
@@ -121,9 +127,21 @@ func main() {
 
 	clock := agentsupport.Clock{}
 	ids := managerIDs{inner: &agentsupport.IDs{}}
-	openBaoClient, err := openBaoHTTPClient(settings.OpenBaoCAFile)
+	openBaoClient, err := trustedHTTPClient(settings.OpenBaoCAFile)
 	if err != nil {
 		logger.Error("initialize OpenBao trusted client", "error", err)
+		os.Exit(1)
+	}
+	commerceClient, err := trustedMTLSHTTPClient(settings.CommerceCAFile, settings.CommerceCertificateFile, settings.CommercePrivateKeyFile)
+	if err != nil {
+		logger.Error("initialize Commerce trusted client", "error", err)
+		os.Exit(1)
+	}
+	commerceQuotas, err := commercebudget.NewHTTP(commercebudget.HTTPConfig{
+		BaseURL: settings.CommerceAddress, Client: commerceClient,
+	})
+	if err != nil {
+		logger.Error("initialize Commerce command budgets", "error", err)
 		os.Exit(1)
 	}
 	credentialSource, err := workspaceopenbao.NewCredentialSource(workspaceopenbao.CredentialConfig{
@@ -190,7 +208,7 @@ func main() {
 	sessions := &session.Registry{Store: &sessionpostgres.Store{DB: db}, Clock: clock, IDs: ids}
 	workerID := ids.New("workspace-manager")
 	service := &workspace.Service{
-		Store: store, Provider: provider, Sessions: sessions, Leases: issuer, Credentials: credentialSource, Outputs: logStore, PlanReceipts: infrastructureStore, Clock: clock, IDs: ids,
+		Store: store, Provider: provider, Sessions: sessions, Leases: issuer, Credentials: credentialSource, Outputs: logStore, PlanReceipts: infrastructureStore, Budgets: commercebudget.Adapter{Quotas: commerceQuotas}, Clock: clock, IDs: ids,
 		Policy: workspace.DefaultCommandPolicy(), ReconcilerID: workerID, WorkspaceVPCID: settings.WorkspaceVPCID,
 		AllowedEgressHosts: settings.AllowedEgressHosts, EgressGatewayCIDRs: settings.EgressGatewayCIDRs,
 		DNSResolverCIDRs: settings.DNSResolverCIDRs, DeniedCIDRs: settings.DeniedCIDRs,
@@ -301,6 +319,8 @@ func loadConfig() (config, error) {
 		LogS3Bucket: required("WORKSPACE_LOG_S3_BUCKET"), LogS3Prefix: env("WORKSPACE_LOG_S3_PREFIX", "workspace-command-logs"),
 		LogS3AccessKeyFile: required("WORKSPACE_LOG_S3_ACCESS_KEY_FILE"), LogS3SecretKeyFile: required("WORKSPACE_LOG_S3_SECRET_KEY_FILE"),
 		LogEncryptionKeyFile: required("WORKSPACE_LOG_ENCRYPTION_KEY_FILE"),
+		CommerceAddress:      required("COMMERCE_API_URL"), CommerceCAFile: required("COMMERCE_CA_FILE"),
+		CommerceCertificateFile: required("COMMERCE_CLIENT_CERT_FILE"), CommercePrivateKeyFile: required("COMMERCE_CLIENT_KEY_FILE"),
 	}
 	var err error
 	if settings.OpenBaoTTL, err = duration("OPENBAO_WORKSPACE_CERT_TTL", 15*time.Minute); err != nil {
@@ -341,6 +361,8 @@ func loadConfig() (config, error) {
 		"WORKSPACE_LOG_S3_ENDPOINT":    settings.LogS3Endpoint, "WORKSPACE_LOG_S3_BUCKET": settings.LogS3Bucket,
 		"WORKSPACE_LOG_S3_ACCESS_KEY_FILE": settings.LogS3AccessKeyFile, "WORKSPACE_LOG_S3_SECRET_KEY_FILE": settings.LogS3SecretKeyFile,
 		"WORKSPACE_LOG_ENCRYPTION_KEY_FILE": settings.LogEncryptionKeyFile,
+		"COMMERCE_API_URL":                  settings.CommerceAddress, "COMMERCE_CA_FILE": settings.CommerceCAFile,
+		"COMMERCE_CLIENT_CERT_FILE": settings.CommerceCertificateFile, "COMMERCE_CLIENT_KEY_FILE": settings.CommercePrivateKeyFile,
 	} {
 		if strings.TrimSpace(value) == "" {
 			return config{}, fmt.Errorf("%s is required", name)
@@ -357,19 +379,36 @@ func loadConfig() (config, error) {
 	return settings, nil
 }
 
-func openBaoHTTPClient(caFile string) (*http.Client, error) {
+func trustedHTTPClient(caFile string) (*http.Client, error) {
 	raw, err := os.ReadFile(caFile)
 	if err != nil || len(raw) == 0 || len(raw) > 256<<10 {
-		return nil, errors.New("load OpenBao CA")
+		return nil, errors.New("load trusted service CA")
 	}
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(raw) {
-		return nil, errors.New("parse OpenBao CA")
+		return nil, errors.New("parse trusted service CA")
 	}
 	return &http.Client{
 		Timeout:   15 * time.Second,
 		Transport: &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots}},
 	}, nil
+}
+
+func trustedMTLSHTTPClient(caFile, certificateFile, privateKeyFile string) (*http.Client, error) {
+	client, err := trustedHTTPClient(caFile)
+	if err != nil {
+		return nil, err
+	}
+	certificate, err := tls.LoadX509KeyPair(certificateFile, privateKeyFile)
+	if err != nil {
+		return nil, errors.New("load trusted service client certificate")
+	}
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok || transport.TLSClientConfig == nil {
+		return nil, errors.New("trusted service transport is unavailable")
+	}
+	transport.TLSClientConfig.Certificates = []tls.Certificate{certificate}
+	return client, nil
 }
 
 func readSecureFile(filename string, maximum int64) ([]byte, error) {

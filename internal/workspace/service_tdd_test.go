@@ -99,6 +99,16 @@ type fakeSessions struct {
 	canceled   []string
 }
 
+type fakeBudgets struct{}
+
+func (fakeBudgets) ReserveAndCommit(_ context.Context, request CommandBudgetRequest) (CommandBudgetLease, error) {
+	return CommandBudgetLease{
+		ReservationID:  "budget-" + request.CommandID,
+		GrantedSeconds: request.RequestedSeconds,
+		NotAfter:       request.RequestedAt.Add(time.Duration(request.RequestedSeconds) * time.Second),
+	}, nil
+}
+
 func (s *fakeSessions) Connected(_ context.Context, _, vmID string) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -197,7 +207,7 @@ func newFixture() *fixture {
 	outputs := &fakeOutputs{}
 	receipts := &fakePlanReceipts{}
 	service := &Service{
-		Store: store, Provider: provider, Sessions: sessions, Leases: leases, Credentials: credentials, Outputs: outputs, PlanReceipts: receipts, Clock: clock, IDs: &testIDs{},
+		Store: store, Provider: provider, Sessions: sessions, Leases: leases, Credentials: credentials, Outputs: outputs, PlanReceipts: receipts, Budgets: fakeBudgets{}, Clock: clock, IDs: &testIDs{},
 		Policy: DefaultCommandPolicy(), ReconcilerID: "workspace-manager-1", WorkspaceVPCID: "vpc-workspace",
 		AllowedEgressHosts: []string{"gitlab.com", "registry.npmjs.org", "ai-native-paas-registry.registry.twcstorage.ru"},
 		EgressGatewayCIDRs: []string{"192.168.75.4/32"}, DNSResolverCIDRs: []string{"192.168.75.1/32"},

@@ -102,6 +102,27 @@ func TestHandler_TenantPathMustMatchPrincipal(t *testing.T) {
 		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
 }
+func TestHandler_WorkspaceBudgetServiceRequiresExactScopeAndNarrowRoute(t *testing.T) {
+	f := newHTTPFixture(t)
+	body := `{"resource":"runtime.units","quantity":1,"expires_at":"2026-07-01T02:00:00Z","at":"2026-07-01T01:00:00Z"}`
+	headers := map[string]string{
+		"X-Principal-ID": "workspace-manager", "X-Principal-Kind": "service", "X-Tenant-ID": "platform",
+		"Idempotency-Key": "workspace-service-quota",
+	}
+	denied := request(t, f.handler, http.MethodPost, "/v1/organizations/tenant-1/quota-reservations", body, headers)
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("missing scope status=%d body=%s", denied.Code, denied.Body.String())
+	}
+	headers["X-Scopes"] = "commerce.workspace_budget:write"
+	created := request(t, f.handler, http.MethodPost, "/v1/organizations/tenant-1/quota-reservations", body, headers)
+	if created.Code != http.StatusCreated {
+		t.Fatalf("exact scope status=%d body=%s", created.Code, created.Body.String())
+	}
+	otherRoute := request(t, f.handler, http.MethodPost, "/v1/organizations/tenant-1/entitlements/check", `{"feature":"deploy"}`, headers)
+	if otherRoute.Code != http.StatusForbidden {
+		t.Fatalf("budget scope escaped its route status=%d body=%s", otherRoute.Code, otherRoute.Body.String())
+	}
+}
 func TestHandler_RejectsUnknownJSONFields(t *testing.T) {
 	f := newHTTPFixture(t)
 	w := request(t, f.handler, http.MethodPost, "/v1/organizations/tenant-1/entitlements/check", `{"feature":"deploy","unknown":true}`, tenantHeaders())

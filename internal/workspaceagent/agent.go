@@ -150,7 +150,7 @@ func (a *Agent) runSession(ctx context.Context, session workspacev1.AgentSession
 }
 
 func (a *Agent) handleExec(ctx context.Context, sessionID string, message workspacev1.AgentMessage) error {
-	if message.WorkspaceID != a.WorkspaceID || message.Spec == nil || a.Policy.Validate(*message.Spec) != nil {
+	if message.WorkspaceID != a.WorkspaceID || message.Spec == nil || a.Policy.Validate(*message.Spec) != nil || !validCommandBudget(message, a.Now().UTC()) {
 		return a.Control.Acknowledge(ctx, sessionID, message.MessageID, false)
 	}
 	record, _, err := a.Journal.Prepare(message)
@@ -177,6 +177,21 @@ func (a *Agent) handleExec(ctx context.Context, sessionID string, message worksp
 			return err
 		}
 		if err := a.Control.Acknowledge(ctx, sessionID, message.MessageID, true); err != nil {
+			return err
+		}
+		return a.flushOutcomes(ctx, sessionID)
+	}
+	if !message.BudgetDeadline.After(a.Now().UTC()) {
+		if _, err := a.Journal.MarkRunning(message.CommandID, sessionID); err != nil {
+			return err
+		}
+		if err := a.Control.Acknowledge(ctx, sessionID, message.MessageID, true); err != nil {
+			return err
+		}
+		if _, err := a.Journal.Finish(message.CommandID, workspacev1.AgentCommandOutcome{
+			CommandID: message.CommandID, ExecutionSessionID: sessionID, State: workspacev1.CommandTimedOut,
+			FinishedAt: a.Now().UTC(), ProcessTreeTerminated: true,
+		}); err != nil {
 			return err
 		}
 		return a.flushOutcomes(ctx, sessionID)
@@ -209,7 +224,7 @@ func (a *Agent) handleExec(ctx context.Context, sessionID string, message worksp
 	environment.SystemValues = cloneSystemEnvironment(a.SystemEnvironment)
 	environment.SystemValues["PLATFORM_COMMAND_ID"] = message.CommandID
 	environment.SystemValues["PLATFORM_EXECUTION_SESSION_ID"] = sessionID
-	executionContext, cancel := context.WithCancel(ctx)
+	executionContext, cancel := context.WithDeadline(ctx, message.BudgetDeadline)
 	a.active = &activeCommand{commandID: message.CommandID, executionSessionID: sessionID, cancel: cancel}
 	spec := cloneCommandSpec(*message.Spec)
 	go func() {
@@ -220,6 +235,14 @@ func (a *Agent) handleExec(ctx context.Context, sessionID string, message worksp
 		a.results <- commandCompletion{commandID: message.CommandID, executionSessionID: sessionID, result: result, environment: environment}
 	}()
 	return nil
+}
+
+func validCommandBudget(message workspacev1.AgentMessage, now time.Time) bool {
+	if message.Spec == nil || strings.TrimSpace(message.BudgetReservationID) == "" || len(message.BudgetReservationID) > 256 || message.BudgetDeadline.IsZero() {
+		return false
+	}
+	maximum := now.Add(time.Duration(message.Spec.TimeoutSeconds) * time.Second)
+	return !message.BudgetDeadline.After(maximum)
 }
 
 func (a *Agent) handleCancel(ctx context.Context, sessionID string, message workspacev1.AgentMessage) error {

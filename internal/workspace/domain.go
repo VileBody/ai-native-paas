@@ -16,6 +16,7 @@ var (
 	ErrPolicyDenied        = errors.New("workspace command denied by policy")
 	ErrReconcileClaimed    = errors.New("workspace reconciliation is already claimed")
 	ErrStatefulCommandBusy = errors.New("stateful workspace command is already running")
+	ErrBudgetExceeded      = errors.New("workspace command budget is exhausted")
 )
 
 type Scope struct {

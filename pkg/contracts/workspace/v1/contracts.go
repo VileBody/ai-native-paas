@@ -129,13 +129,15 @@ const (
 // channel. It contains only credential references; secret values are resolved
 // inside the workspace through the governed gateway.
 type AgentMessage struct {
-	MessageID        string           `json:"message_id"`
-	Kind             AgentMessageKind `json:"kind"`
-	CommandID        string           `json:"command_id"`
-	WorkspaceID      string           `json:"workspace_id"`
-	Spec             *CommandSpec     `json:"spec,omitempty"`
-	CredentialLeases []string         `json:"credential_leases,omitempty"`
-	DeliveryAttempt  int64            `json:"delivery_attempt"`
+	MessageID           string           `json:"message_id"`
+	Kind                AgentMessageKind `json:"kind"`
+	CommandID           string           `json:"command_id"`
+	WorkspaceID         string           `json:"workspace_id"`
+	Spec                *CommandSpec     `json:"spec,omitempty"`
+	CredentialLeases    []string         `json:"credential_leases,omitempty"`
+	BudgetReservationID string           `json:"budget_reservation_id,omitempty"`
+	BudgetDeadline      time.Time        `json:"budget_deadline,omitempty"`
+	DeliveryAttempt     int64            `json:"delivery_attempt"`
 }
 
 type AgentSessionConnect struct {

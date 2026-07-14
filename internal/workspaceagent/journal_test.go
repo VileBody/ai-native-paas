@@ -8,9 +8,11 @@ import (
 )
 
 func journalMessage() workspacev1.AgentMessage {
+	now := time.Date(2026, 7, 14, 16, 0, 0, 0, time.UTC)
 	return workspacev1.AgentMessage{
 		MessageID: "message-1", Kind: workspacev1.AgentMessageExec, CommandID: "command-1", WorkspaceID: "workspace-1", DeliveryAttempt: 1,
-		Spec: &workspacev1.CommandSpec{Argv: []string{"tofu", "apply"}, WorkingDir: "repo", TimeoutSeconds: 60, OutputLimitBytes: 4096},
+		Spec:                &workspacev1.CommandSpec{Argv: []string{"tofu", "apply"}, WorkingDir: "repo", TimeoutSeconds: 60, OutputLimitBytes: 4096},
+		BudgetReservationID: "budget-command-1", BudgetDeadline: now.Add(time.Minute),
 	}
 }
 

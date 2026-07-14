@@ -66,7 +66,7 @@ func NewJournal(directory, workspaceID string, now func() time.Time) (*Journal, 
 func (j *Journal) Prepare(message workspacev1.AgentMessage) (JournalRecord, bool, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	if message.Kind != workspacev1.AgentMessageExec || !identityPattern.MatchString(message.CommandID) || message.WorkspaceID != j.workspaceID || message.Spec == nil || message.Spec.Validate() != nil || message.DeliveryAttempt < 1 {
+	if message.Kind != workspacev1.AgentMessageExec || !identityPattern.MatchString(message.CommandID) || message.WorkspaceID != j.workspaceID || message.Spec == nil || message.Spec.Validate() != nil || message.DeliveryAttempt < 1 || !validCommandBudget(message, j.now().UTC()) {
 		return JournalRecord{}, false, errors.New("workspace command message is invalid")
 	}
 	hash, err := messageFingerprint(message)

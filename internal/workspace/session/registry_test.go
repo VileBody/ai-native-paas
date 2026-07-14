@@ -57,6 +57,7 @@ func commandEnvelope() workspace.CommandEnvelope {
 		CommandID: "command-1", WorkspaceID: "workspace-1", ProjectID: "project-1", TaskID: "task-1",
 		Spec:             workspacev1.CommandSpec{Argv: []string{"tofu", "plan"}, WorkingDir: "repo/infrastructure/tofu", EnvironmentRefs: map[string]string{"STATE_TOKEN": "state://project-1"}, TimeoutSeconds: 60, OutputLimitBytes: 1 << 20},
 		CredentialLeases: []string{"credential/project-1/git"},
+		BudgetLease:      workspace.CommandBudgetLease{ReservationID: "budget-command-1", GrantedSeconds: 60, NotAfter: time.Date(2026, 7, 14, 12, 1, 0, 0, time.UTC)},
 	}
 }
 

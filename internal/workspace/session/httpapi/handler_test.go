@@ -329,7 +329,8 @@ func TestWorkspaceAgentHTTP_OutboundPullAndAckAreCertificateBound(t *testing.T) 
 	connected := connectAgent(t, handler, certificate)
 	envelope := workspace.CommandEnvelope{
 		CommandID: "command-1", WorkspaceID: "workspace-1", ProjectID: "project-1", TaskID: "task-1",
-		Spec: workspacev1.CommandSpec{Argv: []string{"tofu", "plan"}, WorkingDir: "repo", TimeoutSeconds: 60, OutputLimitBytes: 4096},
+		Spec:        workspacev1.CommandSpec{Argv: []string{"tofu", "plan"}, WorkingDir: "repo", TimeoutSeconds: 60, OutputLimitBytes: 4096},
+		BudgetLease: workspace.CommandBudgetLease{ReservationID: "budget-command-1", GrantedSeconds: 60, NotAfter: time.Date(2026, 7, 14, 12, 1, 0, 0, time.UTC)},
 	}
 	type dispatchResult struct {
 		receipt workspace.DispatchReceipt

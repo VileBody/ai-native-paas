@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 952,
-  "discovered_unique_test_name_count": 950,
+  "discovered_go_test_count": 957,
+  "discovered_unique_test_name_count": 955,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1088,7 +1088,7 @@
       "id": "C12",
       "level": "workspace/commerce integration",
       "name": "TestBudget_WorkspaceCommandStoppedBeforeExceedingHardLimit",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/commerce_v2_test.go",
       "test_name": "TestBudget_WorkspaceCommandStoppedBeforeExceedingHardLimit",
       "test_ref": "test/pivot/commerce_v2_test.go::TestBudget_WorkspaceCommandStoppedBeforeExceedingHardLimit"
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 5,
-      "REUSED": 86
+      "NEW": 4,
+      "REUSED": 87
     },
     "unmapped": 0
   }

@@ -49,7 +49,7 @@ func TestWorkspaceManager_OpenBaoClientTrustsOnlyConfiguredCA(t *testing.T) {
 	if err := os.WriteFile(caFile, caPEM, 0o444); err != nil {
 		t.Fatal(err)
 	}
-	client, err := openBaoHTTPClient(caFile)
+	client, err := trustedHTTPClient(caFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestWorkspaceManager_OpenBaoClientTrustsOnlyConfiguredCA(t *testing.T) {
 	if err := os.WriteFile(caFile, []byte("not a certificate"), 0o444); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := openBaoHTTPClient(caFile); err == nil {
+	if _, err := trustedHTTPClient(caFile); err == nil {
 		t.Fatal("invalid OpenBao CA accepted")
 	}
 }

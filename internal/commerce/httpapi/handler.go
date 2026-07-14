@@ -15,6 +15,7 @@ import (
 )
 
 const platformAdminRole = "platform-admin"
+const workspaceBudgetScope = "commerce.workspace_budget:write"
 
 type createPlanDefinitionBody struct {
 	ID   string `json:"id"`
@@ -293,10 +294,30 @@ func authorizeTenant(r *http.Request, pathTenant string) (string, error) {
 	if actor == "" || tenant == "" {
 		return "", domain.NewError(domain.CodePermissionDenied, "principal headers required")
 	}
-	if tenant != pathTenant {
+	if tenant != pathTenant && !(strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Principal-Kind")), "service") && hasScope(r.Header.Get("X-Scopes"), workspaceBudgetScope) && isWorkspaceBudgetRoute(r, pathTenant)) {
 		return "", domain.NewError(domain.CodePermissionDenied, "tenant path does not match principal")
 	}
 	return actor, nil
+}
+
+func isWorkspaceBudgetRoute(r *http.Request, pathTenant string) bool {
+	if r.Method != http.MethodPost {
+		return false
+	}
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) == 4 {
+		return parts[0] == "v1" && parts[1] == "organizations" && parts[2] == pathTenant && parts[3] == "quota-reservations"
+	}
+	return len(parts) == 6 && parts[0] == "v1" && parts[1] == "organizations" && parts[2] == pathTenant && parts[3] == "quota-reservations" && parts[4] != "" && parts[5] == "commit"
+}
+
+func hasScope(raw, wanted string) bool {
+	for _, scope := range strings.Fields(raw) {
+		if scope == wanted {
+			return true
+		}
+	}
+	return false
 }
 func decode(r *http.Request, limit int64, out any) error {
 	if limit <= 0 {
