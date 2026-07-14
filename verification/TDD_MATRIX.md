@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **932**
-- Reused now: **66**
-- New local/contract tests required: **25**
+- Discovered Go tests/fuzz targets: **933**
+- Reused now: **67**
+- New local/contract tests required: **24**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -79,7 +79,7 @@ A release gate may become green only after every referenced test exists and pass
 | `R16` | REUSED | reconciliation | `internal/runtime/application/status_test.go::TestRuntime_UnknownObservedObjectIsQuarantined` |
 | `R17` | LIVE_ONLY | real Kubernetes | `test/pivot/runtime_gitops_test.go::TestRuntime_GVisorRequiredForSharedUntrustedTier` |
 | `R18` | LIVE_ONLY | real Kubernetes/network | `test/pivot/runtime_gitops_test.go::TestRuntime_CiliumDefaultDenyAndExplicitEgressProfiles` |
-| `A5.1` | NEW | application | `test/pivot/attachments_v2_test.go::TestSecret_SetIsWriteOnlyAndReturnsMetadataOnly` |
+| `A5.1` | REUSED | application | `internal/attachments/application/attachments_tdd_test.go::TestSecret_SetIsWriteOnlyAndReturnsMetadataOnly` |
 | `A5.2` | LIVE_ONLY | domain + OpenBao integration | `test/pivot/attachments_v2_test.go::TestSecret_ProjectAndEnvironmentScopesAreIsolated` |
 | `A5.3` | LIVE_ONLY | PostgreSQL + redaction | `test/pivot/attachments_v2_test.go::TestSecret_ValueAbsentFromControlPlanePersistenceAndEvents` |
 | `A5.4` | LIVE_ONLY | credential broker integration | `test/pivot/attachments_v2_test.go::TestCredential_LeaseIsShortLivedProjectScopedAndSinglePurpose` |

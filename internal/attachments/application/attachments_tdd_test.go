@@ -90,6 +90,45 @@ func TestSecret_SetStoresValueOnlyThroughVaultPort(t *testing.T) {
 		t.Fatal("secret boundary violated")
 	}
 }
+
+func TestSecret_SetIsWriteOnlyAndReturnsMetadataOnly(t *testing.T) {
+	f := newFixture(t)
+	metadata, snapshot, err := f.service.SetSecret(context.Background(), application.SetSecretRequest{
+		TenantID: "tenant-1", ApplicationID: "app-1", EnvironmentID: "env-1",
+		Name: "API_TOKEN", Scope: attachmentsv1.SecretScopeRuntime, Phase: attachmentsv1.SecretPhaseRuntime,
+		Value: []byte(sentinel), ActorID: "agent-1", IdempotencyKey: "write-only-metadata",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if metadata.Name != "API_TOKEN" || metadata.Version != 1 || snapshot.SnapshotID == "" || !f.vault.Contains(sentinel) {
+		t.Fatalf("metadata=%+v snapshot=%+v vault_contains=%t", metadata, snapshot, f.vault.Contains(sentinel))
+	}
+	resolved, err := f.service.Resolve(context.Background(), "tenant-1", "env-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var persisted any
+	if err := f.store.Transact(context.Background(), func(tx application.Tx) error {
+		set, _ := tx.FindSecretSet("tenant-1", "env-1")
+		secret, _ := tx.FindSecret(set.ID, "API_TOKEN", attachmentsv1.SecretScopeRuntime)
+		persisted = struct {
+			Set      domain.SecretSet
+			Metadata domain.SecretMetadata
+		}{set, secret}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for surface, value := range map[string]any{
+		"response": metadata, "snapshot_ref": snapshot, "resolved_snapshot": resolved,
+		"postgres_shape": persisted, "audit": f.store.Audit(), "outbox": f.store.Outbox(),
+	} {
+		if containsJSON(value, sentinel) {
+			t.Fatalf("write-only value leaked through %s", surface)
+		}
+	}
+}
 func TestSecret_GetReturnsMetadataNotValue(t *testing.T) {
 	f := newFixture(t)
 	f.setRuntime(t, "API_TOKEN", sentinel, "s1")
