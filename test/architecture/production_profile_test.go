@@ -23,7 +23,11 @@ func TestEveryEntrypointDeclaresProductionAdapterInventory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(raw), "platformprofile.Validate(os.Getenv(\"PLATFORM_PROFILE\")") {
+		source := string(raw)
+		legacyInventory := strings.Contains(source, "platformprofile.Validate(os.Getenv(\"PLATFORM_PROFILE\")")
+		dynamicInventory := strings.Contains(source, "platformprofile.Parse(os.Getenv(\"PLATFORM_PROFILE\"))") &&
+			strings.Contains(source, "platformprofile.Validate(string(profile)")
+		if !legacyInventory && !dynamicInventory {
 			t.Errorf("%s has no fail-closed production adapter inventory", filepath.Base(filepath.Dir(entrypoint)))
 		}
 	}

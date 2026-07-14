@@ -99,3 +99,25 @@ func TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction(t *tes
 		t.Fatal("unverified agent request reached tool dispatch")
 	}
 }
+
+func TestProductionPublicPrefixesAreExplicit(t *testing.T) {
+	var invoked bool
+	handler := Middleware{
+		Profile:        platformprofile.Production,
+		PublicPrefixes: []string{"/hooks/gitlab/"},
+	}.Wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { invoked = true }))
+
+	allowed := httptest.NewRequest(http.MethodPost, "/hooks/gitlab/tenant-1", nil)
+	handler.ServeHTTP(httptest.NewRecorder(), allowed)
+	if !invoked {
+		t.Fatal("configured webhook prefix was not public")
+	}
+
+	invoked = false
+	lookalike := httptest.NewRequest(http.MethodPost, "/hooks/gitlab-evil/tenant-1", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, lookalike)
+	if invoked || response.Code != http.StatusUnauthorized {
+		t.Fatalf("lookalike prefix bypassed authentication: invoked=%t status=%d", invoked, response.Code)
+	}
+}

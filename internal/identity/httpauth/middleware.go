@@ -32,10 +32,11 @@ type MTLSVerifier interface {
 }
 
 type Middleware struct {
-	Profile     platformprofile.Profile
-	OIDC        OIDCVerifier
-	MTLS        MTLSVerifier
-	PublicPaths map[string]struct{}
+	Profile        platformprofile.Profile
+	OIDC           OIDCVerifier
+	MTLS           MTLSVerifier
+	PublicPaths    map[string]struct{}
+	PublicPrefixes []string
 }
 
 type contextKey struct{}
@@ -49,7 +50,7 @@ var developmentIdentityHeaders = []string{"X-Tenant-ID", "X-Project-ID", "X-Prin
 
 func (m Middleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, public := m.PublicPaths[r.URL.Path]; public {
+		if m.public(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -79,6 +80,19 @@ func (m Middleware) Wrap(next http.Handler) http.Handler {
 		request.Header.Set("X-Scopes", strings.Join(identity.Scopes, " "))
 		next.ServeHTTP(w, request)
 	})
+}
+
+func (m Middleware) public(path string) bool {
+	if _, public := m.PublicPaths[path]; public {
+		return true
+	}
+	for _, prefix := range m.PublicPrefixes {
+		prefix = strings.TrimSpace(prefix)
+		if prefix != "" && strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func (m Middleware) authenticate(r *http.Request) (Identity, error) {

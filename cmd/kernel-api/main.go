@@ -10,20 +10,63 @@ import (
 	"syscall"
 	"time"
 
+	kernelpostgres "github.com/keir-research/ai-native-paas/adapters/postgres/kernel"
+	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
 	"github.com/keir-research/ai-native-paas/internal/kernel"
 	"github.com/keir-research/ai-native-paas/internal/kernel/httpapi"
 	"github.com/keir-research/ai-native-paas/internal/kernel/memory"
 	"github.com/keir-research/ai-native-paas/internal/platformprofile"
+	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	if _, err := platformprofile.Validate(os.Getenv("PLATFORM_PROFILE"), "kernel-api", platformprofile.Dev("kernel-memory-store"), platformprofile.Dev("development-identity-headers")); err != nil {
+	profile, err := platformprofile.Parse(os.Getenv("PLATFORM_PROFILE"))
+	if err != nil {
 		logger.Error("invalid runtime profile", "error", err)
 		os.Exit(1)
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	var (
+		store       kernel.Store
+		storageName string
+		adapters    []platformprofile.Adapter
+	)
+	if profile == platformprofile.Production {
+		bootstrapCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		defer cancel()
+		db, openErr := postgresbootstrap.Open(bootstrapCtx, os.Getenv("DATABASE_URL"))
+		if openErr != nil {
+			logger.Error("initialize PostgreSQL", "error", openErr)
+			os.Exit(1)
+		}
+		defer db.Close()
+		if migrateErr := postgresbootstrap.WithMigrationLock(bootstrapCtx, db, "kernel", func(migrateCtx context.Context) error {
+			return kernelpostgres.Migrate(migrateCtx, db)
+		}); migrateErr != nil {
+			logger.Error("migrate PostgreSQL", "error", migrateErr)
+			os.Exit(1)
+		}
+		store, err = kernelpostgres.NewStore(db)
+		storageName = "postgres"
+		adapters = []platformprofile.Adapter{platformprofile.Prod("kernel-postgres-store"), platformprofile.Prod("verified-identity-middleware")}
+	} else {
+		store = memory.NewStore()
+		storageName = "memory-development-only"
+		adapters = []platformprofile.Adapter{platformprofile.Dev("kernel-memory-store"), platformprofile.Dev("development-identity-headers")}
+	}
+	if err != nil {
+		logger.Error("initialize kernel store", "error", err)
+		os.Exit(1)
+	}
+	if _, err := platformprofile.Validate(string(profile), "kernel-api", adapters...); err != nil {
+		logger.Error("invalid runtime adapters", "error", err)
+		os.Exit(1)
+	}
 	ids := kernel.CryptoIDGenerator{}
-	service, err := kernel.NewService(memory.NewStore(), kernel.SystemClock{}, ids)
+	service, err := kernel.NewService(store, kernel.SystemClock{}, ids)
 	if err != nil {
 		logger.Error("initialize kernel service", "error", err)
 		os.Exit(1)
@@ -38,6 +81,12 @@ func main() {
 	if address == "" {
 		address = ":8080"
 	}
+	handler = (httpauth.Middleware{
+		Profile: profile,
+		PublicPaths: map[string]struct{}{
+			"/healthz": {},
+		},
+	}).Wrap(handler)
 	server := &http.Server{
 		Addr:              address,
 		Handler:           handler,
@@ -47,8 +96,6 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -58,7 +105,7 @@ func main() {
 		}
 	}()
 
-	logger.Info("kernel API listening", "address", address, "storage", "memory-development-only")
+	logger.Info("kernel API listening", "address", address, "storage", storageName, "profile", profile)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error("HTTP server failed", "error", err)
 		os.Exit(1)

@@ -14,27 +14,64 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/agent/devadapter"
 	"github.com/keir-research/ai-native-paas/internal/agent/httpapi"
 	"github.com/keir-research/ai-native-paas/internal/agent/memory"
+	agentpostgres "github.com/keir-research/ai-native-paas/internal/agent/postgres"
 	"github.com/keir-research/ai-native-paas/internal/agent/support"
 	"github.com/keir-research/ai-native-paas/internal/platformprofile"
+	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 	agentv1 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v1"
 	commercev1 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1"
 )
 
 func main() {
-	if _, err := platformprofile.Validate(os.Getenv("PLATFORM_PROFILE"), "agent-api",
-		platformprofile.Dev("agent-memory-store"),
-		platformprofile.Dev("source-build-runtime-development-gateways"),
-	); err != nil {
+	profile, err := platformprofile.Parse(os.Getenv("PLATFORM_PROFILE"))
+	if err != nil {
 		log.Fatal(err)
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
+	adapters := []platformprofile.Adapter{
+		platformprofile.Dev("source-build-runtime-development-gateways"),
+		platformprofile.Dev("development-identity-headers"),
+	}
+	if profile == platformprofile.Production {
+		adapters = append(adapters, platformprofile.Prod("agent-postgres-store"))
+	} else {
+		adapters = append(adapters, platformprofile.Dev("agent-memory-store"))
+	}
+	if _, err := platformprofile.Validate(string(profile), "agent-api", adapters...); err != nil {
+		log.Fatal(err)
+	}
+
+	var (
+		store       application.Store
+		storageName string
+	)
+	if profile == platformprofile.Production {
+		db, openErr := postgresbootstrap.Open(ctx, os.Getenv("DATABASE_URL"))
+		if openErr != nil {
+			log.Fatal(openErr)
+		}
+		defer db.Close()
+		postgresStore, storeErr := agentpostgres.NewStore(db)
+		if storeErr != nil {
+			log.Fatal(storeErr)
+		}
+		if migrateErr := postgresbootstrap.WithMigrationLock(ctx, db, "agent", postgresStore.Migrate); migrateErr != nil {
+			log.Fatal(migrateErr)
+		}
+		store = postgresStore
+		storageName = "postgres"
+	} else {
+		store = memory.New()
+		storageName = "memory-development-only"
+	}
+
 	clock := support.Clock{}
 	ids := &support.IDs{}
 	commerce := &devadapter.Commerce{Allowed: true}
 	service := &application.Service{
-		Store:       memory.New(),
+		Store:       store,
 		Clock:       clock,
 		IDs:         ids,
 		Source:      devadapter.NewSource(),
@@ -71,7 +108,7 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 	go func() {
-		log.Printf("agent API listening on %s (development adapters; replace before production)", server.Addr)
+		log.Printf("agent API listening on %s (storage=%s profile=%s; development gateways)", server.Addr, storageName, profile)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Printf("agent API stopped unexpectedly: %v", err)
 			stop()

@@ -17,7 +17,9 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/attachments/httpapi"
 	"github.com/keir-research/ai-native-paas/internal/attachments/memory"
 	"github.com/keir-research/ai-native-paas/internal/attachments/openbao"
+	attachmentspostgres "github.com/keir-research/ai-native-paas/internal/attachments/postgres"
 	"github.com/keir-research/ai-native-paas/internal/platformprofile"
+	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
 )
 
@@ -35,11 +37,21 @@ func mustPlan(service *application.Service, plan domain.ServicePlan) {
 }
 
 func main() {
-	if _, err := platformprofile.Validate(os.Getenv("PLATFORM_PROFILE"), "attachments-api",
-		platformprofile.Dev("attachments-memory-store"),
+	profile, err := platformprofile.Parse(os.Getenv("PLATFORM_PROFILE"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	adapters := []platformprofile.Adapter{
 		platformprofile.Dev("openbao-memory-backend"),
 		platformprofile.Dev("managed-provider-development-gateways"),
-	); err != nil {
+		platformprofile.Dev("development-identity-headers"),
+	}
+	if profile == platformprofile.Production {
+		adapters = append(adapters, platformprofile.Prod("attachments-postgres-store"))
+	} else {
+		adapters = append(adapters, platformprofile.Dev("attachments-memory-store"))
+	}
+	if _, err := platformprofile.Validate(string(profile), "attachments-api", adapters...); err != nil {
 		log.Fatal(err)
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -49,7 +61,29 @@ func main() {
 	applicationID := env("ATTACHMENTS_DEV_APPLICATION_ID", "app-local")
 	environmentID := env("ATTACHMENTS_DEV_ENVIRONMENT_ID", "env-local")
 
-	store := memory.New()
+	var (
+		store       application.Store
+		storageName string
+	)
+	if profile == platformprofile.Production {
+		db, openErr := postgresbootstrap.Open(ctx, os.Getenv("DATABASE_URL"))
+		if openErr != nil {
+			log.Fatal(openErr)
+		}
+		defer db.Close()
+		postgresStore, storeErr := attachmentspostgres.NewStore(db)
+		if storeErr != nil {
+			log.Fatal(storeErr)
+		}
+		if migrateErr := postgresbootstrap.WithMigrationLock(ctx, db, "attachments", postgresStore.Migrate); migrateErr != nil {
+			log.Fatal(migrateErr)
+		}
+		store = postgresStore
+		storageName = "postgres"
+	} else {
+		store = memory.New()
+		storageName = "memory-development-only"
+	}
 	backend := openbao.NewMemoryBackend()
 	service := &application.Service{
 		Store: store,
@@ -89,7 +123,7 @@ func main() {
 	}
 	failures := make(chan error, 1)
 	go func() {
-		log.Printf("attachments-api listening on %s", server.Addr)
+		log.Printf("attachments-api listening on %s (storage=%s profile=%s; development gateways)", server.Addr, storageName, profile)
 		failures <- server.ListenAndServe()
 	}()
 
