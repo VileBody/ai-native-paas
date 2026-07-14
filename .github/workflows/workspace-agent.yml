@@ -81,12 +81,23 @@ jobs:
       - name: Verify libguestfs appliance
         env:
           LIBGUESTFS_BACKEND: direct
+          LIBGUESTFS_BACKEND_SETTINGS: force_tcg
         run: |
           sudo chmod 0644 /boot/vmlinuz-*
           libguestfs-test-tool
+      - name: Force libguestfs QEMU user networking
+        run: |
+          if passt_path="$(command -v passt)"; then
+            sudo mv "$passt_path" "${passt_path}.disabled"
+          fi
+          if command -v passt; then
+            echo "passt must be unavailable so libguestfs falls back to QEMU SLIRP" >&2
+            exit 1
+          fi
       - run: ./scripts/build-workspace-image.sh
         env:
           LIBGUESTFS_BACKEND: direct
+          LIBGUESTFS_BACKEND_SETTINGS: force_tcg
       - name: Sign disk image and manifest
         env:
           COSIGN_YES: 'true'
