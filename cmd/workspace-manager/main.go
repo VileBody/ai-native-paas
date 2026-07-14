@@ -46,6 +46,7 @@ type config struct {
 	ClientCAFile           string
 	TrustDomain            string
 	OpenBaoAddress         string
+	OpenBaoCAFile          string
 	OpenBaoTokenFile       string
 	OpenBaoPKIMount        string
 	OpenBaoRole            string
@@ -119,9 +120,14 @@ func main() {
 
 	clock := agentsupport.Clock{}
 	ids := managerIDs{inner: &agentsupport.IDs{}}
+	openBaoClient, err := openBaoHTTPClient(settings.OpenBaoCAFile)
+	if err != nil {
+		logger.Error("initialize OpenBao trusted client", "error", err)
+		os.Exit(1)
+	}
 	credentialSource, err := workspaceopenbao.NewCredentialSource(workspaceopenbao.CredentialConfig{
 		Address: settings.OpenBaoAddress, TokenFile: settings.OpenBaoTokenFile, Mount: settings.OpenBaoCredentialMount,
-		MaximumTTL: settings.OpenBaoCredentialTTL, Clock: clock,
+		MaximumTTL: settings.OpenBaoCredentialTTL, HTTPClient: openBaoClient, Clock: clock,
 	})
 	if err != nil {
 		logger.Error("initialize OpenBao workspace credential source", "error", err)
@@ -129,7 +135,7 @@ func main() {
 	}
 	issuer, err := workspaceopenbao.NewIssuer(workspaceopenbao.Config{
 		Address: settings.OpenBaoAddress, TokenFile: settings.OpenBaoTokenFile, PKIMount: settings.OpenBaoPKIMount,
-		Role: settings.OpenBaoRole, TrustDomain: settings.TrustDomain, TTL: settings.OpenBaoTTL, Clock: clock,
+		Role: settings.OpenBaoRole, TrustDomain: settings.TrustDomain, TTL: settings.OpenBaoTTL, HTTPClient: openBaoClient, Clock: clock,
 	})
 	if err != nil {
 		logger.Error("initialize OpenBao workspace issuer", "error", err)
@@ -281,6 +287,7 @@ func loadConfig() (config, error) {
 		ServerCertificateFile: required("WORKSPACE_SERVER_CERT_FILE"), ServerPrivateKeyFile: required("WORKSPACE_SERVER_KEY_FILE"),
 		ClientCAFile: required("WORKSPACE_CLIENT_CA_FILE"), TrustDomain: required("WORKSPACE_TRUST_DOMAIN"),
 		OpenBaoAddress: required("OPENBAO_ADDR"), OpenBaoTokenFile: required("OPENBAO_TOKEN_FILE"),
+		OpenBaoCAFile:   required("OPENBAO_CA_FILE"),
 		OpenBaoPKIMount: env("OPENBAO_WORKSPACE_PKI_MOUNT", "workspace-pki"), OpenBaoRole: env("OPENBAO_WORKSPACE_PKI_ROLE", "workspace-agent"),
 		OpenBaoCredentialMount: env("OPENBAO_WORKSPACE_CREDENTIAL_MOUNT", "workspace-credentials"),
 		TimewebAPIURL:          env("TIMEWEB_API_URL", "https://api.timeweb.cloud/api/v1"), TimewebTokenFile: required("TIMEWEB_TOKEN_FILE"),
@@ -327,7 +334,7 @@ func loadConfig() (config, error) {
 		"DATABASE_URL": settings.DatabaseURL, "WORKSPACE_SERVER_CERT_FILE": settings.ServerCertificateFile,
 		"WORKSPACE_SERVER_KEY_FILE": settings.ServerPrivateKeyFile, "WORKSPACE_CLIENT_CA_FILE": settings.ClientCAFile,
 		"WORKSPACE_TRUST_DOMAIN": settings.TrustDomain, "OPENBAO_ADDR": settings.OpenBaoAddress,
-		"OPENBAO_TOKEN_FILE": settings.OpenBaoTokenFile, "TIMEWEB_TOKEN_FILE": settings.TimewebTokenFile,
+		"OPENBAO_TOKEN_FILE": settings.OpenBaoTokenFile, "OPENBAO_CA_FILE": settings.OpenBaoCAFile, "TIMEWEB_TOKEN_FILE": settings.TimewebTokenFile,
 		"WORKSPACE_VPC_ID": settings.WorkspaceVPCID, "WORKSPACE_AGENT_PUBLIC_URL": settings.ControlPlaneURL,
 		"WORKSPACE_EGRESS_GATEWAY_URL": settings.EgressGatewayURL,
 		"WORKSPACE_LOG_S3_ENDPOINT":    settings.LogS3Endpoint, "WORKSPACE_LOG_S3_BUCKET": settings.LogS3Bucket,
@@ -347,6 +354,21 @@ func loadConfig() (config, error) {
 		}
 	}
 	return settings, nil
+}
+
+func openBaoHTTPClient(caFile string) (*http.Client, error) {
+	raw, err := os.ReadFile(caFile)
+	if err != nil || len(raw) == 0 || len(raw) > 256<<10 {
+		return nil, errors.New("load OpenBao CA")
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(raw) {
+		return nil, errors.New("parse OpenBao CA")
+	}
+	return &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots}},
+	}, nil
 }
 
 func readSecureFile(filename string, maximum int64) ([]byte, error) {
