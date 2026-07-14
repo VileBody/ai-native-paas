@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **982**
-- Reused now: **94**
+- Discovered Go tests/fuzz targets: **984**
+- Reused now: **96**
 - New local/contract tests required: **0**
-- Live/provider/system tests required: **63**
+- Live/provider/system tests required: **61**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -88,8 +88,8 @@ A release gate may become green only after every referenced test exists and pass
 | `A5.7` | LIVE_ONLY | cross-domain acceptance | `test/pivot/attachments_v2_test.go::TestSecret_GitWorkspacePlanAndBuildNeverContainValue` |
 | `A5.8` | REUSED | domain + PostgreSQL + crypto | `test/integration/postgres_attachments_test.go::TestRecipe_ActivatedVersionIsImmutableAndSigned` |
 | `A5.9` | REUSED | application | `internal/attachments/recipe/registry_test.go::TestRecipe_ResolutionPinsExactVersionAndArtifactDigests` |
-| `A5.10` | LIVE_ONLY | domain | `test/pivot/attachments_v2_test.go::TestRecipe_DependencyGraphRejectsCyclesAndVersionConflict` |
-| `A5.11` | LIVE_ONLY | application | `test/pivot/attachments_v2_test.go::TestRecipe_PlanIsPureAndCreatesNoExternalResource` |
+| `A5.10` | REUSED | domain | `internal/attachments/recipe/registry_test.go::TestRecipe_DependencyGraphRejectsCyclesAndVersionConflict` |
+| `A5.11` | REUSED | application | `internal/attachments/recipe/registry_test.go::TestRecipe_PlanIsPureAndCreatesNoExternalResource` |
 | `A5.12` | REUSED | policy integration | `internal/attachments/recipe/registry_test.go::TestRecipe_DeclaredPermissionsMatchRenderedResources` |
 | `A5.13` | REUSED | contract | `internal/attachments/recipe/registry_test.go::TestRecipe_HealthBackupUpgradeAndRemovalProceduresAreComplete` |
 | `A5.14` | REUSED | application | `internal/attachments/recipe/registry_test.go::TestRecipe_CustomAdHocInstallIsAllowedWithinStricterPolicy` |

@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 982,
-  "discovered_unique_test_name_count": 980,
+  "discovered_go_test_count": 984,
+  "discovered_unique_test_name_count": 982,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -748,20 +748,20 @@
       "id": "A5.10",
       "level": "domain",
       "name": "TestRecipe_DependencyGraphRejectsCyclesAndVersionConflict",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/attachments/recipe/registry_test.go",
       "test_name": "TestRecipe_DependencyGraphRejectsCyclesAndVersionConflict",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_DependencyGraphRejectsCyclesAndVersionConflict"
+      "test_ref": "internal/attachments/recipe/registry_test.go::TestRecipe_DependencyGraphRejectsCyclesAndVersionConflict"
     },
     {
       "family": "A5",
       "id": "A5.11",
       "level": "application",
       "name": "TestRecipe_PlanIsPureAndCreatesNoExternalResource",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/attachments_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/attachments/recipe/registry_test.go",
       "test_name": "TestRecipe_PlanIsPureAndCreatesNoExternalResource",
-      "test_ref": "test/pivot/attachments_v2_test.go::TestRecipe_PlanIsPureAndCreatesNoExternalResource"
+      "test_ref": "internal/attachments/recipe/registry_test.go::TestRecipe_PlanIsPureAndCreatesNoExternalResource"
     },
     {
       "family": "A5",
@@ -1589,8 +1589,8 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 63,
-      "REUSED": 94
+      "LIVE_ONLY": 61,
+      "REUSED": 96
     },
     "unmapped": 0
   }

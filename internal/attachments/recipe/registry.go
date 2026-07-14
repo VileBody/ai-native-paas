@@ -40,8 +40,13 @@ func Sign(version recipesv1.RecipeVersion, keyID string, privateKey ed25519.Priv
 	}
 	version.SigningKeyID = strings.TrimSpace(keyID)
 	version.Artifacts = append([]recipesv1.ArtifactPin(nil), version.Artifacts...)
+	version.Dependencies = cloneDependencies(version.Dependencies)
 	version.Permissions = append([]recipesv1.ResourcePermission(nil), version.Permissions...)
 	sort.Slice(version.Artifacts, func(i, j int) bool { return version.Artifacts[i].Name < version.Artifacts[j].Name })
+	sort.Slice(version.Dependencies, func(i, j int) bool { return version.Dependencies[i].RecipeID < version.Dependencies[j].RecipeID })
+	for index := range version.Dependencies {
+		sort.Strings(version.Dependencies[index].AllowedVersions)
+	}
 	sort.Slice(version.Permissions, func(i, j int) bool {
 		return permissionKey(version.Permissions[i]) < permissionKey(version.Permissions[j])
 	})
@@ -71,8 +76,13 @@ func CanonicalContent(version recipesv1.RecipeVersion) ([]byte, error) {
 	copy.SignatureDigest = ""
 	copy.Signature = ""
 	copy.Artifacts = append([]recipesv1.ArtifactPin(nil), version.Artifacts...)
+	copy.Dependencies = cloneDependencies(version.Dependencies)
 	copy.Permissions = append([]recipesv1.ResourcePermission(nil), version.Permissions...)
 	sort.Slice(copy.Artifacts, func(i, j int) bool { return copy.Artifacts[i].Name < copy.Artifacts[j].Name })
+	sort.Slice(copy.Dependencies, func(i, j int) bool { return copy.Dependencies[i].RecipeID < copy.Dependencies[j].RecipeID })
+	for index := range copy.Dependencies {
+		sort.Strings(copy.Dependencies[index].AllowedVersions)
+	}
 	sort.Slice(copy.Permissions, func(i, j int) bool { return permissionKey(copy.Permissions[i]) < permissionKey(copy.Permissions[j]) })
 	return json.Marshal(copy)
 }
@@ -140,6 +150,247 @@ func (r Registry) Resolve(ctx context.Context, request ResolveRequest) (recipesv
 		return recipesv1.RecipeLock{}, err
 	}
 	return lock, nil
+}
+
+// ResolveGraph produces dependency-first immutable locks for a recipe and its
+// transitive dependencies. Resolution is read-only, deterministic, verifies
+// every signature and backtracks across active versions when constraints are
+// incompatible. No provider port is present on Registry, so a rejected graph
+// cannot create an external resource.
+func (r Registry) ResolveGraph(ctx context.Context, request ResolveRequest) ([]recipesv1.RecipeLock, error) {
+	if r.Store == nil || strings.TrimSpace(request.RecipeID) == "" {
+		return nil, ErrInvalid
+	}
+	rootConstraint, err := versionConstraint(request.AllowedVersions)
+	if err != nil {
+		return nil, err
+	}
+	constraints := map[string][]map[string]struct{}{
+		strings.TrimSpace(request.RecipeID): {rootConstraint},
+	}
+	selected, err := r.solveGraph(ctx, constraints, map[string]recipesv1.RecipeVersion{})
+	if err != nil {
+		return nil, err
+	}
+	order, err := dependencyOrder(strings.TrimSpace(request.RecipeID), selected)
+	if err != nil {
+		return nil, err
+	}
+	locks := make([]recipesv1.RecipeLock, 0, len(order))
+	for _, recipeID := range order {
+		lock, lockErr := lockRecipe(selected[recipeID])
+		if lockErr != nil {
+			return nil, lockErr
+		}
+		locks = append(locks, lock)
+	}
+	return locks, nil
+}
+
+// Plan resolves a complete immutable dependency graph and hashes only its
+// normalized public inputs. It has no provider port and performs no store
+// mutation, making repeated plans pure and safe before approval.
+func (r Registry) Plan(ctx context.Context, request ResolveRequest) (recipesv1.InstallationPlan, error) {
+	locks, err := r.ResolveGraph(ctx, request)
+	if err != nil {
+		return recipesv1.InstallationPlan{}, err
+	}
+	plan := recipesv1.InstallationPlan{RootRecipeID: strings.TrimSpace(request.RecipeID), Recipes: locks}
+	payload, err := json.Marshal(struct {
+		RootRecipeID string                 `json:"root_recipe_id"`
+		Recipes      []recipesv1.RecipeLock `json:"recipes"`
+	}{RootRecipeID: plan.RootRecipeID, Recipes: plan.Recipes})
+	if err != nil {
+		return recipesv1.InstallationPlan{}, ErrInvalid
+	}
+	plan.PlanHash = digestOf(payload)
+	if err := plan.Validate(); err != nil {
+		return recipesv1.InstallationPlan{}, errors.Join(ErrInvalid, err)
+	}
+	return plan, nil
+}
+
+func (r Registry) solveGraph(ctx context.Context, constraints map[string][]map[string]struct{}, selected map[string]recipesv1.RecipeVersion) (map[string]recipesv1.RecipeVersion, error) {
+	for recipeID, version := range selected {
+		if !matchesConstraints(version.Version, constraints[recipeID]) {
+			return nil, ErrConflict
+		}
+	}
+	unresolved := make([]string, 0, len(constraints))
+	for recipeID := range constraints {
+		if _, ok := selected[recipeID]; !ok {
+			unresolved = append(unresolved, recipeID)
+		}
+	}
+	if len(unresolved) == 0 {
+		if _, err := dependencyOrder("", selected); err != nil {
+			return nil, err
+		}
+		return selected, nil
+	}
+	sort.Strings(unresolved)
+	recipeID := unresolved[0]
+	versions, err := r.Store.ListActiveRecipes(ctx, recipeID)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(versions, func(i, j int) bool { return compareSemver(versions[i].Version, versions[j].Version) > 0 })
+	matched := false
+	for _, version := range versions {
+		if !matchesConstraints(version.Version, constraints[recipeID]) {
+			continue
+		}
+		matched = true
+		key, ok := r.Keys[version.SigningKeyID]
+		if !ok || Verify(version, key) != nil {
+			return nil, ErrSignature
+		}
+		nextSelected := cloneSelected(selected)
+		nextSelected[recipeID] = version
+		nextConstraints := cloneConstraints(constraints)
+		valid := true
+		for _, dependency := range version.Dependencies {
+			constraint, constraintErr := versionConstraint(dependency.AllowedVersions)
+			if constraintErr != nil {
+				return nil, constraintErr
+			}
+			nextConstraints[dependency.RecipeID] = append(nextConstraints[dependency.RecipeID], constraint)
+			if current, exists := nextSelected[dependency.RecipeID]; exists && !matchesConstraints(current.Version, nextConstraints[dependency.RecipeID]) {
+				valid = false
+				break
+			}
+		}
+		if !valid {
+			continue
+		}
+		resolved, solveErr := r.solveGraph(ctx, nextConstraints, nextSelected)
+		if solveErr == nil {
+			return resolved, nil
+		}
+		if !errors.Is(solveErr, ErrConflict) {
+			return nil, solveErr
+		}
+	}
+	if !matched {
+		return nil, ErrConflict
+	}
+	return nil, ErrConflict
+}
+
+func versionConstraint(versions []string) (map[string]struct{}, error) {
+	if len(versions) == 0 {
+		return nil, ErrInvalid
+	}
+	constraint := make(map[string]struct{}, len(versions))
+	for _, version := range versions {
+		version = strings.TrimSpace(version)
+		parts := strings.Split(version, ".")
+		if len(parts) != 3 {
+			return nil, ErrInvalid
+		}
+		for _, part := range parts {
+			if _, err := strconv.ParseUint(part, 10, 64); err != nil {
+				return nil, ErrInvalid
+			}
+		}
+		constraint[version] = struct{}{}
+	}
+	return constraint, nil
+}
+
+func matchesConstraints(version string, constraints []map[string]struct{}) bool {
+	if len(constraints) == 0 {
+		return false
+	}
+	for _, constraint := range constraints {
+		if _, ok := constraint[version]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func dependencyOrder(root string, selected map[string]recipesv1.RecipeVersion) ([]string, error) {
+	states := map[string]uint8{}
+	order := make([]string, 0, len(selected))
+	var visit func(string) error
+	visit = func(recipeID string) error {
+		switch states[recipeID] {
+		case 1:
+			return ErrConflict
+		case 2:
+			return nil
+		}
+		version, ok := selected[recipeID]
+		if !ok {
+			return ErrConflict
+		}
+		states[recipeID] = 1
+		for _, dependency := range version.Dependencies {
+			if err := visit(dependency.RecipeID); err != nil {
+				return err
+			}
+		}
+		states[recipeID] = 2
+		order = append(order, recipeID)
+		return nil
+	}
+	if root != "" {
+		if err := visit(root); err != nil {
+			return nil, err
+		}
+		return order, nil
+	}
+	ids := make([]string, 0, len(selected))
+	for recipeID := range selected {
+		ids = append(ids, recipeID)
+	}
+	sort.Strings(ids)
+	for _, recipeID := range ids {
+		if err := visit(recipeID); err != nil {
+			return nil, err
+		}
+	}
+	return order, nil
+}
+
+func lockRecipe(selected recipesv1.RecipeVersion) (recipesv1.RecipeLock, error) {
+	lock := recipesv1.RecipeLock{RecipeID: selected.RecipeID, Version: selected.Version, ContentDigest: selected.ContentDigest, SignatureDigest: selected.SignatureDigest, Artifacts: append([]recipesv1.ArtifactPin(nil), selected.Artifacts...)}
+	if err := lock.Validate(); err != nil {
+		return recipesv1.RecipeLock{}, err
+	}
+	return lock, nil
+}
+
+func cloneDependencies(values []recipesv1.DependencyConstraint) []recipesv1.DependencyConstraint {
+	copy := make([]recipesv1.DependencyConstraint, len(values))
+	for index, value := range values {
+		copy[index] = value
+		copy[index].AllowedVersions = append([]string(nil), value.AllowedVersions...)
+	}
+	return copy
+}
+
+func cloneSelected(values map[string]recipesv1.RecipeVersion) map[string]recipesv1.RecipeVersion {
+	copy := make(map[string]recipesv1.RecipeVersion, len(values))
+	for key, value := range values {
+		copy[key] = value
+	}
+	return copy
+}
+
+func cloneConstraints(values map[string][]map[string]struct{}) map[string][]map[string]struct{} {
+	copy := make(map[string][]map[string]struct{}, len(values))
+	for recipeID, constraints := range values {
+		copy[recipeID] = make([]map[string]struct{}, len(constraints))
+		for index, constraint := range constraints {
+			copy[recipeID][index] = make(map[string]struct{}, len(constraint))
+			for version := range constraint {
+				copy[recipeID][index][version] = struct{}{}
+			}
+		}
+	}
+	return copy
 }
 
 type ManifestResource struct {

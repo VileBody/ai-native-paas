@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"errors"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ import (
 
 type memoryRegistry struct {
 	values map[string]recipesv1.RecipeVersion
+	puts   int
 }
 
 func newMemoryRegistry() *memoryRegistry {
@@ -21,6 +23,7 @@ func newMemoryRegistry() *memoryRegistry {
 }
 func recipeKey(id, version string) string { return id + "\x00" + version }
 func (m *memoryRegistry) PutActiveRecipe(_ context.Context, version recipesv1.RecipeVersion) (recipesv1.RecipeVersion, error) {
+	m.puts++
 	key := recipeKey(version.RecipeID, version.Version)
 	if existing, ok := m.values[key]; ok {
 		if existing.ContentDigest != version.ContentDigest {
@@ -83,6 +86,22 @@ func signedRecipe(t *testing.T, version string) (recipesv1.RecipeVersion, ed2551
 	return signed, publicKey
 }
 
+func signedGraphRecipe(t *testing.T, recipeID, version string, dependencies []recipesv1.DependencyConstraint) (recipesv1.RecipeVersion, ed25519.PublicKey) {
+	t.Helper()
+	publicKey, privateKey, err := recipeKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate := unsignedRecipe(version)
+	candidate.RecipeID = recipeID
+	candidate.Dependencies = dependencies
+	signed, err := recipe.Sign(candidate, "beta-recipe-key", privateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signed, publicKey
+}
+
 func TestRecipe_ResolutionPinsExactVersionAndArtifactDigests(t *testing.T) {
 	store := newMemoryRegistry()
 	first, publicKey := signedRecipe(t, "1.0.0")
@@ -106,6 +125,84 @@ func TestRecipe_ResolutionPinsExactVersionAndArtifactDigests(t *testing.T) {
 		if !strings.HasPrefix(artifact.Digest, "sha256:") || strings.Contains(strings.ToLower(artifact.Reference), ":latest") {
 			t.Fatalf("floating artifact in lock: %+v", artifact)
 		}
+	}
+}
+
+func TestRecipe_DependencyGraphRejectsCyclesAndVersionConflict(t *testing.T) {
+	activate := func(t *testing.T, registry recipe.Registry, versions ...recipesv1.RecipeVersion) {
+		t.Helper()
+		for _, version := range versions {
+			if _, err := registry.Activate(context.Background(), version); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	t.Run("cycle", func(t *testing.T) {
+		store := newMemoryRegistry()
+		temporal, publicKey := signedGraphRecipe(t, "temporal", "1.0.0", []recipesv1.DependencyConstraint{{RecipeID: "postgresql", AllowedVersions: []string{"1.0.0"}}})
+		postgres, _ := signedGraphRecipe(t, "postgresql", "1.0.0", []recipesv1.DependencyConstraint{{RecipeID: "temporal", AllowedVersions: []string{"1.0.0"}}})
+		registry := recipe.Registry{Store: store, Keys: map[string]ed25519.PublicKey{"beta-recipe-key": publicKey}}
+		activate(t, registry, temporal, postgres)
+
+		locks, err := registry.ResolveGraph(context.Background(), recipe.ResolveRequest{RecipeID: "temporal", AllowedVersions: []string{"1.0.0"}})
+		if !errors.Is(err, recipe.ErrConflict) || locks != nil {
+			t.Fatalf("cyclic recipe graph resolved: locks=%+v err=%v", locks, err)
+		}
+	})
+
+	t.Run("conflicting transitive versions", func(t *testing.T) {
+		store := newMemoryRegistry()
+		root, publicKey := signedGraphRecipe(t, "platform-stack", "1.0.0", []recipesv1.DependencyConstraint{
+			{RecipeID: "qdrant", AllowedVersions: []string{"1.0.0"}},
+			{RecipeID: "temporal", AllowedVersions: []string{"1.0.0"}},
+		})
+		qdrant, _ := signedGraphRecipe(t, "qdrant", "1.0.0", []recipesv1.DependencyConstraint{{RecipeID: "postgresql", AllowedVersions: []string{"2.0.0"}}})
+		temporal, _ := signedGraphRecipe(t, "temporal", "1.0.0", []recipesv1.DependencyConstraint{{RecipeID: "postgresql", AllowedVersions: []string{"1.0.0"}}})
+		postgresOne, _ := signedGraphRecipe(t, "postgresql", "1.0.0", nil)
+		postgresTwo, _ := signedGraphRecipe(t, "postgresql", "2.0.0", nil)
+		registry := recipe.Registry{Store: store, Keys: map[string]ed25519.PublicKey{"beta-recipe-key": publicKey}}
+		activate(t, registry, root, qdrant, temporal, postgresOne, postgresTwo)
+
+		locks, err := registry.ResolveGraph(context.Background(), recipe.ResolveRequest{RecipeID: "platform-stack", AllowedVersions: []string{"1.0.0"}})
+		if !errors.Is(err, recipe.ErrConflict) || locks != nil {
+			t.Fatalf("conflicting recipe graph resolved: locks=%+v err=%v", locks, err)
+		}
+		if len(store.values) != 5 {
+			t.Fatalf("resolution mutated active recipe store: entries=%d", len(store.values))
+		}
+	})
+}
+
+func TestRecipe_PlanIsPureAndCreatesNoExternalResource(t *testing.T) {
+	store := newMemoryRegistry()
+	temporal, publicKey := signedGraphRecipe(t, "temporal", "1.0.0", []recipesv1.DependencyConstraint{{RecipeID: "postgresql", AllowedVersions: []string{"1.0.0"}}})
+	postgres, _ := signedGraphRecipe(t, "postgresql", "1.0.0", nil)
+	registry := recipe.Registry{Store: store, Keys: map[string]ed25519.PublicKey{"beta-recipe-key": publicKey}}
+	for _, version := range []recipesv1.RecipeVersion{temporal, postgres} {
+		if _, err := registry.Activate(context.Background(), version); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writesBeforePlan := store.puts
+	request := recipe.ResolveRequest{RecipeID: "temporal", AllowedVersions: []string{"1.0.0"}}
+
+	first, err := registry.Plan(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := registry.Plan(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(first, second) || first.PlanHash == "" {
+		t.Fatalf("recipe plan is not deterministic: first=%+v second=%+v", first, second)
+	}
+	if len(first.Recipes) != 2 || first.Recipes[0].RecipeID != "postgresql" || first.Recipes[1].RecipeID != "temporal" {
+		t.Fatalf("recipe plan is not dependency-first: %+v", first.Recipes)
+	}
+	if store.puts != writesBeforePlan {
+		t.Fatalf("pure plan mutated registry: puts before=%d after=%d", writesBeforePlan, store.puts)
 	}
 }
 

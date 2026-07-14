@@ -12,6 +12,7 @@ import (
 const APIVersion = "recipes.platform.example.com/v1"
 
 var digest = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+var semver = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
 type LifecycleCapabilities struct {
 	Plan     bool `json:"plan"`
@@ -67,29 +68,50 @@ type LifecycleProcedures struct {
 	Retention   string `json:"retention"`
 }
 
+// DependencyConstraint declares the exact recipe versions that may satisfy a
+// dependency. Exact finite sets keep resolution deterministic and make the
+// resulting recipes.lock.yaml independent of a mutable remote index.
+type DependencyConstraint struct {
+	RecipeID        string   `json:"recipe_id"`
+	AllowedVersions []string `json:"allowed_versions"`
+}
+
+func (d DependencyConstraint) Validate() error {
+	if strings.TrimSpace(d.RecipeID) == "" || len(d.AllowedVersions) == 0 {
+		return errors.New("invalid recipe dependency")
+	}
+	for index, version := range d.AllowedVersions {
+		if !semver.MatchString(version) || index > 0 && version <= d.AllowedVersions[index-1] {
+			return errors.New("recipe dependency versions must be unique and sorted")
+		}
+	}
+	return nil
+}
+
 func (p LifecycleProcedures) Complete() bool {
 	return strings.TrimSpace(p.HealthCheck) != "" && strings.TrimSpace(p.Backup) != "" && strings.TrimSpace(p.Restore) != "" && strings.TrimSpace(p.Upgrade) != "" && strings.TrimSpace(p.Removal) != "" && strings.TrimSpace(p.Retention) != ""
 }
 
 type RecipeVersion struct {
-	RecipeID        string                `json:"recipe_id"`
-	Version         string                `json:"version"`
-	Kind            string                `json:"kind"`
-	Driver          string                `json:"driver"`
-	ContentDigest   string                `json:"content_digest"`
-	SignatureDigest string                `json:"signature_digest"`
-	SchemaDigest    string                `json:"schema_digest"`
-	Capabilities    LifecycleCapabilities `json:"capabilities"`
-	Stateful        bool                  `json:"stateful"`
-	Artifacts       []ArtifactPin         `json:"artifacts"`
-	Permissions     []ResourcePermission  `json:"permissions"`
-	Procedures      LifecycleProcedures   `json:"procedures"`
-	SigningKeyID    string                `json:"signing_key_id"`
-	Signature       string                `json:"signature"`
+	RecipeID        string                 `json:"recipe_id"`
+	Version         string                 `json:"version"`
+	Kind            string                 `json:"kind"`
+	Driver          string                 `json:"driver"`
+	ContentDigest   string                 `json:"content_digest"`
+	SignatureDigest string                 `json:"signature_digest"`
+	SchemaDigest    string                 `json:"schema_digest"`
+	Capabilities    LifecycleCapabilities  `json:"capabilities"`
+	Stateful        bool                   `json:"stateful"`
+	Artifacts       []ArtifactPin          `json:"artifacts"`
+	Dependencies    []DependencyConstraint `json:"dependencies,omitempty"`
+	Permissions     []ResourcePermission   `json:"permissions"`
+	Procedures      LifecycleProcedures    `json:"procedures"`
+	SigningKeyID    string                 `json:"signing_key_id"`
+	Signature       string                 `json:"signature"`
 }
 
 func (r RecipeVersion) Validate() error {
-	if strings.TrimSpace(r.RecipeID) == "" || !regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`).MatchString(r.Version) || strings.TrimSpace(r.Kind) == "" || strings.TrimSpace(r.Driver) == "" || !digest.MatchString(r.ContentDigest) || !digest.MatchString(r.SignatureDigest) || !digest.MatchString(r.SchemaDigest) || !r.Capabilities.Plan || !r.Capabilities.Apply || !r.Capabilities.Discover || len(r.Artifacts) == 0 || len(r.Permissions) == 0 || strings.TrimSpace(r.SigningKeyID) == "" {
+	if strings.TrimSpace(r.RecipeID) == "" || !semver.MatchString(r.Version) || strings.TrimSpace(r.Kind) == "" || strings.TrimSpace(r.Driver) == "" || !digest.MatchString(r.ContentDigest) || !digest.MatchString(r.SignatureDigest) || !digest.MatchString(r.SchemaDigest) || !r.Capabilities.Plan || !r.Capabilities.Apply || !r.Capabilities.Discover || len(r.Artifacts) == 0 || len(r.Permissions) == 0 || strings.TrimSpace(r.SigningKeyID) == "" {
 		return errors.New("invalid signed recipe")
 	}
 	if signature, err := base64.RawStdEncoding.DecodeString(r.Signature); err != nil || len(signature) != 64 {
@@ -108,8 +130,15 @@ func (r RecipeVersion) Validate() error {
 			return err
 		}
 	}
-	if !sortedUnique(r.Artifacts, func(v ArtifactPin) string { return v.Name }) || !sortedUnique(r.Permissions, func(v ResourcePermission) string { return v.APIGroup + "/" + v.Kind + "/" + string(v.Scope) }) {
-		return errors.New("recipe artifacts and permissions must be unique and sorted")
+	for _, dependency := range r.Dependencies {
+		if err := dependency.Validate(); err != nil {
+			return err
+		}
+	}
+	if !sortedUnique(r.Artifacts, func(v ArtifactPin) string { return v.Name }) ||
+		!sortedUnique(r.Dependencies, func(v DependencyConstraint) string { return v.RecipeID }) ||
+		!sortedUnique(r.Permissions, func(v ResourcePermission) string { return v.APIGroup + "/" + v.Kind + "/" + string(v.Scope) }) {
+		return errors.New("recipe artifacts, dependencies and permissions must be unique and sorted")
 	}
 	return nil
 }
@@ -120,6 +149,29 @@ type RecipeLock struct {
 	ContentDigest   string        `json:"content_digest"`
 	SignatureDigest string        `json:"signature_digest"`
 	Artifacts       []ArtifactPin `json:"artifacts"`
+}
+
+type InstallationPlan struct {
+	RootRecipeID string       `json:"root_recipe_id"`
+	Recipes      []RecipeLock `json:"recipes"`
+	PlanHash     string       `json:"plan_hash"`
+}
+
+func (p InstallationPlan) Validate() error {
+	if strings.TrimSpace(p.RootRecipeID) == "" || len(p.Recipes) == 0 || !digest.MatchString(p.PlanHash) || p.Recipes[len(p.Recipes)-1].RecipeID != p.RootRecipeID {
+		return errors.New("invalid recipe installation plan")
+	}
+	seen := map[string]struct{}{}
+	for _, lock := range p.Recipes {
+		if err := lock.Validate(); err != nil {
+			return err
+		}
+		if _, exists := seen[lock.RecipeID]; exists {
+			return errors.New("duplicate recipe in installation plan")
+		}
+		seen[lock.RecipeID] = struct{}{}
+	}
+	return nil
 }
 
 func (l RecipeLock) Validate() error {
