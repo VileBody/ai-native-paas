@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -93,6 +94,47 @@ func TestGitLab_ErrorRedactsAdminToken(t *testing.T) {
 	_, err := c.GetRepository(context.Background(), 42)
 	if err == nil || strings.Contains(err.Error(), "admin-secret") {
 		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestGitLab_RateLimitRetryIsBoundedAndHonorsRetryAfter(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Retry-After", "50")
+		http.Error(w, "retry later", http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+	var delays []time.Duration
+	client := gitlab.Client{
+		BaseURL: server.URL, MaxRateLimitRetries: 2, MaxRateLimitDelay: 2 * time.Second,
+		Sleep: func(_ context.Context, delay time.Duration) error { delays = append(delays, delay); return nil },
+	}
+	_, err := client.GetRepository(context.Background(), 42)
+	var apiErr *gitlab.APIError
+	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusTooManyRequests || calls != 3 || len(delays) != 2 {
+		t.Fatalf("calls=%d delays=%v err=%v", calls, delays, err)
+	}
+	for _, delay := range delays {
+		if delay != 2*time.Second {
+			t.Fatalf("delay was not capped: %s", delay)
+		}
+	}
+}
+
+func TestGitLab_NonIdempotentPostIsNotRetriedAfter429(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, "retry later", http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+	sleeps := 0
+	client := gitlab.Client{BaseURL: server.URL, Sleep: func(context.Context, time.Duration) error { sleeps++; return nil }}
+	_, err := client.CreateRepository(context.Background(), application.CreateRepositoryRequest{NamespaceID: 7, Name: "Booking", Path: "booking", DefaultBranch: "main", CorrelationID: "corr"})
+	if err == nil || calls != 1 || sleeps != 0 {
+		t.Fatalf("calls=%d sleeps=%d err=%v", calls, sleeps, err)
 	}
 }
 func TestGitLab_RevokeMissingCredentialIsIdempotent(t *testing.T) {

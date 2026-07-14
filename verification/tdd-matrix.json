@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 893,
-  "discovered_unique_test_name_count": 891,
+  "discovered_go_test_count": 896,
+  "discovered_unique_test_name_count": 894,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -288,7 +288,7 @@
       "id": "S15",
       "level": "provider contract",
       "name": "TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency",
-      "status": "LIVE_ONLY",
+      "status": "REUSED",
       "test_file": "test/pivot/source_v2_test.go",
       "test_name": "TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency",
       "test_ref": "test/pivot/source_v2_test.go::TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency"
@@ -1589,9 +1589,9 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 71,
+      "LIVE_ONLY": 70,
       "NEW": 44,
-      "REUSED": 42
+      "REUSED": 43
     },
     "unmapped": 0
   }

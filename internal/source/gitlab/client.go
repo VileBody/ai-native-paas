@@ -19,13 +19,17 @@ import (
 )
 
 type Client struct {
-	BaseURL    string
-	AdminToken string
-	HTTP       *http.Client
+	BaseURL             string
+	AdminToken          string
+	HTTP                *http.Client
+	MaxRateLimitRetries int
+	MaxRateLimitDelay   time.Duration
+	Sleep               func(context.Context, time.Duration) error
 }
 type APIError struct {
-	Status  int
-	Message string
+	Status     int
+	Message    string
+	RetryAfter time.Duration
 }
 
 func (e *APIError) Error() string {
@@ -52,20 +56,54 @@ func (c *Client) do(ctx context.Context, method, path string, body any, out any)
 	if err != nil {
 		return err
 	}
-	var reader io.Reader
+	var requestBody []byte
 	if body != nil {
-		raw, mErr := json.Marshal(body)
-		if mErr != nil {
-			return mErr
+		requestBody, err = json.Marshal(body)
+		if err != nil {
+			return err
 		}
-		reader = bytes.NewReader(raw)
+	}
+	retries := 0
+	if method == http.MethodGet || method == http.MethodHead {
+		retries = c.MaxRateLimitRetries
+		if retries <= 0 {
+			retries = 3
+		}
+	}
+	for attempt := 0; ; attempt++ {
+		err = c.doOnce(ctx, method, endpoint, requestBody, body != nil, out)
+		var apiErr *APIError
+		if !errors.As(err, &apiErr) || apiErr.Status != http.StatusTooManyRequests || attempt >= retries {
+			return err
+		}
+		delay := apiErr.RetryAfter
+		if delay <= 0 {
+			delay = time.Duration(1<<min(attempt, 5)) * 200 * time.Millisecond
+		}
+		limit := c.MaxRateLimitDelay
+		if limit <= 0 {
+			limit = 30 * time.Second
+		}
+		if delay > limit {
+			delay = limit
+		}
+		if err = c.sleep(ctx, delay); err != nil {
+			return err
+		}
+	}
+}
+
+func (c *Client) doOnce(ctx context.Context, method, endpoint string, requestBody []byte, hasBody bool, out any) error {
+	var reader io.Reader
+	if hasBody {
+		reader = bytes.NewReader(requestBody)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Accept", "application/json")
-	if body != nil {
+	if hasBody {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if c.AdminToken != "" {
@@ -88,12 +126,50 @@ func (c *Client) do(ctx context.Context, method, path string, body any, out any)
 		if json.Unmarshal(raw, &e) == nil && e.Message != nil {
 			msg = fmt.Sprint(e.Message)
 		}
-		return &APIError{Status: resp.StatusCode, Message: redact(msg, c.AdminToken)}
+		return &APIError{Status: resp.StatusCode, Message: redact(msg, c.AdminToken), RetryAfter: retryAfter(resp.Header, time.Now().UTC())}
 	}
 	if out != nil && len(raw) > 0 {
 		return json.Unmarshal(raw, out)
 	}
 	return nil
+}
+
+func (c *Client) sleep(ctx context.Context, delay time.Duration) error {
+	if c.Sleep != nil {
+		return c.Sleep(ctx, delay)
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func retryAfter(header http.Header, now time.Time) time.Duration {
+	if value := strings.TrimSpace(header.Get("RateLimit-ResetTime")); value != "" {
+		if reset, err := http.ParseTime(value); err == nil && reset.After(now) {
+			return reset.Sub(now)
+		}
+	}
+	if value := strings.TrimSpace(header.Get("Retry-After")); value != "" {
+		if seconds, err := strconv.ParseInt(value, 10, 64); err == nil && seconds >= 0 {
+			return time.Duration(seconds) * time.Second
+		}
+		if reset, err := http.ParseTime(value); err == nil && reset.After(now) {
+			return reset.Sub(now)
+		}
+	}
+	return 0
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 type projectJSON struct {

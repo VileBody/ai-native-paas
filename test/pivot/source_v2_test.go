@@ -286,3 +286,75 @@ func TestSource_MergeRequestPublishesPlanSummaryWithoutSecrets(t *testing.T) {
 		t.Fatalf("sensitive/provider detail leaked: %s", noteBody)
 	}
 }
+
+func TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency(t *testing.T) {
+	var createCalls, discoveryCalls, protectCalls, sleepCalls int
+	correlationDescription := ""
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v4/projects":
+			createCalls++
+			var request struct {
+				Description string `json:"description"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Fatal(err)
+			}
+			correlationDescription = request.Description
+			w.Header().Set("Retry-After", "2")
+			http.Error(w, "accepted but response rate limited", http.StatusTooManyRequests)
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v4/groups/10/projects":
+			discoveryCalls++
+			if discoveryCalls == 1 {
+				w.Header().Set("Retry-After", "2")
+				http.Error(w, "retry later", http.StatusTooManyRequests)
+				return
+			}
+			_ = json.NewEncoder(w).Encode([]map[string]any{{
+				"id": 42, "namespace": map[string]any{"id": 10}, "path": "rate-limited",
+				"path_with_namespace": "beta/rate-limited", "web_url": "https://gitlab.example/beta/rate-limited",
+				"default_branch": "main", "description": correlationDescription,
+			}})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v4/projects/42/protected_branches":
+			protectCalls++
+			w.WriteHeader(http.StatusCreated)
+		default:
+			t.Fatalf("unexpected request %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
+		}
+	}))
+	defer server.Close()
+	provider := &gitlab.Client{
+		BaseURL: server.URL, AdminToken: "gitlab-admin-sentinel", MaxRateLimitRetries: 2, MaxRateLimitDelay: 3 * time.Second,
+		Sleep: func(_ context.Context, delay time.Duration) error {
+			sleepCalls++
+			if delay != 2*time.Second {
+				t.Fatalf("unexpected retry delay %s", delay)
+			}
+			return nil
+		},
+	}
+	store := memory.New()
+	clock := &testkit.Clock{T: time.Date(2026, 7, 14, 15, 0, 0, 0, time.UTC)}
+	ids := &testkit.IDs{}
+	service := &sourceapp.Service{Store: store, Provider: provider, Clock: clock, IDs: ids}
+	created, err := service.CreateProject(context.Background(), sourceapp.CreateProjectCommand{
+		TenantID: "tenant-rate", ActorID: "user-rate", Name: "Rate limited", ProviderNamespaceID: 10, IdempotencyKey: "create-rate-limited",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ready, err := service.ProvisionRepository(context.Background(), sourceapp.ProvisionRepositoryCommand{TenantID: "tenant-rate", ActorID: "user-rate", RepositoryID: created.Repository.ID})
+	if err != nil || ready.ProviderProjectID != 42 || ready.State != domain.RepositoryReady {
+		t.Fatalf("ready=%+v err=%v", ready, err)
+	}
+	resumed, err := service.ProvisionRepository(context.Background(), sourceapp.ProvisionRepositoryCommand{TenantID: "tenant-rate", ActorID: "user-rate", RepositoryID: created.Repository.ID})
+	if err != nil || resumed.ProviderProjectID != ready.ProviderProjectID {
+		t.Fatalf("resumed=%+v err=%v", resumed, err)
+	}
+	if createCalls != 1 || discoveryCalls != 2 || protectCalls != 1 || sleepCalls != 1 {
+		t.Fatalf("create=%d discovery=%d protect=%d sleeps=%d", createCalls, discoveryCalls, protectCalls, sleepCalls)
+	}
+	if !strings.Contains(correlationDescription, "paas-correlation") || strings.Contains(correlationDescription, provider.AdminToken) {
+		t.Fatalf("unsafe correlation description %q", correlationDescription)
+	}
+}

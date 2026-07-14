@@ -44,5 +44,6 @@ Matrix effect:
 Not claimed:
 
 - No live comment was posted to GitLab.com in this slice.
-- GitLab.com project-token isolation, rename/transfer, archive and 429 gates
-  remain pending.
+- GitLab.com project-token isolation, rename/transfer and archive gates remain
+  pending; bounded 429 behavior is covered separately by the S15 provider
+  contract.

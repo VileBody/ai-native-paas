@@ -41,6 +41,9 @@ Implemented:
 - Merge request plan summaries are published through the GitLab Notes API from
   action counts and customer cost ranges only. Exact marker recovery handles a
   lost response without exposing resource/provider values.
+- GitLab discovery calls have bounded `429` retry using documented reset
+  headers. Non-idempotent project creation is never blindly retried; recovery
+  uses the exact correlation marker.
 
 Evidence:
 
@@ -56,8 +59,8 @@ Evidence:
   `TestPostgres_WorkspaceCommitReceiptMigrationAndRoundTrip` passed. The pod
   was deleted immediately after the test.
 - Pivot matrix discovers executable evidence for S2, S3, S4, S5, S6, S7,
-  S9, S10, S12, S13, S14 and S17; the complete matrix remains mapped at 157
-  requirements and now discovers 893 Go test/fuzz targets.
+  S9, S10, S12, S13, S14, S15 and S17; the complete matrix remains mapped at
+  157 requirements and now discovers 896 Go test/fuzz targets.
 - Managed PostgreSQL migration `004_branch_environment_cleanup.sql`, the full
   tagged Source suite and the real Store round-trip passed in temporary
   in-cluster test pods; see
@@ -65,10 +68,12 @@ Evidence:
 - The GitLab Notes adapter, sanitized renderer and lost-response recovery pass
   the S12 contract; see
   `docs/evidence/phase-4/gitlab-plan-summary-notes-2026-07-14.md`.
+- Bounded rate-limit discovery recovery passes the S15 contract; see
+  `docs/evidence/phase-4/gitlab-rate-limit-recovery-2026-07-14.md`.
 
 Remaining source gates:
 
-- GitLab.com live token isolation, rename/transfer, archive and 429 tests;
+- GitLab.com live token isolation, rename/transfer and archive tests;
 - runtime consumption of preview cleanup intents;
 - live signed-image proof for the implemented task-UID and command-scoped
   identity-FD boundary; see
