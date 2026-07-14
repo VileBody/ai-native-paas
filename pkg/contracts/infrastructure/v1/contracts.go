@@ -57,6 +57,71 @@ type PlanSummary struct {
 	EstimateFingerprint string           `json:"estimate_fingerprint"`
 }
 
+// ChangeCounts is a value-only summary suitable for human approval surfaces.
+// Resource details remain available separately in the plan artifact.
+type ChangeCounts struct {
+	Create  int `json:"create"`
+	Update  int `json:"update"`
+	Replace int `json:"replace"`
+	Delete  int `json:"delete"`
+	NoOp    int `json:"no_op"`
+}
+
+// CostDeltaRange is signed: deletion may reduce the monthly amount. Complete
+// is false whenever the plan lacks enough provider pricing or before/after
+// detail to calculate an exact delta.
+type CostDeltaRange struct {
+	Currency     string `json:"currency"`
+	MinimumMinor int64  `json:"minimum_minor"`
+	MaximumMinor int64  `json:"maximum_minor"`
+	Complete     bool   `json:"complete"`
+}
+
+type DestructionRisk struct {
+	Address string       `json:"address"`
+	Action  ChangeAction `json:"action"`
+	Reason  string       `json:"reason"`
+}
+
+// ApprovalSummary is the additive v1 payload shown before an exact-plan grant.
+// It intentionally contains no raw provider values or credentials.
+type ApprovalSummary struct {
+	PlanID            string            `json:"plan_id"`
+	ProjectID         string            `json:"project_id"`
+	Target            string            `json:"target"`
+	PlanHash          string            `json:"plan_hash"`
+	Counts            ChangeCounts      `json:"counts"`
+	DestructionRisks  []DestructionRisk `json:"destruction_risks"`
+	MonthlyDelta      CostDeltaRange    `json:"monthly_delta"`
+	OneTimeDelta      CostDeltaRange    `json:"one_time_delta"`
+	Unknowns          []string          `json:"unknowns"`
+	EstimateVersion   string            `json:"estimate_version"`
+	ReservationID     string            `json:"reservation_id"`
+	ApprovalExpiresAt time.Time         `json:"approval_expires_at"`
+}
+
+func (s ApprovalSummary) Validate() error {
+	if strings.TrimSpace(s.PlanID) == "" || strings.TrimSpace(s.ProjectID) == "" || strings.TrimSpace(s.Target) == "" ||
+		!digest.MatchString(s.PlanHash) || strings.TrimSpace(s.EstimateVersion) == "" || strings.TrimSpace(s.ReservationID) == "" ||
+		s.ApprovalExpiresAt.IsZero() || validateDelta(s.MonthlyDelta) != nil || validateDelta(s.OneTimeDelta) != nil ||
+		s.Counts.Create < 0 || s.Counts.Update < 0 || s.Counts.Replace < 0 || s.Counts.Delete < 0 || s.Counts.NoOp < 0 {
+		return errors.New("invalid approval summary")
+	}
+	for _, risk := range s.DestructionRisks {
+		if strings.TrimSpace(risk.Address) == "" || strings.TrimSpace(risk.Reason) == "" || (risk.Action != ActionDelete && risk.Action != ActionReplace) {
+			return errors.New("invalid approval destruction risk")
+		}
+	}
+	return nil
+}
+
+func validateDelta(delta CostDeltaRange) error {
+	if !regexp.MustCompile(`^[A-Z]{3}$`).MatchString(delta.Currency) || delta.MinimumMinor > delta.MaximumMinor {
+		return errors.New("invalid cost delta")
+	}
+	return nil
+}
+
 type ApplyAuthorization struct {
 	PlanID          string    `json:"plan_id"`
 	PlanHash        string    `json:"plan_hash"`

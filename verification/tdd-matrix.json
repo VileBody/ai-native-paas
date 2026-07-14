@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 928,
-  "discovered_unique_test_name_count": 926,
+  "discovered_go_test_count": 929,
+  "discovered_unique_test_name_count": 927,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1128,7 +1128,7 @@
       "id": "C16",
       "level": "contract/golden",
       "name": "TestCost_ApprovalSummaryIncludesDestructionRiskAndMonthlyDelta",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/commerce_v2_test.go",
       "test_name": "TestCost_ApprovalSummaryIncludesDestructionRiskAndMonthlyDelta",
       "test_ref": "test/pivot/commerce_v2_test.go::TestCost_ApprovalSummaryIncludesDestructionRiskAndMonthlyDelta"
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 28,
-      "REUSED": 63
+      "NEW": 27,
+      "REUSED": 64
     },
     "unmapped": 0
   }

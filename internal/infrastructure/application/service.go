@@ -223,6 +223,120 @@ func (s *Service) GetPlan(ctx context.Context, tenantID, projectID, planID strin
 	return s.Store.GetPlan(ctx, tenantID, projectID, planID)
 }
 
+// GetApprovalSummary builds the value-only, exact-plan payload shown to the
+// human approver. Deltas are deliberately conservative when OpenTofu does not
+// expose enough before/after pricing detail.
+func (s *Service) GetApprovalSummary(ctx context.Context, tenantID, projectID, planID string) (infrastructurev1.ApprovalSummary, error) {
+	if s == nil || s.Store == nil {
+		return infrastructurev1.ApprovalSummary{}, errors.New("infrastructure service is unavailable")
+	}
+	if err := s.Prices.Validate(); err != nil {
+		return infrastructurev1.ApprovalSummary{}, fmt.Errorf("invalid price book: %w", err)
+	}
+	plan, err := s.Store.GetPlan(ctx, tenantID, projectID, planID)
+	if err != nil {
+		return infrastructurev1.ApprovalSummary{}, err
+	}
+	summary, err := s.approvalSummary(plan)
+	if err != nil {
+		return infrastructurev1.ApprovalSummary{}, err
+	}
+	if err := summary.Validate(); err != nil {
+		return infrastructurev1.ApprovalSummary{}, err
+	}
+	return summary, nil
+}
+
+func (s *Service) approvalSummary(plan PlanRecord) (infrastructurev1.ApprovalSummary, error) {
+	currency := s.Prices.RateCard.Currency
+	monthly := infrastructurev1.CostDeltaRange{Currency: currency, Complete: true}
+	oneTime := infrastructurev1.CostDeltaRange{Currency: currency, Complete: true}
+	counts := infrastructurev1.ChangeCounts{}
+	risks := make([]infrastructurev1.DestructionRisk, 0)
+	unknowns := make([]string, 0)
+	for _, change := range plan.Summary.Changes {
+		price, known := s.Prices.Prices[change.ResourceType]
+		upper := int64(1_000_000)
+		if known {
+			upper = price.ProviderMinorPerQuantity
+			known = price.Known
+			if !known {
+				upper = price.UnknownMaximumMinor
+			}
+		}
+		customer, err := markup(upper, s.Prices.RateCard.MarkupBasisPoints)
+		if err != nil {
+			return infrastructurev1.ApprovalSummary{}, err
+		}
+		minimum, maximum := int64(0), int64(0)
+		switch change.Action {
+		case infrastructurev1.ActionCreate:
+			counts.Create++
+			maximum = customer
+			if known {
+				minimum = customer
+			} else {
+				monthly.Complete = false
+				unknowns = append(unknowns, "monthly-price:"+change.Address)
+			}
+			oneTime.Complete = false
+			unknowns = append(unknowns, "one-time-price:"+change.Address)
+		case infrastructurev1.ActionUpdate:
+			counts.Update++
+			minimum, maximum = -customer, customer
+			monthly.Complete = false
+			oneTime.Complete = false
+			unknowns = append(unknowns, "monthly-delta:"+change.Address, "one-time-price:"+change.Address)
+		case infrastructurev1.ActionReplace:
+			counts.Replace++
+			minimum, maximum = -customer, customer
+			monthly.Complete = false
+			oneTime.Complete = false
+			unknowns = append(unknowns, "monthly-delta:"+change.Address, "one-time-price:"+change.Address)
+			risks = append(risks, infrastructurev1.DestructionRisk{Address: change.Address, Action: change.Action, Reason: "replacement destroys the current resource"})
+		case infrastructurev1.ActionDelete:
+			counts.Delete++
+			minimum = -customer
+			if known {
+				maximum = -customer
+			} else {
+				maximum = 0
+				monthly.Complete = false
+				unknowns = append(unknowns, "monthly-price:"+change.Address)
+			}
+			risks = append(risks, infrastructurev1.DestructionRisk{Address: change.Address, Action: change.Action, Reason: "resource deletion is irreversible"})
+		case infrastructurev1.ActionNoOp:
+			counts.NoOp++
+		default:
+			return infrastructurev1.ApprovalSummary{}, errors.New("unsupported approval summary action")
+		}
+		monthly.MinimumMinor, err = addSigned(monthly.MinimumMinor, minimum)
+		if err != nil {
+			return infrastructurev1.ApprovalSummary{}, err
+		}
+		monthly.MaximumMinor, err = addSigned(monthly.MaximumMinor, maximum)
+		if err != nil {
+			return infrastructurev1.ApprovalSummary{}, err
+		}
+	}
+	sort.Strings(unknowns)
+	return infrastructurev1.ApprovalSummary{
+		PlanID: plan.Summary.PlanID, ProjectID: plan.Summary.ProjectID, Target: plan.Target,
+		PlanHash: plan.Summary.PlanHash, Counts: counts, DestructionRisks: risks,
+		MonthlyDelta: monthly, OneTimeDelta: oneTime, Unknowns: unknowns,
+		EstimateVersion: plan.Estimate.Version, ReservationID: plan.Reservation.ReservationID,
+		ApprovalExpiresAt: plan.Reservation.ExpiresAt,
+	}, nil
+}
+
+func addSigned(left, right int64) (int64, error) {
+	value := new(big.Int).Add(big.NewInt(left), big.NewInt(right))
+	if !value.IsInt64() {
+		return 0, errors.New("cost delta overflow")
+	}
+	return value.Int64(), nil
+}
+
 func (s *Service) GetApprovalStatus(ctx context.Context, tenantID, projectID, planID, actorID string) (ApprovalStatus, error) {
 	if s == nil || s.Store == nil || s.Clock == nil || tenantID == "" || projectID == "" || planID == "" || actorID == "" {
 		return ApprovalStatus{}, errors.New("invalid infrastructure approval lookup")

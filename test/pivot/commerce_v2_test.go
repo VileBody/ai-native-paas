@@ -2,7 +2,9 @@ package pivot_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -95,6 +97,72 @@ func TestQuota_ExpiredReservationCannotAuthorizeLateApply(t *testing.T) {
 	}
 	if !stored.ApplyStartedAt.IsZero() {
 		t.Fatalf("rejected late apply was marked started: %#v", stored)
+	}
+}
+
+func TestCost_ApprovalSummaryIncludesDestructionRiskAndMonthlyDelta(t *testing.T) {
+	service, _, _ := infrastructureFixture()
+	plan := `{"resource_changes":[
+		{"address":"twc_server.new","provider_name":"timeweb","type":"twc_server","change":{"actions":["create"]}},
+		{"address":"twc_server.changed","provider_name":"timeweb","type":"twc_server","change":{"actions":["update"]}},
+		{"address":"twc_server.old","provider_name":"timeweb","type":"twc_server","change":{"actions":["delete"]}}
+	]}`
+	result, err := service.Plan(context.Background(), planCommand("approval-summary", "production", plan))
+	if err != nil {
+		t.Fatal(err)
+	}
+	summary, err := service.GetApprovalSummary(context.Background(), "tenant-1", "project-1", result.Summary.PlanID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.MarshalIndent(summary, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const golden = `{
+  "plan_id": "plan-2",
+  "project_id": "project-1",
+  "target": "production",
+  "plan_hash": "PLAN_HASH",
+  "counts": {
+    "create": 1,
+    "update": 1,
+    "replace": 0,
+    "delete": 1,
+    "no_op": 0
+  },
+  "destruction_risks": [
+    {
+      "address": "twc_server.old",
+      "action": "DELETE",
+      "reason": "resource deletion is irreversible"
+    }
+  ],
+  "monthly_delta": {
+    "currency": "RUB",
+    "minimum_minor": -125,
+    "maximum_minor": 125,
+    "complete": false
+  },
+  "one_time_delta": {
+    "currency": "RUB",
+    "minimum_minor": 0,
+    "maximum_minor": 0,
+    "complete": false
+  },
+  "unknowns": [
+    "monthly-delta:twc_server.changed",
+    "one-time-price:twc_server.changed",
+    "one-time-price:twc_server.new"
+  ],
+  "estimate_version": "ESTIMATE_VERSION",
+  "reservation_id": "reservation-3",
+  "approval_expires_at": "2026-07-14T09:50:00Z"
+}`
+	want := strings.ReplaceAll(golden, "PLAN_HASH", result.Summary.PlanHash)
+	want = strings.ReplaceAll(want, "ESTIMATE_VERSION", result.Estimate.Version)
+	if string(raw) != want {
+		t.Fatalf("approval summary contract changed:\n%s\nwant:\n%s", raw, want)
 	}
 }
 
