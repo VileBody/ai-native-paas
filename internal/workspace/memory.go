@@ -167,7 +167,7 @@ func (s *MemoryStore) ListTimedOut(_ context.Context, now time.Time, limit int) 
 	defer s.mu.Unlock()
 	result := make([]Command, 0)
 	for _, command := range s.commands {
-		if command.State == "RUNNING" && command.StartedAt != nil && !command.StartedAt.Add(time.Duration(command.Spec.TimeoutSeconds)*time.Second).After(now) {
+		if command.State == "RUNNING" && command.StartedAt != nil && command.CancelRequestedAt == nil && !command.StartedAt.Add(time.Duration(command.Spec.TimeoutSeconds)*time.Second).After(now) {
 			result = append(result, cloneCommand(command))
 		}
 	}
@@ -218,6 +218,7 @@ func scopedKey(values ...string) string {
 func cloneWorkspace(value Workspace) Workspace {
 	value.Spec.CredentialLeases = append([]string(nil), value.Spec.CredentialLeases...)
 	value.ProviderDiskIDs = append([]string(nil), value.ProviderDiskIDs...)
+	value.ProviderFirewallGroupIDs = append([]string(nil), value.ProviderFirewallGroupIDs...)
 	return value
 }
 
@@ -230,6 +231,7 @@ func cloneCommand(value Command) Command {
 	value.FinishedAt = cloneTime(value.FinishedAt)
 	value.UsageStartedAt = cloneTime(value.UsageStartedAt)
 	value.UsageFinishedAt = cloneTime(value.UsageFinishedAt)
+	value.CancelRequestedAt = cloneTime(value.CancelRequestedAt)
 	return value
 }
 

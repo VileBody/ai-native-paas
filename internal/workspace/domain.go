@@ -32,27 +32,28 @@ func (s Scope) validate() error {
 }
 
 type Workspace struct {
-	ID                  string
-	TenantID            string
-	ProjectID           string
-	TaskID              string
-	Spec                workspacev1.WorkspaceSpec
-	State               workspacev1.WorkspaceState
-	IdempotencyKey      string
-	RequestHash         string
-	CorrelationID       string
-	ProviderVMID        string
-	ProviderDiskIDs     []string
-	ProviderFingerprint string
-	LastError           string
-	ExpiresAt           time.Time
-	CreatedBy           string
-	UpdatedBy           string
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	Version             int64
-	ReconcileOwner      string
-	ReconcileLeaseUntil time.Time
+	ID                       string
+	TenantID                 string
+	ProjectID                string
+	TaskID                   string
+	Spec                     workspacev1.WorkspaceSpec
+	State                    workspacev1.WorkspaceState
+	IdempotencyKey           string
+	RequestHash              string
+	CorrelationID            string
+	ProviderVMID             string
+	ProviderDiskIDs          []string
+	ProviderFirewallGroupIDs []string
+	ProviderFingerprint      string
+	LastError                string
+	ExpiresAt                time.Time
+	CreatedBy                string
+	UpdatedBy                string
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
+	Version                  int64
+	ReconcileOwner           string
+	ReconcileLeaseUntil      time.Time
 }
 
 func (w Workspace) Ref() workspacev1.WorkspaceRef {
@@ -64,29 +65,30 @@ func (w Workspace) terminal() bool {
 }
 
 type Command struct {
-	ID               string
-	TenantID         string
-	ProjectID        string
-	TaskID           string
-	WorkspaceID      string
-	Spec             workspacev1.CommandSpec
-	Kind             string
-	SerializationKey string
-	CredentialLeases []string
-	ActorID          string
-	IdempotencyKey   string
-	RequestHash      string
-	State            workspacev1.CommandState
-	AgentSessionID   string
-	ExecutionVMID    string
-	ExitCode         *int
-	StartedAt        *time.Time
-	FinishedAt       *time.Time
-	UsageStartedAt   *time.Time
-	UsageFinishedAt  *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	Version          int64
+	ID                string
+	TenantID          string
+	ProjectID         string
+	TaskID            string
+	WorkspaceID       string
+	Spec              workspacev1.CommandSpec
+	Kind              string
+	SerializationKey  string
+	CredentialLeases  []string
+	ActorID           string
+	IdempotencyKey    string
+	RequestHash       string
+	State             workspacev1.CommandState
+	AgentSessionID    string
+	ExecutionVMID     string
+	ExitCode          *int
+	StartedAt         *time.Time
+	FinishedAt        *time.Time
+	UsageStartedAt    *time.Time
+	UsageFinishedAt   *time.Time
+	CancelRequestedAt *time.Time
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	Version           int64
 }
 
 func (c Command) View() workspacev1.CommandView {

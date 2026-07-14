@@ -62,7 +62,7 @@ func (p *fakeProvider) Create(_ context.Context, request ProviderCreateRequest) 
 	defer p.mu.Unlock()
 	p.requests = append(p.requests, request)
 	p.vm = ProviderVM{
-		VMID: "twc-vm-1", DiskIDs: []string{"twc-disk-1"}, CorrelationID: request.CorrelationID,
+		VMID: "twc-vm-1", DiskIDs: []string{"twc-disk-1"}, FirewallGroupIDs: []string{"twc-firewall-1"}, CorrelationID: request.CorrelationID,
 		ImageDigest: request.ImageDigest, NetworkProfile: request.NetworkProfile,
 		PrivateAddressOnly: request.NetworkIsolation.PrivateAddressOnly,
 		DenyAllInbound:     request.NetworkIsolation.DenyAllInbound, OutboundAgentReady: true,
@@ -81,7 +81,7 @@ func (p *fakeProvider) Destroy(_ context.Context, vm ProviderVM) (DestroyEvidenc
 		return DestroyEvidence{}, errors.New("wrong workspace provider identity")
 	}
 	p.destroyed = true
-	return DestroyEvidence{VMAbsent: true, AbsentDiskIDs: append([]string(nil), p.vm.DiskIDs...)}, nil
+	return DestroyEvidence{VMAbsent: true, AbsentDiskIDs: append([]string(nil), p.vm.DiskIDs...), AbsentFirewallGroupIDs: append([]string(nil), p.vm.FirewallGroupIDs...)}, nil
 }
 
 type fakeSessions struct {
@@ -91,7 +91,6 @@ type fakeSessions struct {
 	dispatched map[string]int
 	closed     []string
 	canceled   []string
-	finishedAt time.Time
 }
 
 func (s *fakeSessions) Connected(_ context.Context, _, vmID string) (bool, error) {
@@ -110,11 +109,11 @@ func (s *fakeSessions) Dispatch(_ context.Context, envelope CommandEnvelope) (Di
 	return DispatchReceipt{CommandID: envelope.CommandID, WorkspaceID: envelope.WorkspaceID, VMID: s.vmID, AgentSessionID: "mtls-session-1", Accepted: true}, nil
 }
 
-func (s *fakeSessions) Cancel(_ context.Context, workspaceID, commandID string) (CancellationEvidence, error) {
+func (s *fakeSessions) RequestCancel(_ context.Context, workspaceID, commandID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.canceled = append(s.canceled, workspaceID+"/"+commandID)
-	return CancellationEvidence{CommandID: commandID, WorkspaceID: workspaceID, VMID: s.vmID, AgentSessionID: "mtls-session-1", ProcessTreeTerminated: true, FinishedAt: s.finishedAt}, nil
+	return nil
 }
 
 func (s *fakeSessions) Close(_ context.Context, workspaceID string) error {
@@ -160,7 +159,8 @@ func newFixture() *fixture {
 		Store: store, Provider: provider, Sessions: sessions, Leases: leases, Clock: clock, IDs: &testIDs{},
 		Policy: DefaultCommandPolicy(), ReconcilerID: "workspace-manager-1", WorkspaceVPCID: "vpc-workspace",
 		AllowedEgressHosts: []string{"gitlab.com", "registry.npmjs.org", "ai-native-paas-registry.registry.twcstorage.ru"},
-		DeniedCIDRs:        []string{"192.168.73.0/24", "192.168.74.0/24", "10.0.0.0/8", "172.16.0.0/12"},
+		EgressGatewayCIDRs: []string{"192.168.75.4/32"}, DNSResolverCIDRs: []string{"192.168.75.1/32"},
+		DeniedCIDRs: []string{"192.168.73.0/24", "192.168.74.0/24", "10.0.0.0/8", "172.16.0.0/12"},
 	}
 	return &fixture{
 		service: service, store: store, provider: provider, sessions: sessions, leases: leases, clock: clock,
@@ -278,6 +278,9 @@ func TestWorkspace_NetworkProfileAllowsRequiredAndDeniesSensitiveDestinations(t 
 	if !contains(policy.AllowedEgressHosts, "gitlab.com") || !containsInt(policy.DeniedDestinationPorts, 25) {
 		t.Fatalf("required egress or SMTP deny missing: %#v", policy)
 	}
+	if !contains(policy.EgressGatewayCIDRs, "192.168.75.4/32") || !contains(policy.DNSResolverCIDRs, "192.168.75.1/32") {
+		t.Fatalf("workspace traffic does not have an explicit proxy/DNS path: %#v", policy)
+	}
 }
 
 func TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage(t *testing.T) {
@@ -295,13 +298,22 @@ func TestWorkspace_CommandTimeoutKillsProcessTreeAndMarksUsage(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.clock.Add(3 * time.Second)
-	f.sessions.finishedAt = f.clock.Now()
 	count, err := f.service.EnforceTimeouts(context.Background(), 10)
 	if err != nil {
 		t.Fatal(err)
 	}
 	command, getErr := f.store.GetCommand(context.Background(), f.scope.TenantID, f.scope.ProjectID, view.CommandID)
-	if getErr != nil || count != 1 || command.State != workspacev1.CommandTimedOut || command.UsageFinishedAt == nil || f.leases.revoked["command-lease"] != 1 || len(f.sessions.canceled) != 1 {
+	if getErr != nil || count != 1 || command.State != workspacev1.CommandRunning || command.CancelRequestedAt == nil || command.UsageFinishedAt != nil || f.leases.revoked["command-lease"] != 0 || len(f.sessions.canceled) != 1 {
+		t.Fatalf("timeout cancellation intent incomplete: command=%#v count=%d canceled=%v leases=%v err=%v", command, count, f.sessions.canceled, f.leases.revoked, getErr)
+	}
+	if _, err := f.service.RecordOutcome(context.Background(), CommandOutcome{TenantID: f.scope.TenantID, ProjectID: f.scope.ProjectID, WorkspaceID: ready.WorkspaceID, CommandID: view.CommandID, AgentSessionID: "mtls-session-1", VMID: "twc-vm-1", State: workspacev1.CommandTimedOut, FinishedAt: f.clock.Now()}); err == nil {
+		t.Fatal("timeout accepted without process-tree termination evidence")
+	}
+	if _, err := f.service.RecordOutcome(context.Background(), CommandOutcome{TenantID: f.scope.TenantID, ProjectID: f.scope.ProjectID, WorkspaceID: ready.WorkspaceID, CommandID: view.CommandID, AgentSessionID: "mtls-session-1", VMID: "twc-vm-1", State: workspacev1.CommandTimedOut, FinishedAt: f.clock.Now(), ProcessTreeTerminated: true}); err != nil {
+		t.Fatal(err)
+	}
+	command, getErr = f.store.GetCommand(context.Background(), f.scope.TenantID, f.scope.ProjectID, view.CommandID)
+	if getErr != nil || command.State != workspacev1.CommandTimedOut || command.UsageFinishedAt == nil || f.leases.revoked["command-lease"] != 1 {
 		t.Fatalf("timeout evidence incomplete: command=%#v count=%d canceled=%v leases=%v err=%v", command, count, f.sessions.canceled, f.leases.revoked, getErr)
 	}
 }

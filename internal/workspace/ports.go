@@ -31,6 +31,8 @@ type NetworkIsolation struct {
 	DenyAllInbound         bool
 	OutboundGatewayMTLS    bool
 	AllowedEgressHosts     []string
+	EgressGatewayCIDRs     []string
+	DNSResolverCIDRs       []string
 	DeniedCIDRs            []string
 	DeniedDestinationPorts []int
 }
@@ -51,6 +53,7 @@ type ProviderCreateRequest struct {
 type ProviderVM struct {
 	VMID               string
 	DiskIDs            []string
+	FirewallGroupIDs   []string
 	CorrelationID      string
 	ImageDigest        string
 	NetworkProfile     string
@@ -60,8 +63,9 @@ type ProviderVM struct {
 }
 
 type DestroyEvidence struct {
-	VMAbsent      bool
-	AbsentDiskIDs []string
+	VMAbsent               bool
+	AbsentDiskIDs          []string
+	AbsentFirewallGroupIDs []string
 }
 
 type Provider interface {
@@ -87,22 +91,13 @@ type DispatchReceipt struct {
 	Accepted       bool
 }
 
-type CancellationEvidence struct {
-	CommandID             string
-	WorkspaceID           string
-	VMID                  string
-	AgentSessionID        string
-	ProcessTreeTerminated bool
-	FinishedAt            time.Time
-}
-
 // AgentSessions is implemented by an outbound mTLS session registry. The
 // control plane never dials a management port on the VM and never starts a
 // local process.
 type AgentSessions interface {
 	Connected(context.Context, string, string) (bool, error)
 	Dispatch(context.Context, CommandEnvelope) (DispatchReceipt, error)
-	Cancel(context.Context, string, string) (CancellationEvidence, error)
+	RequestCancel(context.Context, string, string) error
 	Close(context.Context, string) error
 }
 

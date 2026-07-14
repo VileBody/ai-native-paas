@@ -78,22 +78,23 @@ func (s *Store) Migrate(ctx context.Context) error {
 	return nil
 }
 
-const workspaceColumns = `id,tenant_id,project_id,task_id,spec,state,idempotency_key,request_hash,correlation_id,provider_vm_id,provider_disk_ids,provider_fingerprint,last_error,expires_at,created_by,updated_by,created_at,updated_at,version,reconcile_owner,reconcile_lease_until`
+const workspaceColumns = `id,tenant_id,project_id,task_id,spec,state,idempotency_key,request_hash,correlation_id,provider_vm_id,provider_disk_ids,provider_firewall_group_ids,provider_fingerprint,last_error,expires_at,created_by,updated_by,created_at,updated_at,version,reconcile_owner,reconcile_lease_until`
 
 func (s *Store) CreateWorkspace(ctx context.Context, candidate workspace.Workspace) (workspace.Workspace, bool, error) {
 	spec, err := json.Marshal(candidate.Spec)
 	if err != nil {
 		return workspace.Workspace{}, false, err
 	}
-	disks, _ := json.Marshal(candidate.ProviderDiskIDs)
+	disks := marshalStringArray(candidate.ProviderDiskIDs)
+	firewalls := marshalStringArray(candidate.ProviderFirewallGroupIDs)
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return workspace.Workspace{}, false, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	result, err := tx.ExecContext(ctx, `INSERT INTO workspace.workspaces (`+workspaceColumns+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) ON CONFLICT DO NOTHING`,
+	result, err := tx.ExecContext(ctx, `INSERT INTO workspace.workspaces (`+workspaceColumns+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) ON CONFLICT DO NOTHING`,
 		candidate.ID, candidate.TenantID, candidate.ProjectID, candidate.TaskID, spec, candidate.State, candidate.IdempotencyKey, candidate.RequestHash,
-		candidate.CorrelationID, candidate.ProviderVMID, disks, candidate.ProviderFingerprint, candidate.LastError, candidate.ExpiresAt, candidate.CreatedBy,
+		candidate.CorrelationID, candidate.ProviderVMID, disks, firewalls, candidate.ProviderFingerprint, candidate.LastError, candidate.ExpiresAt, candidate.CreatedBy,
 		candidate.UpdatedBy, candidate.CreatedAt, candidate.UpdatedAt, candidate.Version, candidate.ReconcileOwner, nullableTime(candidate.ReconcileLeaseUntil))
 	if err != nil {
 		return workspace.Workspace{}, false, err
@@ -129,14 +130,15 @@ func (s *Store) GetWorkspace(ctx context.Context, tenantID, projectID, workspace
 }
 
 func (s *Store) UpdateWorkspace(ctx context.Context, value workspace.Workspace, expected int64) error {
-	disks, _ := json.Marshal(value.ProviderDiskIDs)
+	disks := marshalStringArray(value.ProviderDiskIDs)
+	firewalls := marshalStringArray(value.ProviderFirewallGroupIDs)
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	result, err := tx.ExecContext(ctx, `UPDATE workspace.workspaces SET state=$1,provider_vm_id=$2,provider_disk_ids=$3,provider_fingerprint=$4,last_error=$5,expires_at=$6,updated_by=$7,updated_at=$8,version=$9,reconcile_owner=$10,reconcile_lease_until=$11 WHERE id=$12 AND tenant_id=$13 AND project_id=$14 AND version=$15`,
-		value.State, value.ProviderVMID, disks, value.ProviderFingerprint, value.LastError, value.ExpiresAt, value.UpdatedBy, value.UpdatedAt,
+	result, err := tx.ExecContext(ctx, `UPDATE workspace.workspaces SET state=$1,provider_vm_id=$2,provider_disk_ids=$3,provider_firewall_group_ids=$4,provider_fingerprint=$5,last_error=$6,expires_at=$7,updated_by=$8,updated_at=$9,version=$10,reconcile_owner=$11,reconcile_lease_until=$12 WHERE id=$13 AND tenant_id=$14 AND project_id=$15 AND version=$16`,
+		value.State, value.ProviderVMID, disks, firewalls, value.ProviderFingerprint, value.LastError, value.ExpiresAt, value.UpdatedBy, value.UpdatedAt,
 		value.Version, value.ReconcileOwner, nullableTime(value.ReconcileLeaseUntil), value.ID, value.TenantID, value.ProjectID, expected)
 	if err := affected(result, err); err != nil {
 		return err
@@ -187,23 +189,23 @@ func (s *Store) ListExpired(ctx context.Context, now time.Time, limit int) ([]wo
 	return result, rows.Err()
 }
 
-const commandColumns = `id,tenant_id,project_id,task_id,workspace_id,spec,kind,serialization_key,credential_leases,actor_id,idempotency_key,request_hash,state,agent_session_id,execution_vm_id,exit_code,started_at,finished_at,usage_started_at,usage_finished_at,created_at,updated_at,version`
+const commandColumns = `id,tenant_id,project_id,task_id,workspace_id,spec,kind,serialization_key,credential_leases,actor_id,idempotency_key,request_hash,state,agent_session_id,execution_vm_id,exit_code,started_at,finished_at,usage_started_at,usage_finished_at,cancel_requested_at,created_at,updated_at,version`
 
 func (s *Store) CreateCommand(ctx context.Context, candidate workspace.Command) (workspace.Command, bool, error) {
 	spec, err := json.Marshal(candidate.Spec)
 	if err != nil {
 		return workspace.Command{}, false, err
 	}
-	leases, _ := json.Marshal(candidate.CredentialLeases)
+	leases := marshalStringArray(candidate.CredentialLeases)
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return workspace.Command{}, false, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	result, err := tx.ExecContext(ctx, `INSERT INTO workspace.commands (`+commandColumns+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) ON CONFLICT DO NOTHING`,
+	result, err := tx.ExecContext(ctx, `INSERT INTO workspace.commands (`+commandColumns+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) ON CONFLICT DO NOTHING`,
 		candidate.ID, candidate.TenantID, candidate.ProjectID, candidate.TaskID, candidate.WorkspaceID, spec, candidate.Kind, candidate.SerializationKey,
 		leases, candidate.ActorID, candidate.IdempotencyKey, candidate.RequestHash, candidate.State, candidate.AgentSessionID, candidate.ExecutionVMID, candidate.ExitCode,
-		candidate.StartedAt, candidate.FinishedAt, candidate.UsageStartedAt, candidate.UsageFinishedAt, candidate.CreatedAt, candidate.UpdatedAt, candidate.Version)
+		candidate.StartedAt, candidate.FinishedAt, candidate.UsageStartedAt, candidate.UsageFinishedAt, candidate.CancelRequestedAt, candidate.CreatedAt, candidate.UpdatedAt, candidate.Version)
 	if err != nil {
 		return workspace.Command{}, false, err
 	}
@@ -243,9 +245,9 @@ func (s *Store) UpdateCommand(ctx context.Context, value workspace.Command, expe
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	result, err := tx.ExecContext(ctx, `UPDATE workspace.commands SET state=$1,agent_session_id=$2,execution_vm_id=$3,exit_code=$4,started_at=$5,finished_at=$6,usage_started_at=$7,usage_finished_at=$8,updated_at=$9,version=$10 WHERE id=$11 AND tenant_id=$12 AND project_id=$13 AND version=$14`,
+	result, err := tx.ExecContext(ctx, `UPDATE workspace.commands SET state=$1,agent_session_id=$2,execution_vm_id=$3,exit_code=$4,started_at=$5,finished_at=$6,usage_started_at=$7,usage_finished_at=$8,cancel_requested_at=$9,updated_at=$10,version=$11 WHERE id=$12 AND tenant_id=$13 AND project_id=$14 AND version=$15`,
 		value.State, value.AgentSessionID, value.ExecutionVMID, value.ExitCode, value.StartedAt, value.FinishedAt, value.UsageStartedAt,
-		value.UsageFinishedAt, value.UpdatedAt, value.Version, value.ID, value.TenantID, value.ProjectID, expected)
+		value.UsageFinishedAt, value.CancelRequestedAt, value.UpdatedAt, value.Version, value.ID, value.TenantID, value.ProjectID, expected)
 	if err := affected(result, err); err != nil {
 		return err
 	}
@@ -256,7 +258,7 @@ func (s *Store) UpdateCommand(ctx context.Context, value workspace.Command, expe
 }
 
 func (s *Store) ListTimedOut(ctx context.Context, now time.Time, limit int) ([]workspace.Command, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT `+commandColumns+` FROM workspace.commands WHERE state='RUNNING' AND started_at + ((spec->>'timeout_seconds')::bigint * interval '1 second') <= $1 ORDER BY started_at,id LIMIT $2`, now, limit)
+	rows, err := s.DB.QueryContext(ctx, `SELECT `+commandColumns+` FROM workspace.commands WHERE state='RUNNING' AND cancel_requested_at IS NULL AND started_at + ((spec->>'timeout_seconds')::bigint * interval '1 second') <= $1 ORDER BY started_at,id LIMIT $2`, now, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -311,10 +313,10 @@ type scanner interface{ Scan(...any) error }
 
 func scanWorkspace(row scanner) (workspace.Workspace, error) {
 	var value workspace.Workspace
-	var spec, disks []byte
+	var spec, disks, firewalls []byte
 	var lease sql.NullTime
 	err := row.Scan(&value.ID, &value.TenantID, &value.ProjectID, &value.TaskID, &spec, &value.State, &value.IdempotencyKey, &value.RequestHash,
-		&value.CorrelationID, &value.ProviderVMID, &disks, &value.ProviderFingerprint, &value.LastError, &value.ExpiresAt, &value.CreatedBy,
+		&value.CorrelationID, &value.ProviderVMID, &disks, &firewalls, &value.ProviderFingerprint, &value.LastError, &value.ExpiresAt, &value.CreatedBy,
 		&value.UpdatedBy, &value.CreatedAt, &value.UpdatedAt, &value.Version, &value.ReconcileOwner, &lease)
 	if err != nil {
 		return value, err
@@ -323,6 +325,9 @@ func scanWorkspace(row scanner) (workspace.Workspace, error) {
 		return value, err
 	}
 	if err := json.Unmarshal(disks, &value.ProviderDiskIDs); err != nil {
+		return value, err
+	}
+	if err := json.Unmarshal(firewalls, &value.ProviderFirewallGroupIDs); err != nil {
 		return value, err
 	}
 	if lease.Valid {
@@ -335,10 +340,10 @@ func scanCommand(row scanner) (workspace.Command, error) {
 	var value workspace.Command
 	var spec, leases []byte
 	var exit sql.NullInt64
-	var started, finished, usageStarted, usageFinished sql.NullTime
+	var started, finished, usageStarted, usageFinished, cancelRequested sql.NullTime
 	err := row.Scan(&value.ID, &value.TenantID, &value.ProjectID, &value.TaskID, &value.WorkspaceID, &spec, &value.Kind,
 		&value.SerializationKey, &leases, &value.ActorID, &value.IdempotencyKey, &value.RequestHash, &value.State, &value.AgentSessionID,
-		&value.ExecutionVMID, &exit, &started, &finished, &usageStarted, &usageFinished, &value.CreatedAt, &value.UpdatedAt, &value.Version)
+		&value.ExecutionVMID, &exit, &started, &finished, &usageStarted, &usageFinished, &cancelRequested, &value.CreatedAt, &value.UpdatedAt, &value.Version)
 	if err != nil {
 		return value, err
 	}
@@ -354,6 +359,7 @@ func scanCommand(row scanner) (workspace.Command, error) {
 	}
 	value.StartedAt, value.FinishedAt = nullTimePointer(started), nullTimePointer(finished)
 	value.UsageStartedAt, value.UsageFinishedAt = nullTimePointer(usageStarted), nullTimePointer(usageFinished)
+	value.CancelRequestedAt = nullTimePointer(cancelRequested)
 	return value, nil
 }
 
@@ -402,4 +408,12 @@ func nullTimePointer(value sql.NullTime) *time.Time {
 		return nil
 	}
 	return &value.Time
+}
+
+func marshalStringArray(values []string) []byte {
+	if values == nil {
+		values = []string{}
+	}
+	raw, _ := json.Marshal(values)
+	return raw
 }

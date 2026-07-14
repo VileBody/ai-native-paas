@@ -25,6 +25,8 @@ type Service struct {
 	ReconcilerID       string
 	WorkspaceVPCID     string
 	AllowedEgressHosts []string
+	EgressGatewayCIDRs []string
+	DNSResolverCIDRs   []string
 	DeniedCIDRs        []string
 }
 
@@ -116,6 +118,7 @@ func (s *Service) reconcileProvision(ctx context.Context, workspace Workspace) (
 	expected := workspace.Version
 	workspace.ProviderVMID = vm.VMID
 	workspace.ProviderDiskIDs = append([]string(nil), vm.DiskIDs...)
+	workspace.ProviderFirewallGroupIDs = append([]string(nil), vm.FirewallGroupIDs...)
 	workspace.ProviderFingerprint = providerFingerprint(vm)
 	workspace.State = workspacev1.WorkspaceReady
 	workspace.LastError = ""
@@ -164,7 +167,7 @@ func (s *Service) reconcileDestroy(ctx context.Context, workspace Workspace) (wo
 			return workspace.Ref(), err
 		}
 	}
-	target := ProviderVM{VMID: workspace.ProviderVMID, DiskIDs: workspace.ProviderDiskIDs, CorrelationID: workspace.CorrelationID, ImageDigest: workspace.Spec.ImageDigest, NetworkProfile: workspace.Spec.NetworkProfile}
+	target := ProviderVM{VMID: workspace.ProviderVMID, DiskIDs: workspace.ProviderDiskIDs, FirewallGroupIDs: workspace.ProviderFirewallGroupIDs, CorrelationID: workspace.CorrelationID, ImageDigest: workspace.Spec.ImageDigest, NetworkProfile: workspace.Spec.NetworkProfile}
 	if target.VMID == "" || len(target.DiskIDs) == 0 {
 		discovered, findErr := s.Provider.FindByCorrelation(ctx, workspace.CorrelationID)
 		if findErr == nil {
@@ -177,8 +180,8 @@ func (s *Service) reconcileDestroy(ctx context.Context, workspace Workspace) (wo
 	if err != nil {
 		return workspace.Ref(), err
 	}
-	if !evidence.VMAbsent || !sameSet(evidence.AbsentDiskIDs, target.DiskIDs) {
-		return workspace.Ref(), errors.New("provider did not prove workspace VM and disks absent")
+	if !evidence.VMAbsent || !sameSet(evidence.AbsentDiskIDs, target.DiskIDs) || !sameSet(evidence.AbsentFirewallGroupIDs, target.FirewallGroupIDs) {
+		return workspace.Ref(), errors.New("provider did not prove workspace VM, disks, and firewall absent")
 	}
 	expected := workspace.Version
 	workspace.State = workspacev1.WorkspaceDestroyed
@@ -301,15 +304,16 @@ func (s *Service) Dispatch(ctx context.Context, scope Scope, commandID string) (
 }
 
 type CommandOutcome struct {
-	TenantID       string
-	ProjectID      string
-	WorkspaceID    string
-	CommandID      string
-	AgentSessionID string
-	VMID           string
-	State          workspacev1.CommandState
-	ExitCode       *int
-	FinishedAt     time.Time
+	TenantID              string
+	ProjectID             string
+	WorkspaceID           string
+	CommandID             string
+	AgentSessionID        string
+	VMID                  string
+	State                 workspacev1.CommandState
+	ExitCode              *int
+	FinishedAt            time.Time
+	ProcessTreeTerminated bool
 }
 
 func (s *Service) RecordOutcome(ctx context.Context, outcome CommandOutcome) (workspacev1.CommandView, error) {
@@ -325,6 +329,9 @@ func (s *Service) RecordOutcome(ctx context.Context, outcome CommandOutcome) (wo
 			return command.View(), nil
 		}
 		return workspacev1.CommandView{}, ErrConflict
+	}
+	if outcome.State == workspacev1.CommandTimedOut && !outcome.ProcessTreeTerminated {
+		return workspacev1.CommandView{}, errors.New("workspace agent did not prove process-tree termination")
 	}
 	if outcome.FinishedAt.Before(*command.StartedAt) || outcome.FinishedAt.After(s.Clock.Now().UTC().Add(time.Minute)) {
 		return workspacev1.CommandView{}, errors.New("command outcome time is invalid")
@@ -372,8 +379,9 @@ func (s *Service) Expire(ctx context.Context, limit int) (int, error) {
 	return len(items), nil
 }
 
-// EnforceTimeouts asks the workspace agent to terminate the whole process tree
-// and records usage only through the agent's mTLS-bound termination evidence.
+// EnforceTimeouts persists cancellation intent through the outbound agent
+// session. TIMED_OUT and usage are recorded later from mTLS-bound termination
+// evidence, never from a control-plane assumption.
 func (s *Service) EnforceTimeouts(ctx context.Context, limit int) (int, error) {
 	if err := s.require(); err != nil {
 		return 0, err
@@ -386,20 +394,16 @@ func (s *Service) EnforceTimeouts(ctx context.Context, limit int) (int, error) {
 		return 0, err
 	}
 	for _, command := range commands {
-		evidence, cancelErr := s.Sessions.Cancel(ctx, command.WorkspaceID, command.ID)
-		if cancelErr != nil {
+		if cancelErr := s.Sessions.RequestCancel(ctx, command.WorkspaceID, command.ID); cancelErr != nil {
 			return 0, cancelErr
 		}
-		if evidence.CommandID != command.ID || evidence.WorkspaceID != command.WorkspaceID || evidence.VMID != command.ExecutionVMID || evidence.AgentSessionID != command.AgentSessionID || !evidence.ProcessTreeTerminated {
-			return 0, errors.New("workspace agent did not prove process-tree termination")
-		}
-		_, outcomeErr := s.RecordOutcome(ctx, CommandOutcome{
-			TenantID: command.TenantID, ProjectID: command.ProjectID, WorkspaceID: command.WorkspaceID,
-			CommandID: command.ID, AgentSessionID: command.AgentSessionID, VMID: command.ExecutionVMID,
-			State: workspacev1.CommandTimedOut, FinishedAt: evidence.FinishedAt,
-		})
-		if outcomeErr != nil {
-			return 0, outcomeErr
+		expected := command.Version
+		now := s.Clock.Now().UTC()
+		command.CancelRequestedAt = timePointer(now)
+		command.UpdatedAt = now
+		command.Version++
+		if err := s.Store.UpdateCommand(ctx, command, expected); err != nil {
+			return 0, err
 		}
 	}
 	return len(commands), nil
@@ -414,21 +418,22 @@ func (s *Service) providerRequest(workspace Workspace) ProviderCreateRequest {
 		ExpiresAt: workspace.ExpiresAt, NetworkProfile: workspace.Spec.NetworkProfile,
 		NetworkIsolation: NetworkIsolation{
 			VPCID: s.WorkspaceVPCID, PrivateAddressOnly: true, DenyAllInbound: true, OutboundGatewayMTLS: true,
-			AllowedEgressHosts: append([]string(nil), s.AllowedEgressHosts...), DeniedCIDRs: denied,
+			AllowedEgressHosts: append([]string(nil), s.AllowedEgressHosts...), EgressGatewayCIDRs: append([]string(nil), s.EgressGatewayCIDRs...),
+			DNSResolverCIDRs: append([]string(nil), s.DNSResolverCIDRs...), DeniedCIDRs: denied,
 			DeniedDestinationPorts: []int{25, 465, 587},
 		},
 	}
 }
 
 func (s *Service) require() error {
-	if s == nil || s.Store == nil || s.Provider == nil || s.Sessions == nil || s.Leases == nil || s.Clock == nil || s.IDs == nil || strings.TrimSpace(s.ReconcilerID) == "" || strings.TrimSpace(s.WorkspaceVPCID) == "" || len(s.Policy.AllowedExecutables) == 0 {
+	if s == nil || s.Store == nil || s.Provider == nil || s.Sessions == nil || s.Leases == nil || s.Clock == nil || s.IDs == nil || strings.TrimSpace(s.ReconcilerID) == "" || strings.TrimSpace(s.WorkspaceVPCID) == "" || len(s.Policy.AllowedExecutables) == 0 || len(s.EgressGatewayCIDRs) == 0 || len(s.DNSResolverCIDRs) == 0 {
 		return errors.New("workspace service dependencies are unavailable")
 	}
 	return nil
 }
 
 func validateProviderVM(workspace Workspace, vm ProviderVM) error {
-	if vm.VMID == "" || len(vm.DiskIDs) == 0 || vm.CorrelationID != workspace.CorrelationID || vm.ImageDigest != workspace.Spec.ImageDigest || vm.NetworkProfile != workspace.Spec.NetworkProfile || !vm.PrivateAddressOnly || !vm.DenyAllInbound {
+	if vm.VMID == "" || len(vm.DiskIDs) == 0 || len(vm.FirewallGroupIDs) == 0 || vm.CorrelationID != workspace.CorrelationID || vm.ImageDigest != workspace.Spec.ImageDigest || vm.NetworkProfile != workspace.Spec.NetworkProfile || !vm.PrivateAddressOnly || !vm.DenyAllInbound {
 		return errors.New("workspace provider returned an invalid or unisolated VM")
 	}
 	return nil
