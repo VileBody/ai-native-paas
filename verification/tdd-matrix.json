@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 946,
-  "discovered_unique_test_name_count": 944,
+  "discovered_go_test_count": 947,
+  "discovered_unique_test_name_count": 945,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -908,7 +908,7 @@
       "id": "A5.26",
       "level": "concurrency",
       "name": "TestCapability_RateLimitIsPerProjectAndDoesNotLeakCrossTenantState",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/attachments_v2_test.go",
       "test_name": "TestCapability_RateLimitIsPerProjectAndDoesNotLeakCrossTenantState",
       "test_ref": "test/pivot/attachments_v2_test.go::TestCapability_RateLimitIsPerProjectAndDoesNotLeakCrossTenantState"
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 10,
-      "REUSED": 81
+      "NEW": 9,
+      "REUSED": 82
     },
     "unmapped": 0
   }

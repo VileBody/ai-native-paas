@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **946**
-- Reused now: **81**
-- New local/contract tests required: **10**
+- Discovered Go tests/fuzz targets: **947**
+- Reused now: **82**
+- New local/contract tests required: **9**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -104,7 +104,7 @@ A release gate may become green only after every referenced test exists and pass
 | `A5.23` | LIVE_ONLY | integration | `test/pivot/attachments_v2_test.go::TestCapability_ProviderUsageIsAttributedAndDeduplicated` |
 | `A5.24` | LIVE_ONLY | contract | `test/pivot/attachments_v2_test.go::TestCapability_ProviderSubstitutionPreservesPlatformContract` |
 | `A5.25` | LIVE_ONLY | security | `test/pivot/attachments_v2_test.go::TestCapability_ApifyOrBrightDataCredentialCannotBeUsedOutsideGateway` |
-| `A5.26` | NEW | concurrency | `test/pivot/attachments_v2_test.go::TestCapability_RateLimitIsPerProjectAndDoesNotLeakCrossTenantState` |
+| `A5.26` | REUSED | concurrency | `test/pivot/attachments_v2_test.go::TestCapability_RateLimitIsPerProjectAndDoesNotLeakCrossTenantState` |
 | `A5.27` | REUSED | domain + PostgreSQL | `test/integration/postgres_attachments_test.go::TestInputsSnapshot_IsImmutableAndContainsReferencesOnly` |
 | `A5.28` | REUSED | cross-domain | `internal/runtime/application/gitops_saga_test.go::TestInputsSnapshot_SameImageNewInputsCreatesNewRuntimeRevision` |
 | `A5.29` | REUSED | cross-domain | `internal/runtime/application/gitops_saga_test.go::TestInputsSnapshot_RollbackRestoresMatchingHistoricalInputs` |

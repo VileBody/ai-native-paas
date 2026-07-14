@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/attachments/domain"
 	"github.com/keir-research/ai-native-paas/internal/attachments/memory"
 	"github.com/keir-research/ai-native-paas/internal/attachments/testkit"
+	"github.com/keir-research/ai-native-paas/internal/capability/ratelimit"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
 )
 
@@ -189,6 +191,76 @@ func TestProviderResource_DestroyRequiresMatchingPlanHashApproval(t *testing.T) 
 	})
 	if err != nil || deleted.State != attachmentsv1.ServiceDeleted || provider.DeleteCalls != 1 {
 		t.Fatalf("exact approval did not destroy once: resource=%+v err=%v delete_calls=%d", deleted, err, provider.DeleteCalls)
+	}
+}
+
+func TestCapability_RateLimitIsPerProjectAndDoesNotLeakCrossTenantState(t *testing.T) {
+	t.Parallel()
+
+	limiter, err := ratelimit.New(10, time.Minute, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	type requestSet struct {
+		scope ratelimit.Scope
+		count int
+	}
+	sets := []requestSet{
+		{scope: ratelimit.Scope{TenantID: "tenant-a", ProjectID: "shared-project-id"}, count: 16},
+		{scope: ratelimit.Scope{TenantID: "tenant-b", ProjectID: "shared-project-id"}, count: 8},
+		{scope: ratelimit.Scope{TenantID: "tenant-a", ProjectID: "another-project"}, count: 5},
+	}
+	type result struct {
+		scope ratelimit.Scope
+		err   error
+	}
+	results := make(chan result, 29)
+	start := make(chan struct{})
+	var group sync.WaitGroup
+	for _, set := range sets {
+		for index := 0; index < set.count; index++ {
+			scope := set.scope
+			group.Add(1)
+			go func() {
+				defer group.Done()
+				<-start
+				results <- result{scope: scope, err: limiter.Allow(scope, now)}
+			}()
+		}
+	}
+	close(start)
+	group.Wait()
+	close(results)
+
+	type counts struct{ allowed, limited int }
+	byScope := map[ratelimit.Scope]counts{}
+	for result := range results {
+		value := byScope[result.scope]
+		switch {
+		case result.err == nil:
+			value.allowed++
+		case errors.Is(result.err, ratelimit.ErrRateLimited):
+			value.limited++
+			if strings.Contains(result.err.Error(), "tenant-b") || strings.Contains(result.err.Error(), "shared-project-id") {
+				t.Fatalf("rate-limit error leaked scope state: %v", result.err)
+			}
+		default:
+			t.Fatalf("unexpected rate-limit error for %+v: %v", result.scope, result.err)
+		}
+		byScope[result.scope] = value
+	}
+	if got := byScope[sets[0].scope]; got.allowed != 10 || got.limited != 6 {
+		t.Fatalf("tenant A shared project counts=%+v", got)
+	}
+	if got := byScope[sets[1].scope]; got.allowed != 8 || got.limited != 0 {
+		t.Fatalf("tenant B was affected by tenant A: %+v", got)
+	}
+	if got := byScope[sets[2].scope]; got.allowed != 5 || got.limited != 0 {
+		t.Fatalf("another tenant A project shared rate state: %+v", got)
+	}
+	if err := limiter.Allow(sets[0].scope, now.Add(time.Minute)); err != nil {
+		t.Fatalf("new fixed window did not reset project rate: %v", err)
 	}
 }
 
