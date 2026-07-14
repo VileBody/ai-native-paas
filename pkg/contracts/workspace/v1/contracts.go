@@ -109,3 +109,51 @@ type CommandView struct {
 	StartedAt   *time.Time   `json:"started_at,omitempty"`
 	FinishedAt  *time.Time   `json:"finished_at,omitempty"`
 }
+
+type AgentMessageKind string
+
+const (
+	AgentMessageExec   AgentMessageKind = "EXEC"
+	AgentMessageCancel AgentMessageKind = "CANCEL"
+)
+
+// AgentMessage is delivered over the workspace agent's outbound mTLS
+// channel. It contains only credential references; secret values are resolved
+// inside the workspace through the governed gateway.
+type AgentMessage struct {
+	MessageID        string           `json:"message_id"`
+	Kind             AgentMessageKind `json:"kind"`
+	CommandID        string           `json:"command_id"`
+	WorkspaceID      string           `json:"workspace_id"`
+	Spec             *CommandSpec     `json:"spec,omitempty"`
+	CredentialLeases []string         `json:"credential_leases,omitempty"`
+	DeliveryAttempt  int64            `json:"delivery_attempt"`
+}
+
+type AgentSessionConnect struct {
+	VMID string `json:"vm_id"`
+}
+
+type AgentSessionView struct {
+	SessionID   string    `json:"session_id"`
+	WorkspaceID string    `json:"workspace_id"`
+	ExpiresAt   time.Time `json:"expires_at"`
+}
+
+type AgentMessageAck struct {
+	SessionID string `json:"session_id"`
+	Accepted  bool   `json:"accepted"`
+}
+
+type AgentHeartbeat struct {
+	SessionID string `json:"session_id"`
+}
+
+type AgentCommandOutcome struct {
+	SessionID             string       `json:"session_id"`
+	CommandID             string       `json:"command_id"`
+	State                 CommandState `json:"state"`
+	ExitCode              *int         `json:"exit_code,omitempty"`
+	FinishedAt            time.Time    `json:"finished_at"`
+	ProcessTreeTerminated bool         `json:"process_tree_terminated,omitempty"`
+}

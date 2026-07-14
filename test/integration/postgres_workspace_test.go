@@ -14,6 +14,8 @@ import (
 
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	workspacepostgres "github.com/keir-research/ai-native-paas/internal/workspace/postgres"
+	"github.com/keir-research/ai-native-paas/internal/workspace/session"
+	sessionpostgres "github.com/keir-research/ai-native-paas/internal/workspace/session/postgres"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -127,5 +129,80 @@ func TestPostgres_WorkspaceStatefulCommandLockHasOneWinner(t *testing.T) {
 	}
 	if winners.Load() != 1 {
 		t.Fatalf("stateful serialization winners=%d want=1", winners.Load())
+	}
+}
+
+type workspaceSessionClock struct{ now time.Time }
+
+func (c workspaceSessionClock) Now() time.Time { return c.now }
+
+type workspaceSessionIDs struct{ next atomic.Int64 }
+
+func (i *workspaceSessionIDs) New(prefix string) string {
+	return fmt.Sprintf("%s-pg-%d", prefix, i.next.Add(1))
+}
+
+func TestPostgres_WorkspaceAgentAckSurvivesControlPlaneRestart(t *testing.T) {
+	db, workspaceStore := migratedWorkspaceStore(t)
+	now := time.Date(2026, 7, 14, 8, 0, 0, 0, time.UTC)
+	if _, _, err := workspaceStore.CreateWorkspace(context.Background(), postgresWorkspace(now)); err != nil {
+		t.Fatal(err)
+	}
+	ids := &workspaceSessionIDs{}
+	clock := workspaceSessionClock{now: now}
+	sessionStore := &sessionpostgres.Store{DB: db}
+	registry := &session.Registry{Store: sessionStore, Clock: clock, IDs: ids, AckPollInterval: time.Millisecond, DispatchAckTimeout: 2 * time.Second}
+	principal := session.Principal{
+		TenantID: "tenant-pg", ProjectID: "project-pg", WorkspaceID: "workspace-pg", TaskID: "task-pg",
+		AgentID: "agent-pg", CertificateID: "certificate-pg", NotAfter: now.Add(10 * time.Minute),
+	}
+	connected, err := registry.Connect(context.Background(), principal, "vm-pg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelope := workspace.CommandEnvelope{
+		CommandID: "command-pg", WorkspaceID: "workspace-pg", ProjectID: "project-pg", TaskID: "task-pg",
+		Spec: workspacev1.CommandSpec{Argv: []string{"tofu", "plan"}, WorkingDir: "infrastructure", TimeoutSeconds: 60, OutputLimitBytes: 4096},
+	}
+	type dispatchResult struct {
+		receipt workspace.DispatchReceipt
+		err     error
+	}
+	done := make(chan dispatchResult, 1)
+	go func() {
+		receipt, dispatchErr := registry.Dispatch(context.Background(), envelope)
+		done <- dispatchResult{receipt: receipt, err: dispatchErr}
+	}()
+	var message workspacev1.AgentMessage
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		message, err = registry.Next(context.Background(), principal, connected.SessionID)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, session.ErrNotFound) {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if err != nil {
+		t.Fatalf("claim outbound message: %v", err)
+	}
+	if err := registry.Acknowledge(context.Background(), principal, connected.SessionID, message.MessageID, true); err != nil {
+		t.Fatal(err)
+	}
+	first := <-done
+	if first.err != nil || !first.receipt.Accepted || first.receipt.VMID != "vm-pg" {
+		t.Fatalf("dispatch receipt=%#v err=%v", first.receipt, first.err)
+	}
+
+	restarted := &session.Registry{Store: &sessionpostgres.Store{DB: db}, Clock: clock, IDs: ids, AckPollInterval: time.Millisecond, DispatchAckTimeout: time.Second}
+	replayed, err := restarted.Dispatch(context.Background(), envelope)
+	if err != nil || replayed != first.receipt {
+		t.Fatalf("restart replay receipt=%#v err=%v", replayed, err)
+	}
+	var messageCount int
+	if err := db.QueryRow(`SELECT count(*) FROM workspace.agent_messages WHERE workspace_id=$1 AND command_id=$2`, "workspace-pg", "command-pg").Scan(&messageCount); err != nil || messageCount != 1 {
+		t.Fatalf("durable message count=%d err=%v", messageCount, err)
 	}
 }
