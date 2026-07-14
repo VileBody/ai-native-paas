@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/keir-research/ai-native-paas/internal/build/dockerfilepolicy"
 	"github.com/keir-research/ai-native-paas/internal/build/domain"
 	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
 	buildv2 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v2"
@@ -555,6 +556,9 @@ func (s *Service) resolveExecution(ctx context.Context, sourcePath string, build
 	if build.BuildSpec != nil {
 		switch build.BuildSpec.Driver {
 		case buildv2.DriverDockerfile:
+			if err := dockerfilepolicy.Validate(sourcePath, build.BuildSpec.DefinitionPath); err != nil {
+				return Detection{}, "", err
+			}
 			return Detection{Runtime: "dockerfile", Backend: BackendDockerfile, Evidence: []string{"explicit-build-spec:" + build.BuildSpecDigest, "definition:" + build.BuildSpec.DefinitionPath}}, "explicit-build-spec", nil
 		default:
 			return Detection{}, "", domain.NewError(domain.CodeInvalidArgument, "explicit build driver is not executable in this release slice")
@@ -572,6 +576,11 @@ func (s *Service) resolveExecution(ctx context.Context, sourcePath string, build
 	}
 	if build.RequestContract == buildv2.APIVersion && detection.Backend != BackendBuildpacks {
 		return Detection{}, "", domain.NewError(domain.CodePolicyRejected, "v2 auto mode only permits the buildpacks fallback; Dockerfile requires an explicit BuildSpec")
+	}
+	if detection.Backend == BackendDockerfile {
+		if err := dockerfilepolicy.Validate(sourcePath, build.Config.DockerfilePath); err != nil {
+			return Detection{}, "", err
+		}
 	}
 	return detection, "runtime-detector", nil
 }

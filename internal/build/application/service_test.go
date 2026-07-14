@@ -31,6 +31,7 @@ func setup(t *testing.T) (*application.Service, *testkit.Builder, *testkit.Regis
 	t.Helper()
 	path := t.TempDir()
 	_ = os.WriteFile(path+"/app.txt", []byte("safe"), 0644)
+	_ = os.WriteFile(path+"/Dockerfile", []byte("FROM scratch\n"), 0644)
 	clock := &testkit.Clock{T: time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)}
 	builder := &testkit.Builder{Output: application.BuildOutput{ManifestDigest: dg("a"), MediaType: "application/vnd.oci.image.manifest.v1+json"}}
 	registry := &testkit.Registry{Published: application.PublishedArtifact{Repository: "registry.test/tenants/t1/apps/p1", Digest: dg("a"), MediaType: "application/vnd.oci.image.manifest.v1+json"}}
@@ -159,6 +160,27 @@ func TestBuildV2_RequiresExclusiveExplicitOrBuildpacksFallback(t *testing.T) {
 	build, _, err := s.RunBuild(context.Background(), "t1", "u1", requested.Build.ID)
 	if !domain.HasCode(err, domain.CodePolicyRejected) || build.State != buildv1.BuildFailedUserCode || build.Backend != "" {
 		t.Fatalf("build=%+v err=%v", build, err)
+	}
+}
+
+func TestBuildV2_MutableDockerfileIsRejectedBeforeDisposableVM(t *testing.T) {
+	s, _, _, _, _ := setup(t)
+	path := s.Fetcher.(*testkit.Fetcher).Snapshot.Path
+	if err := os.WriteFile(path+"/Dockerfile", []byte("FROM ubuntu:latest\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	dockerfile := &testkit.Builder{Output: application.BuildOutput{ManifestDigest: dg("a"), MediaType: "application/vnd.oci.image.manifest.v1+json"}}
+	s.Dockerfile = &testkit.IsolatedBuilder{Builder: dockerfile, Isolation: application.IsolationDisposableWorkspaceVM}
+	requested, err := s.RequestBuildV2(context.Background(), explicitDockerfileCommand("mutable-base"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	build, _, err := s.RunBuild(context.Background(), "t1", "u1", requested.Build.ID)
+	if !domain.HasCode(err, domain.CodePolicyRejected) || build.State != buildv1.BuildFailedUserCode || build.Backend != "" {
+		t.Fatalf("build=%+v err=%v", build, err)
+	}
+	if len(dockerfile.Requests) != 0 {
+		t.Fatalf("mutable Dockerfile reached VM backend: %+v", dockerfile.Requests)
 	}
 }
 func TestBuildRequest_ConcurrentDuplicateCreatesOneBuild(t *testing.T) {
