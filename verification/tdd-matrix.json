@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 916,
-  "discovered_unique_test_name_count": 914,
+  "discovered_go_test_count": 919,
+  "discovered_unique_test_name_count": 917,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -388,20 +388,20 @@
       "id": "B7",
       "level": "integration",
       "name": "TestBuild_SecretsNeverEnterLayerLogOrProvenance",
-      "status": "NEW",
-      "test_file": "test/pivot/build_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/build/provenance/security_integration_test.go",
       "test_name": "TestBuild_SecretsNeverEnterLayerLogOrProvenance",
-      "test_ref": "test/pivot/build_v2_test.go::TestBuild_SecretsNeverEnterLayerLogOrProvenance"
+      "test_ref": "internal/build/provenance/security_integration_test.go::TestBuild_SecretsNeverEnterLayerLogOrProvenance"
     },
     {
       "family": "B",
       "id": "B8",
       "level": "integration",
       "name": "TestBuild_CacheIsProjectScopedForUntrustedLayers",
-      "status": "NEW",
-      "test_file": "test/pivot/build_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/build/cache/cache_test.go",
       "test_name": "TestBuild_CacheIsProjectScopedForUntrustedLayers",
-      "test_ref": "test/pivot/build_v2_test.go::TestBuild_CacheIsProjectScopedForUntrustedLayers"
+      "test_ref": "internal/build/cache/cache_test.go::TestBuild_CacheIsProjectScopedForUntrustedLayers"
     },
     {
       "family": "B",
@@ -468,10 +468,10 @@
       "id": "B15",
       "level": "contract/crypto",
       "name": "TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest",
-      "status": "NEW",
-      "test_file": "test/pivot/build_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/build/provenance/provenance_test.go",
       "test_name": "TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest",
-      "test_ref": "test/pivot/build_v2_test.go::TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest"
+      "test_ref": "internal/build/provenance/provenance_test.go::TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest"
     },
     {
       "family": "R",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 39,
-      "REUSED": 52
+      "NEW": 36,
+      "REUSED": 55
     },
     "unmapped": 0
   }

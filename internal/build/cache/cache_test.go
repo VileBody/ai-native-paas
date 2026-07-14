@@ -64,3 +64,26 @@ func TestBuild_BuildSecretIsAbsentFromCacheMetadata(t *testing.T) {
 		t.Fatalf("secret-bearing entry stored: ok=%v err=%v", ok, getErr)
 	}
 }
+
+func TestBuild_CacheIsProjectScopedForUntrustedLayers(t *testing.T) {
+	buildCache := cache.New()
+	marker := []byte("untrusted-project-a-layer-marker")
+	if err := buildCache.Put(cache.Entry{TenantID: "tenant-1", ProjectID: "project-a", Key: "dependency-layer", Scope: cache.ScopeProject, Digest: digest(marker), Payload: marker}); err != nil {
+		t.Fatal(err)
+	}
+	for _, probe := range []struct{ tenant, project string }{{"tenant-1", "project-b"}, {"tenant-2", "project-a"}} {
+		if _, found, err := buildCache.Get(probe.tenant, probe.project, "dependency-layer", cache.ScopeProject); err != nil || found {
+			t.Fatalf("probe=%+v found=%v err=%v", probe, found, err)
+		}
+	}
+	trusted := []byte("verified-global-base-layer")
+	if err := buildCache.Put(cache.Entry{Key: "go-runtime@sha256:trusted", Scope: cache.ScopeTrustedBase, Digest: digest(trusted), Payload: trusted}); err != nil {
+		t.Fatal(err)
+	}
+	for _, project := range []string{"project-a", "project-b"} {
+		entry, found, err := buildCache.Get("tenant-1", project, "go-runtime@sha256:trusted", cache.ScopeTrustedBase)
+		if err != nil || !found || string(entry.Payload) != string(trusted) {
+			t.Fatalf("trusted base project=%s found=%v err=%v entry=%+v", project, found, err, entry)
+		}
+	}
+}

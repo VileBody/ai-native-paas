@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **916**
-- Reused now: **52**
-- New local/contract tests required: **39**
+- Discovered Go tests/fuzz targets: **919**
+- Reused now: **55**
+- New local/contract tests required: **36**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -52,15 +52,15 @@ A release gate may become green only after every referenced test exists and pass
 | `B4` | REUSED | application | `internal/build/application/service_test.go::TestBuild_DockerfileRunsOnlyInDisposableIsolationBackend` |
 | `B5` | LIVE_ONLY | provider/system security | `test/pivot/build_v2_test.go::TestBuild_NetworkProfileBlocksMetadataPrivateAndControlPlane` |
 | `B6` | LIVE_ONLY | system | `test/pivot/build_v2_test.go::TestBuild_ResourceLimitsTerminateForkBombAndOversizedContext` |
-| `B7` | NEW | integration | `test/pivot/build_v2_test.go::TestBuild_SecretsNeverEnterLayerLogOrProvenance` |
-| `B8` | NEW | integration | `test/pivot/build_v2_test.go::TestBuild_CacheIsProjectScopedForUntrustedLayers` |
+| `B7` | REUSED | integration | `internal/build/provenance/security_integration_test.go::TestBuild_SecretsNeverEnterLayerLogOrProvenance` |
+| `B8` | REUSED | integration | `internal/build/cache/cache_test.go::TestBuild_CacheIsProjectScopedForUntrustedLayers` |
 | `B9` | REUSED | registry integration | `internal/build/registry/local_test.go::TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery` |
 | `B10` | REUSED | domain + PostgreSQL | `test/integration/postgres_build_test.go::TestBuild_TrustChainRequiredBeforeArtifactReleasable` |
 | `B11` | NEW | policy | `test/pivot/build_v2_test.go::TestBuild_MutableBaseOrOutputTagCannotDefineProductionArtifact` |
 | `B12` | NEW | PostgreSQL + concurrency | `test/pivot/build_v2_test.go::TestBuild_SameIdentityConcurrentRequestsExecuteOnce` |
 | `B13` | LIVE_ONLY | application/system | `test/pivot/build_v2_test.go::TestBuild_CancelStopsExecutionAndRevokesBuildCredentials` |
 | `B14` | NEW | registry integration | `test/pivot/build_v2_test.go::TestBuild_MultiArchManifestContainsOnlyVerifiedPlatformDigests` |
-| `B15` | NEW | contract/crypto | `test/pivot/build_v2_test.go::TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest` |
+| `B15` | REUSED | contract/crypto | `internal/build/provenance/provenance_test.go::TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest` |
 | `R1` | LIVE_ONLY | application | `test/pivot/runtime_gitops_test.go::TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath` |
 | `R2` | LIVE_ONLY | integration/golden | `test/pivot/runtime_gitops_test.go::TestGitOps_HelmRenderIsDeterministicForPinnedInputs` |
 | `R3` | NEW | integration/fuzz | `test/pivot/runtime_gitops_test.go::TestGitOps_KustomizeRenderIsDeterministicAndPathSafe` |
