@@ -1,9 +1,9 @@
 {
   "schema": "ai-native-paas.io/admin-images-lock/v1",
   "workspace_manager": {
-    "git_revision": "0940a48f4e1d8348b6b832905e3fe59b243d97e6",
-    "github_actions_run": 29309971206,
-    "image": "ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-workspace-manager@sha256:7b552ce31a42e30d797ad7cb7f313898abe868f950d31a7c445d53e72e9d4fcc",
+    "git_revision": "3e4dc8774ffe265e25fc92e2cd417393226105bb",
+    "github_actions_run": 29320772358,
+    "image": "ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-workspace-manager@sha256:8de3938abbe3a6bb31bf4cba60e0e36e8ba3ddb64a6c40f1828148bf59ee8312",
     "provenance": "mode=max",
     "sbom": true
   }

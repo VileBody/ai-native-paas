@@ -3,19 +3,21 @@
 Evidence tier: `LOCAL_GREEN` (build and supply chain); deployment remains
 blocked until the OpenBao initialization ceremony and workspace image import.
 
-- Git revision: `0940a48f4e1d8348b6b832905e3fe59b243d97e6`
+- Git revision: `3e4dc8774ffe265e25fc92e2cd417393226105bb`
 - GitHub Actions workflow: `workspace-manager`
-- Run: `29309971206`
+- Run: `29320772358`
 - `verify`: success
 - PostgreSQL workspace integration: success
 - OCI image build/push: success
 - Immutable digest:
-  `sha256:7b552ce31a42e30d797ad7cb7f313898abe868f950d31a7c445d53e72e9d4fcc`
+  `sha256:8de3938abbe3a6bb31bf4cba60e0e36e8ba3ddb64a6c40f1828148bf59ee8312`
 - Registry: private Timeweb Container Registry
 - Build attestations: BuildKit `provenance=mode=max` and SBOM enabled
 
-This revision contains the command-scoped OpenBao credential broker and the
-encrypted durable S3 command-log store. The verification job passed race tests
+This revision contains the command-scoped OpenBao credential broker, the
+encrypted durable S3 command-log store, the mTLS egress gateway bootstrap and
+explicit trust of the mounted OpenBao CA. It also enforces Timeweb's current
+1000 Mbps Moscow configurator minimum. The verification job passed race tests
 for the manager, workspace adapters and v1 workspace contracts. The PostgreSQL
 job passed the workspace migration and lifecycle integration suite against a
 clean PostgreSQL 17 service before the image was published.

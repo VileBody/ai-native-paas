@@ -1,0 +1,351 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workspace-manager
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: workspace-manager
+automountServiceAccountToken: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workspace-manager
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: workspace-manager
+    ai-native-paas.io/owner: control-plane
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: workspace-manager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: workspace-manager
+        ai-native-paas.io/owner: control-plane
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/agent-inject-token: "true"
+        vault.hashicorp.com/role: workspace-manager
+        vault.hashicorp.com/service: https://openbao-active.openbao.svc:8200
+        vault.hashicorp.com/tls-secret: openbao-client-ca
+        vault.hashicorp.com/ca-cert: /vault/tls/ca.crt
+        vault.hashicorp.com/agent-run-as-user: "65532"
+        vault.hashicorp.com/agent-run-as-group: "65532"
+        vault.hashicorp.com/agent-set-security-context: "true"
+    spec:
+      serviceAccountName: workspace-manager
+      automountServiceAccountToken: true
+      imagePullSecrets:
+        - name: craas-ai-native-paas-registry
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: ai-native-paas.io/pool
+                    operator: In
+                    values: [system]
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: workspace-manager
+      tolerations:
+        - key: ai-native-paas.io/system
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      containers:
+        - name: manager
+          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-workspace-manager@sha256:8de3938abbe3a6bb31bf4cba60e0e36e8ba3ddb64a6c40f1828148bf59ee8312
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: agent-mtls
+              containerPort: 8443
+          env:
+            - name: PLATFORM_PROFILE
+              value: production
+            - name: WORKSPACE_MANAGER_ADDR
+              value: :8443
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-postgres
+                  key: DATABASE_URL
+            - name: WORKSPACE_SERVER_CERT_FILE
+              value: /var/run/secrets/workspace-manager-tls/tls.crt
+            - name: WORKSPACE_SERVER_KEY_FILE
+              value: /var/run/secrets/workspace-manager-tls/tls.key
+            - name: WORKSPACE_CLIENT_CA_FILE
+              value: /var/run/secrets/workspace-manager-tls/ca.crt
+            - name: WORKSPACE_TRUST_DOMAIN
+              value: workspace.platform.example.com
+            - name: OPENBAO_ADDR
+              value: https://openbao-active.openbao.svc:8200
+            - name: OPENBAO_CA_FILE
+              value: /var/run/secrets/openbao/ca.crt
+            - name: OPENBAO_TOKEN_FILE
+              value: /vault/secrets/token
+            - name: OPENBAO_WORKSPACE_PKI_MOUNT
+              value: workspace-pki
+            - name: OPENBAO_WORKSPACE_PKI_ROLE
+              value: workspace-agent
+            - name: OPENBAO_WORKSPACE_CERT_TTL
+              value: 15m
+            - name: OPENBAO_WORKSPACE_CREDENTIAL_MOUNT
+              value: workspace-credentials
+            - name: OPENBAO_WORKSPACE_CREDENTIAL_MAX_TTL
+              value: 15m
+            - name: TIMEWEB_API_URL
+              value: https://api.timeweb.cloud/api/v1
+            - name: TIMEWEB_TOKEN_FILE
+              value: /var/run/secrets/workspace-manager/timeweb-token
+            - name: TIMEWEB_PROJECT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-manager-release
+                  key: TIMEWEB_PROJECT_ID
+            - name: TIMEWEB_WORKSPACE_CONFIGURATOR_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-manager-release
+                  key: TIMEWEB_WORKSPACE_CONFIGURATOR_ID
+            - name: TIMEWEB_AVAILABILITY_ZONE
+              value: msk-1
+            - name: TIMEWEB_WORKSPACE_BANDWIDTH_MBPS
+              value: "1000"
+            - name: TIMEWEB_WORKSPACE_SYSTEM_DISK_MIB
+              value: "40960"
+            - name: WORKSPACE_VPC_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-manager-release
+                  key: WORKSPACE_VPC_ID
+            - name: WORKSPACE_IMAGE_MAP_JSON
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-manager-release
+                  key: WORKSPACE_IMAGE_MAP_JSON
+            - name: WORKSPACE_AGENT_PUBLIC_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-manager-release
+                  key: WORKSPACE_AGENT_PUBLIC_URL
+            - name: WORKSPACE_ALLOWED_EGRESS_HOSTS
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-manager-release
+                  key: WORKSPACE_ALLOWED_EGRESS_HOSTS
+            - name: WORKSPACE_EGRESS_GATEWAY_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-manager-release
+                  key: WORKSPACE_EGRESS_GATEWAY_URL
+            - name: WORKSPACE_EGRESS_GATEWAY_CIDRS
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-manager-release
+                  key: WORKSPACE_EGRESS_GATEWAY_CIDRS
+            - name: WORKSPACE_DNS_RESOLVER_CIDRS
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-manager-release
+                  key: WORKSPACE_DNS_RESOLVER_CIDRS
+            - name: WORKSPACE_DENIED_CIDRS
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-manager-release
+                  key: WORKSPACE_DENIED_CIDRS
+            - name: WORKSPACE_LOG_S3_ENDPOINT
+              value: https://s3.twcstorage.ru
+            - name: WORKSPACE_LOG_S3_REGION
+              value: ru-1
+            - name: WORKSPACE_LOG_S3_BUCKET
+              value: ai-native-paas-workspace-logs
+            - name: WORKSPACE_LOG_S3_PREFIX
+              value: workspace-command-logs
+            - name: WORKSPACE_LOG_S3_ACCESS_KEY_FILE
+              value: /var/run/secrets/workspace-manager/log-s3-access-key
+            - name: WORKSPACE_LOG_S3_SECRET_KEY_FILE
+              value: /var/run/secrets/workspace-manager/log-s3-secret-key
+            - name: WORKSPACE_LOG_ENCRYPTION_KEY_FILE
+              value: /var/run/secrets/workspace-manager/log-encryption-key
+          volumeMounts:
+            - name: manager-secrets
+              mountPath: /var/run/secrets/workspace-manager
+              readOnly: true
+            - name: manager-tls
+              mountPath: /var/run/secrets/workspace-manager-tls
+              readOnly: true
+            - name: openbao-ca
+              mountPath: /var/run/secrets/openbao
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: agent-mtls
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: agent-mtls
+              scheme: HTTPS
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: manager-secrets
+          secret:
+            secretName: workspace-manager-secrets
+            defaultMode: 0440
+            items:
+              - key: TIMEWEB_TOKEN
+                path: timeweb-token
+              - key: WORKSPACE_LOG_S3_ACCESS_KEY
+                path: log-s3-access-key
+              - key: WORKSPACE_LOG_S3_SECRET_KEY
+                path: log-s3-secret-key
+              - key: WORKSPACE_LOG_ENCRYPTION_KEY
+                path: log-encryption-key
+        - name: manager-tls
+          secret:
+            secretName: workspace-manager-tls
+            defaultMode: 0440
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              - key: ca.crt
+                path: ca.crt
+        - name: openbao-ca
+          secret:
+            secretName: openbao-client-ca
+            defaultMode: 0444
+            items:
+              - key: ca.crt
+                path: ca.crt
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workspace-manager
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: workspace-manager
+  annotations:
+    ai-native-paas.io/exposure: workspace-agent-mtls-only
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    app.kubernetes.io/name: workspace-manager
+  ports:
+    - name: agent-mtls
+      port: 8443
+      targetPort: agent-mtls
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: workspace-manager
+  namespace: ai-native-paas-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: workspace-manager
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8443
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openbao
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: openbao
+      ports:
+        - protocol: TCP
+          port: 8200
+    - to:
+        - ipBlock:
+            cidr: 192.168.73.6/32
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 100.64.0.0/10
+              - 169.254.0.0/16
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: workspace-manager
+  namespace: ai-native-paas-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: workspace-manager
