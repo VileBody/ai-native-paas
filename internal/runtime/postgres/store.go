@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math/rand/v2"
 	"sort"
 	"strings"
 	"time"
@@ -26,11 +27,13 @@ type Store struct {
 	MaxSerializableRetries int
 }
 
+const defaultSerializableRetries = 32
+
 func NewStore(db *sql.DB) (*Store, error) {
 	if db == nil {
 		return nil, errors.New("postgres db is nil")
 	}
-	return &Store{DB: db, MaxSerializableRetries: 6}, nil
+	return &Store{DB: db, MaxSerializableRetries: defaultSerializableRetries}, nil
 }
 func (s *Store) Migrate(ctx context.Context) error {
 	if s == nil || s.DB == nil {
@@ -91,7 +94,7 @@ func (s *Store) Transact(ctx context.Context, fn func(application.Tx) error) err
 	}
 	attempts := s.MaxSerializableRetries
 	if attempts <= 0 {
-		attempts = 6
+		attempts = defaultSerializableRetries
 	}
 	var last error
 	for attempt := 0; attempt < attempts; attempt++ {
@@ -120,7 +123,7 @@ func (s *Store) Transact(ctx context.Context, fn func(application.Tx) error) err
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(time.Duration(attempt+1) * 5 * time.Millisecond):
+		case <-time.After(serializableRetryDelay(attempt)):
 		}
 	}
 	if domain.HasCode(last, domain.CodeConflict) {
@@ -128,6 +131,16 @@ func (s *Store) Transact(ctx context.Context, fn func(application.Tx) error) err
 	}
 	return domain.Wrap(domain.CodeUnavailable, "serializable transaction retry budget exhausted", last)
 }
+
+func serializableRetryDelay(attempt int) time.Duration {
+	shift := attempt
+	if shift > 6 {
+		shift = 6
+	}
+	ceiling := 5 * time.Millisecond * time.Duration(1<<shift)
+	return ceiling/2 + time.Duration(rand.Int64N(int64(ceiling)))
+}
+
 func retryableDB(err error) bool {
 	v := strings.ToLower(fmt.Sprint(err))
 	return strings.Contains(v, "40001") || strings.Contains(v, "40p01") || strings.Contains(v, "serialization") || strings.Contains(v, "deadlock") || strings.Contains(v, "23505") || strings.Contains(v, "duplicate key")

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math/rand/v2"
 	"sort"
 	"strings"
 	"time"
@@ -128,10 +129,22 @@ func (s *Store) Transact(ctx context.Context, fn func(application.Tx) error) err
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(time.Duration(attempt+1) * 5 * time.Millisecond):
+		case <-time.After(serializableRetryDelay(attempt)):
 		}
 	}
 	return domain.Wrap(domain.CodeUnavailable, "serializable transaction retry budget exhausted", last)
+}
+
+func serializableRetryDelay(attempt int) time.Duration {
+	// Exponential full jitter prevents a burst of transactions that lost the
+	// same serialization race from immediately colliding again. Cap the delay
+	// so retries remain bounded and cancellation stays responsive.
+	shift := attempt
+	if shift > 6 {
+		shift = 6
+	}
+	ceiling := 5 * time.Millisecond * time.Duration(1<<shift)
+	return ceiling/2 + time.Duration(rand.Int64N(int64(ceiling)))
 }
 
 func retryableDB(err error) bool {
