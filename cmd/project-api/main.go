@@ -20,6 +20,9 @@ import (
 	agentsupport "github.com/keir-research/ai-native-paas/internal/agent/support"
 	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
 	"github.com/keir-research/ai-native-paas/internal/identity/oidcverify"
+	infraapp "github.com/keir-research/ai-native-paas/internal/infrastructure/application"
+	infraconfig "github.com/keir-research/ai-native-paas/internal/infrastructure/config"
+	infrapostgres "github.com/keir-research/ai-native-paas/internal/infrastructure/postgres"
 	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 	projectapp "github.com/keir-research/ai-native-paas/internal/project/application"
@@ -31,6 +34,7 @@ import (
 	sourcesupport "github.com/keir-research/ai-native-paas/internal/source/support"
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	workspacepostgres "github.com/keir-research/ai-native-paas/internal/workspace/postgres"
+	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
 )
 
 func main() {
@@ -48,6 +52,8 @@ func main() {
 		platformprofile.Prod("oidc-jwks-verifier"),
 		platformprofile.Prod("postgres-membership-resolver"),
 		platformprofile.Prod("workspace-postgres-intent-store"),
+		platformprofile.Prod("infrastructure-postgres-exact-plan-gate"),
+		platformprofile.Prod("versioned-beta-rate-card"),
 	); err != nil {
 		log.Fatal(err)
 	}
@@ -66,6 +72,10 @@ func main() {
 	}
 	workspaceStore := &workspacepostgres.Store{DB: db}
 	if err := postgresbootstrap.WithMigrationLock(ctx, db, "workspace", workspaceStore.Migrate); err != nil {
+		log.Fatal(err)
+	}
+	infrastructureStore := &infrapostgres.Store{DB: db}
+	if err := postgresbootstrap.WithMigrationLock(ctx, db, "infrastructure", infrastructureStore.Migrate); err != nil {
 		log.Fatal(err)
 	}
 	enrollmentStore, err := enrollmentpostgres.New(db)
@@ -112,6 +122,14 @@ func main() {
 		Secrets: enrollment.CryptoSecrets{}, Signer: enrollment.HMACSigner{Key: append([]byte(nil), signingKey...)},
 	}
 	workspaceService := &workspace.Service{Store: workspaceStore, Clock: clock, IDs: enrollmentIDs{inner: runtimeIDs}, Policy: workspace.DefaultCommandPolicy()}
+	priceBook, err := infraconfig.LoadPriceBook(os.Getenv("INFRASTRUCTURE_PRICE_BOOK_FILE"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	infrastructureService := &infraapp.Service{
+		Store: infrastructureStore, Clock: clock, IDs: enrollmentIDs{inner: runtimeIDs}, Prices: priceBook,
+		EstimateTTL: 30 * time.Minute, ReservationTTL: 20 * time.Minute,
+	}
 	projects := &projectapp.Service{
 		Source: source, Bootstrapper: gitLab, Enrollment: enrollmentService,
 		GitLabNamespaceID: namespaceID, MCPBaseURL: os.Getenv("MCP_BASE_URL"), WorkspaceImageDigest: os.Getenv("WORKSPACE_IMAGE_DIGEST"),
@@ -121,9 +139,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	projectHandler := projecthttp.Handler{Projects: projects, MaxBodyBytes: 64 << 10}
+	projectHandler := projecthttp.Handler{Projects: projects, Infrastructure: infrastructureService, MaxBodyBytes: 64 << 10}
 	enrollmentHandler := enrollmenthttp.Handler{Enrollment: enrollmentService, MaxBodyBytes: 64 << 10}
-	mcpHandler := projectmcp.Handler{Enrollment: enrollmentService, Projects: source, Workspaces: workspaceService, MaxBodyBytes: 1 << 20}
+	mcpHandler := projectmcp.Handler{Enrollment: enrollmentService, Projects: source, Workspaces: workspaceService, Infrastructure: infrastructureService, MaxBodyBytes: agentv2.MaximumArgumentsBytes + (64 << 10)}
 	humanHandler := (httpauth.Middleware{
 		Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}},
 	}).Wrap(projectHandler)

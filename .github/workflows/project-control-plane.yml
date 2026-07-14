@@ -10,7 +10,10 @@ on:
       - 'internal/agent/enrollment/**'
       - 'internal/source/**'
       - 'internal/workspace/**'
+      - 'config/rate-cards/**'
       - 'pkg/contracts/agent/v2/**'
+      - 'pkg/contracts/commerce/v2/**'
+      - 'pkg/contracts/infrastructure/v1/**'
       - 'pkg/contracts/project/v2/**'
       - 'pkg/contracts/workspace/v1/**'
       - 'test/integration/postgres_enrollment_test.go'
@@ -28,24 +31,24 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: '1.25.x'
           cache: true
       - run: make fmt-check
-      - run: go vet ./cmd/project-api ./internal/project/... ./internal/identity/... ./internal/agent/enrollment/... ./internal/source/... ./internal/workspace/... ./pkg/contracts/agent/v2 ./pkg/contracts/project/v2 ./pkg/contracts/workspace/v1
-      - run: go test -count=1 ./internal/project/... ./internal/identity/... ./internal/agent/enrollment/... ./internal/source/... ./internal/workspace/... ./pkg/contracts/agent/v2 ./pkg/contracts/project/v2 ./pkg/contracts/workspace/v1
+      - run: go vet ./cmd/project-api ./internal/project/... ./internal/infrastructure/... ./internal/identity/... ./internal/agent/enrollment/... ./internal/source/... ./internal/workspace/... ./pkg/contracts/agent/v2 ./pkg/contracts/commerce/v2 ./pkg/contracts/infrastructure/v1 ./pkg/contracts/project/v2 ./pkg/contracts/workspace/v1
+      - run: go test -count=1 ./internal/project/... ./internal/infrastructure/... ./internal/identity/... ./internal/agent/enrollment/... ./internal/source/... ./internal/workspace/... ./pkg/contracts/agent/v2 ./pkg/contracts/commerce/v2 ./pkg/contracts/infrastructure/v1 ./pkg/contracts/project/v2 ./pkg/contracts/workspace/v1
 
   postgres:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:17
+        image: postgres:17@sha256:9cbd488d3dcffbaf057f994444c92c07901a6bda67799b6712160e813fcdff23
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -60,8 +63,8 @@ jobs:
     env:
       TEST_POSTGRES_DSN: host=127.0.0.1 port=5432 user=postgres password=postgres dbname=paas_test sslmode=disable
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: '1.25.x'
           cache: true
@@ -70,26 +73,26 @@ jobs:
   image:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: [verify, postgres]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
       packages: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ secrets.TWC_REGISTRY_HOST }}
           username: ${{ secrets.TWC_REGISTRY_USERNAME }}
           password: ${{ secrets.TWC_REGISTRY_TOKEN }}
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: cmd/project-api/Dockerfile

@@ -23,6 +23,7 @@ var sourceRevision = regexp.MustCompile(`^[0-9a-f]{40,64}$`)
 type PlanCommand struct {
 	TenantID        string
 	ProjectID       string
+	ActorID         string
 	WorkspaceID     string
 	Target          string
 	SourceSHA       string
@@ -57,7 +58,7 @@ func (s *Service) Plan(ctx context.Context, command PlanCommand) (PlanResult, er
 	if err := validatePlanCommand(command); err != nil {
 		return PlanResult{}, err
 	}
-	if err := s.Prices.RateCard.Validate(); err != nil {
+	if err := s.Prices.Validate(); err != nil {
 		return PlanResult{}, fmt.Errorf("invalid price book: %w", err)
 	}
 	changes, destructive, err := normalizeChanges(command.PlanJSON)
@@ -114,16 +115,17 @@ func (s *Service) Plan(ctx context.Context, command PlanCommand) (PlanResult, er
 	}
 	fingerprint, err := hashJSON(struct {
 		TenantID        string `json:"tenant_id"`
+		ActorID         string `json:"actor_id"`
 		IdempotencyKey  string `json:"idempotency_key"`
 		PlanHash        string `json:"plan_hash"`
 		RateCardID      string `json:"rate_card_id"`
 		RateCardVersion string `json:"rate_card_version"`
-	}{command.TenantID, command.IdempotencyKey, planHash, s.Prices.RateCard.RateCardID, s.Prices.RateCard.Version})
+	}{command.TenantID, command.ActorID, command.IdempotencyKey, planHash, s.Prices.RateCard.RateCardID, s.Prices.RateCard.Version})
 	if err != nil {
 		return PlanResult{}, err
 	}
 	record, err := s.Store.CreatePlan(ctx, PlanRecord{
-		TenantID: command.TenantID, IdempotencyKey: command.IdempotencyKey,
+		TenantID: command.TenantID, RequestedByActorID: command.ActorID, IdempotencyKey: command.IdempotencyKey,
 		IdempotencyFingerprint: fingerprint, Summary: summary,
 		ArtifactDigest: command.ArtifactDigest, Target: command.Target,
 		Estimate: estimate, Reservation: reservation, Version: 1,
@@ -148,12 +150,16 @@ func (s *Service) GrantApproval(ctx context.Context, command GrantApprovalComman
 		return ApprovalGrant{}, errors.New("infrastructure service is unavailable")
 	}
 	now := s.Clock.Now().UTC()
-	if command.TenantID == "" || command.ProjectID == "" || command.PlanID == "" || command.ActorID == "" || command.ApproverUserID == "" || !command.ExpiresAt.After(now) {
+	if command.TenantID == "" || command.ProjectID == "" || command.PlanID == "" || command.ApproverUserID == "" || !command.ExpiresAt.After(now) {
 		return ApprovalGrant{}, errors.New("invalid approval grant command")
 	}
 	plan, err := s.Store.GetPlan(ctx, command.TenantID, command.ProjectID, command.PlanID)
 	if err != nil {
 		return ApprovalGrant{}, err
+	}
+	actorID := plan.RequestedByActorID
+	if actorID == "" || (command.ActorID != "" && command.ActorID != actorID) {
+		return ApprovalGrant{}, ErrPermissionDenied
 	}
 	expiresAt := command.ExpiresAt.UTC()
 	if plan.Reservation.ExpiresAt.Before(expiresAt) {
@@ -163,9 +169,51 @@ func (s *Service) GrantApproval(ctx context.Context, command GrantApprovalComman
 		GrantID: s.IDs.New("approval"), TenantID: command.TenantID, ProjectID: command.ProjectID,
 		PlanID: plan.Summary.PlanID, PlanHash: plan.Summary.PlanHash,
 		EstimateVersion: plan.Estimate.Version, ReservationID: plan.Reservation.ReservationID,
-		Target: plan.Target, ActorID: command.ActorID, ApproverUserID: command.ApproverUserID,
+		Target: plan.Target, ActorID: actorID, ApproverUserID: command.ApproverUserID,
 		CreatedAt: now, ExpiresAt: expiresAt,
 	})
+}
+
+type ApprovalStatus struct {
+	PlanID     string    `json:"plan_id"`
+	Status     string    `json:"status"`
+	GrantID    string    `json:"approval_grant_id,omitempty"`
+	ApproverID string    `json:"approver_user_id,omitempty"`
+	ExpiresAt  time.Time `json:"expires_at,omitempty"`
+}
+
+func (s *Service) GetPlan(ctx context.Context, tenantID, projectID, planID string) (PlanRecord, error) {
+	if s == nil || s.Store == nil || tenantID == "" || projectID == "" || planID == "" {
+		return PlanRecord{}, errors.New("invalid infrastructure plan lookup")
+	}
+	return s.Store.GetPlan(ctx, tenantID, projectID, planID)
+}
+
+func (s *Service) GetApprovalStatus(ctx context.Context, tenantID, projectID, planID, actorID string) (ApprovalStatus, error) {
+	if s == nil || s.Store == nil || s.Clock == nil || tenantID == "" || projectID == "" || planID == "" || actorID == "" {
+		return ApprovalStatus{}, errors.New("invalid infrastructure approval lookup")
+	}
+	plan, err := s.Store.GetPlan(ctx, tenantID, projectID, planID)
+	if err != nil {
+		return ApprovalStatus{}, err
+	}
+	if plan.RequestedByActorID != actorID {
+		return ApprovalStatus{}, ErrPermissionDenied
+	}
+	if !plan.ApplyStartedAt.IsZero() {
+		return ApprovalStatus{PlanID: planID, Status: "CONSUMED"}, nil
+	}
+	if !plan.Summary.RequiresApproval {
+		return ApprovalStatus{PlanID: planID, Status: "NOT_REQUIRED"}, nil
+	}
+	grant, err := s.Store.GetActiveApproval(ctx, tenantID, projectID, planID, actorID, s.Clock.Now().UTC())
+	if errors.Is(err, ErrNotFound) {
+		return ApprovalStatus{PlanID: planID, Status: "WAITING_APPROVAL"}, nil
+	}
+	if err != nil {
+		return ApprovalStatus{}, err
+	}
+	return ApprovalStatus{PlanID: planID, Status: "APPROVED", GrantID: grant.GrantID, ApproverID: grant.ApproverUserID, ExpiresAt: grant.ExpiresAt}, nil
 }
 
 type ApplyCommand struct {
@@ -196,7 +244,7 @@ func (s *Service) AuthorizeApply(ctx context.Context, command ApplyCommand) (Pla
 }
 
 func validatePlanCommand(command PlanCommand) error {
-	if strings.TrimSpace(command.TenantID) == "" || strings.TrimSpace(command.ProjectID) == "" || strings.TrimSpace(command.WorkspaceID) == "" || strings.TrimSpace(command.Target) == "" || strings.TrimSpace(command.IdempotencyKey) == "" || len(command.IdempotencyKey) > 128 || !sourceRevision.MatchString(command.SourceSHA) || !regexp.MustCompile(`^sha256:[0-9a-f]{64}$`).MatchString(command.ArtifactDigest) || command.StateGeneration < 0 || len(command.PlanJSON) == 0 || len(command.PlanJSON) > 8<<20 {
+	if strings.TrimSpace(command.TenantID) == "" || strings.TrimSpace(command.ProjectID) == "" || strings.TrimSpace(command.ActorID) == "" || strings.TrimSpace(command.WorkspaceID) == "" || strings.TrimSpace(command.Target) == "" || strings.TrimSpace(command.IdempotencyKey) == "" || len(command.IdempotencyKey) > 128 || !sourceRevision.MatchString(command.SourceSHA) || !regexp.MustCompile(`^sha256:[0-9a-f]{64}$`).MatchString(command.ArtifactDigest) || command.StateGeneration < 0 || len(command.PlanJSON) == 0 || len(command.PlanJSON) > 8<<20 {
 		return errors.New("invalid infrastructure plan command")
 	}
 	return nil

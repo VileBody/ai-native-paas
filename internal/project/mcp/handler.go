@@ -8,13 +8,17 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
+	"time"
 
 	kernelv2 "github.com/keir-research/ai-native-paas/contracts/kernel/v2"
 	"github.com/keir-research/ai-native-paas/internal/agent/enrollment"
+	infraapp "github.com/keir-research/ai-native-paas/internal/infrastructure/application"
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
+	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
 
@@ -30,13 +34,22 @@ type WorkspaceCommands interface {
 	Destroy(context.Context, workspace.Scope, string) (workspacev1.WorkspaceRef, error)
 }
 
+type InfrastructureCommands interface {
+	Plan(context.Context, infraapp.PlanCommand) (infraapp.PlanResult, error)
+	GetPlan(context.Context, string, string, string) (infraapp.PlanRecord, error)
+	GetApprovalStatus(context.Context, string, string, string, string) (infraapp.ApprovalStatus, error)
+	AuthorizeApply(context.Context, infraapp.ApplyCommand) (infraapp.PlanRecord, error)
+}
+
 var errInvalidWorkspaceArguments = errors.New("invalid workspace tool arguments")
+var errInvalidInfrastructureArguments = errors.New("invalid infrastructure tool arguments")
 
 type Handler struct {
-	Enrollment   *enrollment.Service
-	Projects     ProjectReader
-	Workspaces   WorkspaceCommands
-	MaxBodyBytes int64
+	Enrollment     *enrollment.Service
+	Projects       ProjectReader
+	Workspaces     WorkspaceCommands
+	Infrastructure InfrastructureCommands
+	MaxBodyBytes   int64
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -112,6 +125,8 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 		result, err = h.Projects.GetRepositoryForProject(r.Context(), verified.TenantID, verified.ProjectID)
 	case agentv2.ToolWorkspaceCreate, agentv2.ToolWorkspaceGet, agentv2.ToolWorkspaceExec, agentv2.ToolWorkspaceDestroy:
 		result, err = h.invokeWorkspace(r.Context(), verified, request)
+	case agentv2.ToolInfraPlan, agentv2.ToolInfraGetPlan, agentv2.ToolInfraApply, agentv2.ToolApprovalRequest, agentv2.ToolApprovalGet:
+		result, err = h.invokeInfrastructure(r.Context(), verified, request)
 	default:
 		writeResponse(w, http.StatusNotImplemented, agentv2.InvocationResponse{
 			APIVersion: agentv2.APIVersion, InvocationID: "read-" + request.CorrelationID,
@@ -122,6 +137,16 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 	if err != nil {
 		status, code, message, retryable := http.StatusServiceUnavailable, "UNAVAILABLE", "project operation failed", true
 		switch {
+		case errors.Is(err, errInvalidInfrastructureArguments):
+			status, code, message, retryable = http.StatusBadRequest, "INVALID_ARGUMENT", "invalid infrastructure tool arguments", false
+		case errors.Is(err, infraapp.ErrNotFound):
+			status, code, message, retryable = http.StatusNotFound, "NOT_FOUND", "infrastructure record not found", false
+		case errors.Is(err, infraapp.ErrApprovalRequired):
+			status, code, message, retryable = http.StatusPreconditionRequired, "APPROVAL_REQUIRED", "exact-plan approval is required", false
+		case errors.Is(err, infraapp.ErrPermissionDenied):
+			status, code, message, retryable = http.StatusForbidden, "POLICY_DENIED", "infrastructure authorization does not match exact plan", false
+		case errors.Is(err, infraapp.ErrConflict):
+			status, code, message, retryable = http.StatusConflict, "CONFLICT", "infrastructure operation conflicts with current state", false
 		case errors.Is(err, errInvalidWorkspaceArguments):
 			status, code, message, retryable = http.StatusBadRequest, "INVALID_ARGUMENT", "invalid workspace tool arguments", false
 		case errors.Is(err, workspace.ErrNotFound):
@@ -203,7 +228,7 @@ func (h Handler) invokeWorkspace(ctx context.Context, verified agentv2.VerifiedI
 		}
 		spec := workspacev1.CommandSpec{Argv: append([]string(nil), arguments.Argv...), WorkingDir: arguments.WorkingDir,
 			EnvironmentRefs: cloneStringMap(arguments.EnvironmentRefs), TimeoutSeconds: arguments.TimeoutSeconds, OutputLimitBytes: arguments.OutputLimitBytes}
-		if strings.TrimSpace(arguments.WorkspaceID) == "" || strings.TrimSpace(arguments.Kind) == "" || spec.Validate() != nil {
+		if strings.TrimSpace(arguments.WorkspaceID) == "" || strings.TrimSpace(arguments.Kind) == "" || spec.Validate() != nil || requiresGovernedInfrastructureTool(arguments.Kind, spec.Argv) {
 			return nil, errInvalidWorkspaceArguments
 		}
 		return h.Workspaces.Exec(ctx, workspace.ExecRequest{
@@ -220,6 +245,153 @@ func (h Handler) invokeWorkspace(ctx context.Context, verified agentv2.VerifiedI
 	default:
 		return nil, errors.New("workspace tool is unavailable")
 	}
+}
+
+type infraPlanArguments struct {
+	WorkspaceID     string          `json:"workspace_id"`
+	Target          string          `json:"target"`
+	SourceSHA       string          `json:"source_sha"`
+	ArtifactDigest  string          `json:"artifact_digest"`
+	StateGeneration int64           `json:"state_generation"`
+	PlanJSON        json.RawMessage `json:"plan_json"`
+}
+
+type infraPlanLookupArguments struct {
+	PlanID string `json:"plan_id"`
+}
+
+type infraApplyArguments struct {
+	PlanID           string            `json:"plan_id"`
+	PlanHash         string            `json:"plan_hash"`
+	EstimateVersion  string            `json:"estimate_version"`
+	ReservationID    string            `json:"reservation_id"`
+	Target           string            `json:"target"`
+	PlanPath         string            `json:"plan_path"`
+	WorkingDir       string            `json:"working_dir"`
+	EnvironmentRefs  map[string]string `json:"environment_refs,omitempty"`
+	CredentialLeases []string          `json:"credential_leases,omitempty"`
+	TimeoutSeconds   int64             `json:"timeout_seconds,omitempty"`
+	OutputLimitBytes int64             `json:"output_limit_bytes,omitempty"`
+}
+
+type infrastructurePlanView struct {
+	Summary        infrastructurev1.PlanSummary `json:"summary"`
+	Estimate       any                          `json:"estimate"`
+	Reservation    any                          `json:"reservation"`
+	Target         string                       `json:"target"`
+	ArtifactDigest string                       `json:"artifact_digest"`
+	ApplyStartedAt time.Time                    `json:"apply_started_at,omitempty"`
+}
+
+func (h Handler) invokeInfrastructure(ctx context.Context, verified agentv2.VerifiedInvocationContext, request agentv2.InvocationRequest) (any, error) {
+	if h.Infrastructure == nil {
+		return nil, errors.New("infrastructure service is unavailable")
+	}
+	switch request.Tool {
+	case agentv2.ToolInfraPlan:
+		var arguments infraPlanArguments
+		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil {
+			return nil, errInvalidInfrastructureArguments
+		}
+		return h.Infrastructure.Plan(ctx, infraapp.PlanCommand{
+			TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID,
+			WorkspaceID: arguments.WorkspaceID, Target: arguments.Target, SourceSHA: arguments.SourceSHA,
+			IdempotencyKey: request.IdempotencyKey, ArtifactDigest: arguments.ArtifactDigest,
+			StateGeneration: arguments.StateGeneration, PlanJSON: append([]byte(nil), arguments.PlanJSON...),
+		})
+	case agentv2.ToolInfraGetPlan:
+		plan, err := h.infrastructurePlan(ctx, verified, request.Arguments)
+		if err != nil {
+			return nil, err
+		}
+		return planView(plan), nil
+	case agentv2.ToolApprovalRequest, agentv2.ToolApprovalGet:
+		var arguments infraPlanLookupArguments
+		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || strings.TrimSpace(arguments.PlanID) == "" {
+			return nil, errInvalidInfrastructureArguments
+		}
+		return h.Infrastructure.GetApprovalStatus(ctx, verified.TenantID, verified.ProjectID, arguments.PlanID, verified.AgentID)
+	case agentv2.ToolInfraApply:
+		var arguments infraApplyArguments
+		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || !validRelativePlanPath(arguments.PlanPath) {
+			return nil, errInvalidInfrastructureArguments
+		}
+		plan, err := h.Infrastructure.GetPlan(ctx, verified.TenantID, verified.ProjectID, arguments.PlanID)
+		if err != nil {
+			return nil, err
+		}
+		if plan.Summary.WorkspaceID == "" || plan.RequestedByActorID != verified.AgentID {
+			return nil, infraapp.ErrPermissionDenied
+		}
+		if h.Workspaces == nil {
+			return nil, errors.New("workspace service is unavailable")
+		}
+		timeout := arguments.TimeoutSeconds
+		if timeout == 0 {
+			timeout = 3600
+		}
+		outputLimit := arguments.OutputLimitBytes
+		if outputLimit == 0 {
+			outputLimit = 8 << 20
+		}
+		spec := workspacev1.CommandSpec{
+			Argv:       []string{"workspace-agent", "verified-tofu-apply", plan.ArtifactDigest, arguments.PlanPath},
+			WorkingDir: arguments.WorkingDir, EnvironmentRefs: cloneStringMap(arguments.EnvironmentRefs),
+			TimeoutSeconds: timeout, OutputLimitBytes: outputLimit,
+		}
+		if spec.Validate() != nil {
+			return nil, errInvalidInfrastructureArguments
+		}
+		authorization := infrastructurev1.ApplyAuthorization{
+			PlanID: arguments.PlanID, PlanHash: arguments.PlanHash, EstimateVersion: arguments.EstimateVersion,
+			ReservationID: arguments.ReservationID, ApprovalGrantID: request.ApprovalGrantID,
+			Target: arguments.Target, ActorID: verified.AgentID, ExpiresAt: plan.Reservation.ExpiresAt,
+		}
+		started, err := h.Infrastructure.AuthorizeApply(ctx, infraapp.ApplyCommand{TenantID: verified.TenantID, ProjectID: verified.ProjectID, Authorization: authorization})
+		if err != nil {
+			return nil, err
+		}
+		return h.Workspaces.Exec(ctx, workspace.ExecRequest{
+			Scope:       workspace.Scope{TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID},
+			WorkspaceID: started.Summary.WorkspaceID, IdempotencyKey: request.IdempotencyKey,
+			Kind: "infra_apply", SerializationKey: started.Target,
+			CredentialLeases: append([]string(nil), arguments.CredentialLeases...), Spec: spec,
+		})
+	default:
+		return nil, errors.New("infrastructure tool is unavailable")
+	}
+}
+
+func (h Handler) infrastructurePlan(ctx context.Context, verified agentv2.VerifiedInvocationContext, raw json.RawMessage) (infraapp.PlanRecord, error) {
+	var arguments infraPlanLookupArguments
+	if err := agentv2.DecodeStrict(raw, &arguments); err != nil || strings.TrimSpace(arguments.PlanID) == "" {
+		return infraapp.PlanRecord{}, errInvalidInfrastructureArguments
+	}
+	return h.Infrastructure.GetPlan(ctx, verified.TenantID, verified.ProjectID, arguments.PlanID)
+}
+
+func planView(plan infraapp.PlanRecord) infrastructurePlanView {
+	return infrastructurePlanView{Summary: plan.Summary, Estimate: plan.Estimate, Reservation: plan.Reservation, Target: plan.Target, ArtifactDigest: plan.ArtifactDigest, ApplyStartedAt: plan.ApplyStartedAt}
+}
+
+func validRelativePlanPath(value string) bool {
+	clean := filepath.Clean(strings.TrimSpace(value))
+	return clean != "" && clean != "." && clean == value && !filepath.IsAbs(clean) && clean != ".." && !strings.HasPrefix(clean, ".."+string(filepath.Separator))
+}
+
+func requiresGovernedInfrastructureTool(kind string, argv []string) bool {
+	if kind == "infra_apply" || kind == "infra_destroy" || kind == "infra_import" || len(argv) == 0 || argv[0] == "workspace-agent" {
+		return true
+	}
+	if argv[0] != "tofu" {
+		return false
+	}
+	if len(argv) < 2 {
+		return true
+	}
+	allowed := map[string]struct{}{"fmt": {}, "validate": {}, "plan": {}, "show": {}, "providers": {}, "version": {}, "graph": {}, "output": {}}
+	_, ok := allowed[strings.ToLower(strings.TrimSpace(argv[1]))]
+	return !ok
 }
 
 func cloneStringMap(value map[string]string) map[string]string {
@@ -242,8 +414,8 @@ func route(value string) (string, string, bool) {
 }
 
 func (h Handler) limit() int64 {
-	if h.MaxBodyBytes <= 0 || h.MaxBodyBytes > 1<<20 {
-		return 1 << 20
+	if h.MaxBodyBytes <= 0 || h.MaxBodyBytes > agentv2.MaximumArgumentsBytes+(64<<10) {
+		return agentv2.MaximumArgumentsBytes + (64 << 10)
 	}
 	return h.MaxBodyBytes
 }

@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"sync"
+	"time"
 
 	infraapp "github.com/keir-research/ai-native-paas/internal/infrastructure/application"
 )
@@ -54,11 +55,22 @@ func (s *Store) CreateApproval(_ context.Context, grant infraapp.ApprovalGrant) 
 		return infraapp.ApprovalGrant{}, infraapp.ErrConflict
 	}
 	plan, ok := s.plans[grant.PlanID]
-	if !ok || plan.TenantID != grant.TenantID || plan.Summary.ProjectID != grant.ProjectID || !plan.Summary.RequiresApproval || grant.CreatedAt.IsZero() || !grant.ExpiresAt.After(grant.CreatedAt) {
+	if !ok || plan.TenantID != grant.TenantID || plan.Summary.ProjectID != grant.ProjectID || plan.RequestedByActorID != grant.ActorID || !plan.Summary.RequiresApproval || grant.CreatedAt.IsZero() || !grant.ExpiresAt.After(grant.CreatedAt) || grant.ExpiresAt.After(plan.Reservation.ExpiresAt) {
 		return infraapp.ApprovalGrant{}, infraapp.ErrPermissionDenied
 	}
 	s.approvals[grant.GrantID] = grant
 	return grant, nil
+}
+
+func (s *Store) GetActiveApproval(_ context.Context, tenantID, projectID, planID, actorID string, now time.Time) (infraapp.ApprovalGrant, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, grant := range s.approvals {
+		if grant.TenantID == tenantID && grant.ProjectID == projectID && grant.PlanID == planID && grant.ActorID == actorID && grant.ConsumedAt.IsZero() && grant.ExpiresAt.After(now) {
+			return grant, nil
+		}
+	}
+	return infraapp.ApprovalGrant{}, infraapp.ErrNotFound
 }
 
 func (s *Store) AuthorizeApply(_ context.Context, match infraapp.ApplyMatch) (infraapp.PlanRecord, error) {

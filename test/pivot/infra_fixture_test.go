@@ -48,7 +48,7 @@ func infrastructureFixture() (*infraapp.Service, *inframemory.Store, time.Time) 
 
 func planCommand(key, target, planJSON string) infraapp.PlanCommand {
 	return infraapp.PlanCommand{
-		TenantID: "tenant-1", ProjectID: "project-1", WorkspaceID: "workspace-1",
+		TenantID: "tenant-1", ProjectID: "project-1", ActorID: "agent-1", WorkspaceID: "workspace-1",
 		Target: target, SourceSHA: strings.Repeat("a", 40), IdempotencyKey: key,
 		ArtifactDigest: "sha256:" + strings.Repeat("b", 64), StateGeneration: 7,
 		PlanJSON: []byte(planJSON),

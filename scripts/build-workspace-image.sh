@@ -110,7 +110,7 @@ systemctl enable ai-native-paas-workspace-agent.service \
   ai-native-paas-buildkit.service
 dpkg-query -W -f='${Package}\t${Version}\n' | sort > \
   /usr/share/ai-native-paas/debian-packages.tsv
-syft scan dir:/ -o spdx-json=/usr/share/ai-native-paas/sbom.spdx.json
+/usr/local/bin/syft scan dir:/ -o spdx-json=/usr/share/ai-native-paas/sbom.spdx.json
 rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb /tmp/* /var/tmp/*
 cloud-init clean --logs --machine-id
 PROVISION

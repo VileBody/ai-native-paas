@@ -109,7 +109,7 @@ type CommandPolicy struct {
 }
 
 func DefaultCommandPolicy() CommandPolicy {
-	allowed := []string{"git", "tofu", "helm", "kustomize", "buildctl", "cosign", "go", "npm", "pnpm", "node", "python", "python3", "make", "sed", "grep", "rg", "find", "mkdir", "cp", "mv", "rm", "tar"}
+	allowed := []string{"git", "tofu", "helm", "kustomize", "buildctl", "cosign", "workspace-agent", "go", "npm", "pnpm", "node", "python", "python3", "make", "sed", "grep", "rg", "find", "mkdir", "cp", "mv", "rm", "tar"}
 	result := CommandPolicy{AllowedExecutables: make(map[string]struct{}, len(allowed))}
 	for _, executable := range allowed {
 		result.AllowedExecutables[executable] = struct{}{}

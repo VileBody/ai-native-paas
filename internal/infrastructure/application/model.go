@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	commercev2 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v2"
@@ -29,8 +30,21 @@ type PriceBook struct {
 	Prices   map[string]UnitPrice
 }
 
+func (b PriceBook) Validate() error {
+	if err := b.RateCard.Validate(); err != nil || len(b.Prices) == 0 {
+		return errors.New("invalid infrastructure price book")
+	}
+	for resourceType, price := range b.Prices {
+		if strings.TrimSpace(resourceType) == "" || strings.TrimSpace(price.Meter) == "" || strings.TrimSpace(price.Unit) == "" || price.ProviderMinorPerQuantity < 0 || (price.Known && price.UnknownMaximumMinor != 0) || (!price.Known && price.UnknownMaximumMinor <= 0) {
+			return errors.New("invalid infrastructure unit price")
+		}
+	}
+	return nil
+}
+
 type PlanRecord struct {
 	TenantID               string
+	RequestedByActorID     string
 	IdempotencyKey         string
 	IdempotencyFingerprint string
 	Summary                infrastructurev1.PlanSummary
@@ -70,6 +84,7 @@ type Store interface {
 	CreatePlan(context.Context, PlanRecord) (PlanRecord, error)
 	GetPlan(context.Context, string, string, string) (PlanRecord, error)
 	CreateApproval(context.Context, ApprovalGrant) (ApprovalGrant, error)
+	GetActiveApproval(context.Context, string, string, string, string, time.Time) (ApprovalGrant, error)
 	AuthorizeApply(context.Context, ApplyMatch) (PlanRecord, error)
 }
 

@@ -62,7 +62,7 @@ func TestPostgres_InfrastructureApprovalIsExactAndSingleUse(t *testing.T) {
 		},
 	}
 	command := infraapp.PlanCommand{
-		TenantID: "tenant-pg", ProjectID: "project-pg", WorkspaceID: "workspace-pg", Target: "production",
+		TenantID: "tenant-pg", ProjectID: "project-pg", ActorID: "agent-pg", WorkspaceID: "workspace-pg", Target: "production",
 		SourceSHA: strings.Repeat("a", 40), IdempotencyKey: "plan-pg",
 		ArtifactDigest: "sha256:" + strings.Repeat("b", 64), StateGeneration: 3,
 		PlanJSON: []byte(`{"resource_changes":[{"address":"twc_server.app","provider_name":"timeweb","type":"twc_server","change":{"actions":["create"]}}]}`),

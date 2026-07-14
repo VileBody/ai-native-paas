@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	APIVersion       = "agent.platform.example.com/v2"
-	SemanticsVersion = "v2"
+	APIVersion            = "agent.platform.example.com/v2"
+	SemanticsVersion      = "v2"
+	MaximumArgumentsBytes = 8 << 20
 )
 
 type Tool string
@@ -171,7 +172,7 @@ func (r InvocationRequest) Validate() error {
 	if r.APIVersion != APIVersion || r.SemanticsVersion != SemanticsVersion || !safeID.MatchString(r.TaskID) || !ValidTool(r.Tool) || strings.TrimSpace(r.IdempotencyKey) == "" || len(r.IdempotencyKey) > 128 || !safeID.MatchString(r.CorrelationID) {
 		return errors.New("invalid invocation identity")
 	}
-	if len(r.Arguments) == 0 || len(r.Arguments) > 1<<20 || !json.Valid(r.Arguments) {
+	if len(r.Arguments) == 0 || len(r.Arguments) > MaximumArgumentsBytes || !json.Valid(r.Arguments) {
 		return errors.New("invalid tool arguments")
 	}
 	if r.ApprovalGrantID != "" && !safeID.MatchString(r.ApprovalGrantID) {
@@ -277,7 +278,7 @@ func CompatibilityCatalog() []CompatibilityRoute {
 }
 
 func DecodeStrict(raw json.RawMessage, out any) error {
-	if len(raw) == 0 || len(raw) > 1<<20 {
+	if len(raw) == 0 || len(raw) > MaximumArgumentsBytes {
 		return errors.New("arguments size invalid")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))

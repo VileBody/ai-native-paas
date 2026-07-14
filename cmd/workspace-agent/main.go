@@ -17,6 +17,17 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	if len(os.Args) > 1 {
+		if os.Args[1] != "verified-tofu-apply" {
+			logger.Error("unknown workspace-agent subcommand")
+			os.Exit(2)
+		}
+		if err := workspaceagent.ExecuteVerifiedTofuApply(os.Args[2:]); err != nil {
+			logger.Error("verified OpenTofu apply denied", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
 	profile, err := platformprofile.Validate(os.Getenv("PLATFORM_PROFILE"), "workspace-agent",
 		platformprofile.Prod("outbound-spiffe-mtls"),
 		platformprofile.Prod("durable-command-journal"),

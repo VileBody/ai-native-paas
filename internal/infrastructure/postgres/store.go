@@ -76,7 +76,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 	return nil
 }
 
-const planColumns = `id,tenant_id,project_id,workspace_id,source_sha,plan_hash,state_generation,changes,destructive,requires_approval,estimate_version,estimate_fingerprint,artifact_digest,target,idempotency_key,idempotency_fingerprint,estimate,reservation,apply_started_at,created_at,version`
+const planColumns = `id,tenant_id,requested_by_actor_id,project_id,workspace_id,source_sha,plan_hash,state_generation,changes,destructive,requires_approval,estimate_version,estimate_fingerprint,artifact_digest,target,idempotency_key,idempotency_fingerprint,estimate,reservation,apply_started_at,created_at,version`
 
 func (s *Store) CreatePlan(ctx context.Context, record infraapp.PlanRecord) (infraapp.PlanRecord, error) {
 	changes, estimate, reservation, err := marshalPlan(record)
@@ -88,8 +88,8 @@ func (s *Store) CreatePlan(ctx context.Context, record infraapp.PlanRecord) (inf
 		return infraapp.PlanRecord{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	result, err := tx.ExecContext(ctx, `INSERT INTO infrastructure.plans (`+planColumns+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) ON CONFLICT DO NOTHING`,
-		record.Summary.PlanID, record.TenantID, record.Summary.ProjectID, record.Summary.WorkspaceID,
+	result, err := tx.ExecContext(ctx, `INSERT INTO infrastructure.plans (`+planColumns+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) ON CONFLICT DO NOTHING`,
+		record.Summary.PlanID, record.TenantID, record.RequestedByActorID, record.Summary.ProjectID, record.Summary.WorkspaceID,
 		record.Summary.SourceSHA, record.Summary.PlanHash, record.Summary.StateGeneration, changes,
 		record.Summary.Destructive, record.Summary.RequiresApproval, record.Summary.EstimateVersion,
 		record.Summary.EstimateFingerprint, record.ArtifactDigest, record.Target, record.IdempotencyKey,
@@ -120,6 +120,23 @@ func (s *Store) CreatePlan(ctx context.Context, record infraapp.PlanRecord) (inf
 	return stored, nil
 }
 
+func (s *Store) GetActiveApproval(ctx context.Context, tenantID, projectID, planID, actorID string, now time.Time) (infraapp.ApprovalGrant, error) {
+	var grant infraapp.ApprovalGrant
+	err := s.DB.QueryRowContext(ctx, `
+		SELECT id,tenant_id,project_id,plan_id,plan_hash,estimate_version,reservation_id,target,actor_id,approver_user_id,created_at,expires_at,consumed_at
+		FROM infrastructure.approval_grants
+		WHERE tenant_id=$1 AND project_id=$2 AND plan_id=$3 AND actor_id=$4 AND consumed_at IS NULL AND expires_at>$5
+		ORDER BY created_at DESC LIMIT 1`, tenantID, projectID, planID, actorID, now).Scan(
+		&grant.GrantID, &grant.TenantID, &grant.ProjectID, &grant.PlanID, &grant.PlanHash,
+		&grant.EstimateVersion, &grant.ReservationID, &grant.Target, &grant.ActorID,
+		&grant.ApproverUserID, &grant.CreatedAt, &grant.ExpiresAt, nullableTimeScan{target: &grant.ConsumedAt},
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return infraapp.ApprovalGrant{}, infraapp.ErrNotFound
+	}
+	return grant, err
+}
+
 func (s *Store) GetPlan(ctx context.Context, tenantID, projectID, planID string) (infraapp.PlanRecord, error) {
 	value, err := scanPlan(s.DB.QueryRowContext(ctx, `SELECT `+planColumns+` FROM infrastructure.plans WHERE id=$1 AND tenant_id=$2 AND project_id=$3`, planID, tenantID, projectID))
 	return value, mapNotFound(err)
@@ -135,7 +152,7 @@ func (s *Store) CreateApproval(ctx context.Context, grant infraapp.ApprovalGrant
 	if err != nil {
 		return infraapp.ApprovalGrant{}, mapNotFound(err)
 	}
-	if !plan.Summary.RequiresApproval || plan.Summary.PlanHash != grant.PlanHash || plan.Estimate.Version != grant.EstimateVersion || plan.Reservation.ReservationID != grant.ReservationID || plan.Target != grant.Target || grant.CreatedAt.IsZero() || !grant.ExpiresAt.After(grant.CreatedAt) || grant.ExpiresAt.After(plan.Reservation.ExpiresAt) {
+	if !plan.Summary.RequiresApproval || plan.RequestedByActorID != grant.ActorID || plan.Summary.PlanHash != grant.PlanHash || plan.Estimate.Version != grant.EstimateVersion || plan.Reservation.ReservationID != grant.ReservationID || plan.Target != grant.Target || grant.CreatedAt.IsZero() || !grant.ExpiresAt.After(grant.CreatedAt) || grant.ExpiresAt.After(plan.Reservation.ExpiresAt) {
 		return infraapp.ApprovalGrant{}, infraapp.ErrPermissionDenied
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO infrastructure.approval_grants(id,tenant_id,project_id,plan_id,plan_hash,estimate_version,reservation_id,target,actor_id,approver_user_id,created_at,expires_at,consumed_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULL)`,
@@ -206,7 +223,7 @@ func scanPlan(row rowScanner) (infraapp.PlanRecord, error) {
 	var changesRaw, estimateRaw, reservationRaw []byte
 	var applyStarted sql.NullTime
 	err := row.Scan(
-		&record.Summary.PlanID, &record.TenantID, &record.Summary.ProjectID, &record.Summary.WorkspaceID,
+		&record.Summary.PlanID, &record.TenantID, &record.RequestedByActorID, &record.Summary.ProjectID, &record.Summary.WorkspaceID,
 		&record.Summary.SourceSHA, &record.Summary.PlanHash, &record.Summary.StateGeneration, &changesRaw,
 		&record.Summary.Destructive, &record.Summary.RequiresApproval, &record.Summary.EstimateVersion,
 		&record.Summary.EstimateFingerprint, &record.ArtifactDigest, &record.Target, &record.IdempotencyKey,
@@ -229,6 +246,21 @@ func scanPlan(row rowScanner) (infraapp.PlanRecord, error) {
 		record.ApplyStartedAt = applyStarted.Time
 	}
 	return record, nil
+}
+
+type nullableTimeScan struct{ target *time.Time }
+
+func (s nullableTimeScan) Scan(value any) error {
+	if value == nil {
+		*s.target = time.Time{}
+		return nil
+	}
+	parsed, ok := value.(time.Time)
+	if !ok {
+		return errors.New("invalid nullable timestamp")
+	}
+	*s.target = parsed
+	return nil
 }
 
 func marshalPlan(record infraapp.PlanRecord) ([]byte, []byte, []byte, error) {

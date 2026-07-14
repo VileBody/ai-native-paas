@@ -1,0 +1,31 @@
+{
+  "schema": "ai-native-paas.io/infrastructure-price-book/v1",
+  "rate_card": {
+    "rate_card_id": "beta-default",
+    "version": "2026-07-14",
+    "markup_basis_points": 2500,
+    "currency": "RUB",
+    "price_snapshot_id": "timeweb-msk-2026-07-14"
+  },
+  "prices": {
+    "twc_server": {
+      "meter": "timeweb.server.month",
+      "unit": "server-month",
+      "provider_minor_per_quantity": 100000,
+      "known": true
+    },
+    "twc_database_cluster": {
+      "meter": "timeweb.postgresql.month",
+      "unit": "cluster-month",
+      "provider_minor_per_quantity": 150000,
+      "known": true
+    },
+    "twc_s3_bucket": {
+      "meter": "timeweb.s3.bucket.month",
+      "unit": "bucket-month",
+      "provider_minor_per_quantity": 0,
+      "unknown_maximum_minor": 1000000,
+      "known": false
+    }
+  }
+}
