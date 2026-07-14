@@ -88,10 +88,10 @@ cat >"$provision" <<'PROVISION'
 set -euxo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
-apt_opts=(-q -y -o Dpkg::Options::=--force-confnew)
 rm -f /etc/apt/sources.list
-apt-get "${apt_opts[@]}" --no-download install /tmp/debian-packages/*.deb
-apt-get "${apt_opts[@]}" purge openssh-server || true
+dpkg --force-confnew --unpack /tmp/debian-packages/*.deb
+dpkg --force-confnew --configure -a
+dpkg --purge openssh-server || true
 
 id workspace-agent >/dev/null 2>&1 || \
   useradd --uid 1000 --create-home --home-dir /home/workspace-agent \
