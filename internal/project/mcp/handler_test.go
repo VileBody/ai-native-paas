@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -73,6 +74,8 @@ func (r projectReader) GetRepositoryForProject(_ context.Context, tenantID, proj
 type workspaceCommands struct {
 	created      workspace.CreateRequest
 	exec         workspace.ExecRequest
+	execCalls    int
+	beforeExec   func(workspace.ExecRequest) error
 	scope        workspace.Scope
 	revision     sourcev2.SourceRevision
 	receipt      sourcev2.AgentCommitReceipt
@@ -118,6 +121,12 @@ func (w *workspaceCommands) GetSourceRevision(_ context.Context, scope workspace
 	return w.revision, nil
 }
 func (w *workspaceCommands) Exec(_ context.Context, request workspace.ExecRequest) (workspacev1.CommandView, error) {
+	if w.beforeExec != nil {
+		if err := w.beforeExec(request); err != nil {
+			return workspacev1.CommandView{}, err
+		}
+	}
+	w.execCalls++
 	w.exec = request
 	return workspacev1.CommandView{CommandID: "command-1", WorkspaceID: request.WorkspaceID, State: workspacev1.CommandQueued}, nil
 }
@@ -262,6 +271,59 @@ func TestProjectMCP_ExactPlanApprovalGatesVerifiedWorkspaceApply(t *testing.T) {
 	applied := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, apply)
 	if applied.Code != http.StatusOK || workspaces.exec.Kind != "infra_apply" || workspaces.exec.Spec.Argv[0] != "workspace-agent" || workspaces.exec.Spec.Argv[2] != "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" {
 		t.Fatalf("apply status=%d body=%s request=%#v", applied.Code, applied.Body.String(), workspaces.exec)
+	}
+}
+
+func TestQuota_ReservationCommittedBeforeExternalApply(t *testing.T) {
+	handler, access, workspaces := mcpFixture(t, []string{"agent.tool:infra_apply"})
+	infrastructure := handler.Infrastructure.(*infraapp.Service)
+	now := time.Date(2026, 7, 14, 5, 0, 0, 0, time.UTC)
+	newPlan := func(key string) infraapp.PlanResult {
+		t.Helper()
+		result, err := infrastructure.Plan(context.Background(), infraapp.PlanCommand{
+			TenantID: "tenant-1", ProjectID: "project-1", ActorID: "agent-1", WorkspaceID: "workspace-1",
+			Target: "staging", SourceSHA: strings.Repeat("a", 40), IdempotencyKey: key,
+			ArtifactDigest: "sha256:" + strings.Repeat("b", 64), StateGeneration: 1,
+			PlanJSON: []byte(`{"resource_changes":[{"address":"twc_server.app","provider_name":"timeweb","type":"twc_server","change":{"actions":["create"]}}]}`),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+	invokeApply := func(key string, plan infraapp.PlanResult) *httptest.ResponseRecorder {
+		t.Helper()
+		invocationRequest := invocation(agentv2.ToolInfraApply)
+		invocationRequest.IdempotencyKey = key
+		invocationRequest.Arguments, _ = json.Marshal(infraApplyArguments{
+			PlanID: plan.Summary.PlanID, PlanHash: plan.Summary.PlanHash, EstimateVersion: plan.Estimate.Version,
+			ReservationID: plan.Reservation.ReservationID, Target: "staging", PlanPath: "saved.plan",
+			WorkingDir: "infrastructure", TimeoutSeconds: 300, OutputLimitBytes: 4096,
+		})
+		return request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, invocationRequest)
+	}
+
+	committed := newPlan("reservation-before-external-success")
+	workspaces.beforeExec = func(request workspace.ExecRequest) error {
+		stored, err := infrastructure.GetPlan(context.Background(), "tenant-1", "project-1", committed.Summary.PlanID)
+		if err != nil {
+			return err
+		}
+		if request.Kind != "infra_apply" || stored.ApplyStartedAt.IsZero() || stored.Reservation.ReservationID != committed.Reservation.ReservationID || !stored.Reservation.ExpiresAt.After(stored.ApplyStartedAt) {
+			return errors.New("external apply observed an uncommitted reservation")
+		}
+		return nil
+	}
+	response := invokeApply("reservation-before-external-apply", committed)
+	if response.Code != http.StatusOK || workspaces.execCalls != 1 {
+		t.Fatalf("committed apply status=%d body=%s calls=%d", response.Code, response.Body.String(), workspaces.execCalls)
+	}
+
+	expired := newPlan("reservation-before-external-expired")
+	infrastructure.Clock = mcpClock{now: now.Add(21 * time.Minute)}
+	response = invokeApply("reservation-before-external-rejected", expired)
+	if response.Code != http.StatusForbidden || workspaces.execCalls != 1 {
+		t.Fatalf("failed reservation reached external apply: status=%d body=%s calls=%d", response.Code, response.Body.String(), workspaces.execCalls)
 	}
 }
 

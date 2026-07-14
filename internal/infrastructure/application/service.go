@@ -409,7 +409,7 @@ func (s *Service) AuthorizeApply(ctx context.Context, command ApplyCommand) (Pla
 		if plan.Summary.RequiresApproval && command.Authorization.ApprovalGrantID == "" {
 			return PlanRecord{}, ErrApprovalRequired
 		}
-		return PlanRecord{}, err
+		return PlanRecord{}, ErrPermissionDenied
 	}
 	fingerprint, err := hashJSON(struct {
 		TenantID       string                              `json:"tenant_id"`

@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **991**
-- Reused now: **103**
+- Discovered Go tests/fuzz targets: **992**
+- Reused now: **104**
 - New local/contract tests required: **0**
-- Live/provider/system tests required: **54**
+- Live/provider/system tests required: **53**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -115,7 +115,7 @@ A release gate may become green only after every referenced test exists and pass
 | `C2` | REUSED | domain | `test/pivot/commerce_v2_test.go::TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement` |
 | `C3` | REUSED | application | `test/pivot/commerce_v2_test.go::TestCost_HelmResourcesContributeRequestedRuntimeAllocation` |
 | `C4` | REUSED | domain | `test/pivot/commerce_v2_test.go::TestCost_ApprovalInvalidatedWhenPlanHashChanges` |
-| `C5` | LIVE_ONLY | cross-domain application | `test/pivot/commerce_v2_test.go::TestQuota_ReservationCommittedBeforeExternalApply` |
+| `C5` | REUSED | cross-domain application | `internal/project/mcp/handler_test.go::TestQuota_ReservationCommittedBeforeExternalApply` |
 | `C6` | REUSED | PostgreSQL + race | `test/integration/postgres_commerce_test.go::TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget` |
 | `C7` | REUSED | domain/fake clock | `test/pivot/commerce_v2_test.go::TestQuota_ExpiredReservationCannotAuthorizeLateApply` |
 | `C8` | LIVE_ONLY | application/provider | `test/pivot/commerce_v2_test.go::TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder` |

@@ -867,6 +867,9 @@ func (h Handler) invokeInfrastructure(ctx context.Context, verified agentv2.Veri
 		if err != nil {
 			return nil, err
 		}
+		// AuthorizeApply durably commits the exact reservation/approval gate.
+		// Workspace dispatch is the first external apply side effect and must
+		// remain strictly after that commit.
 		return h.Workspaces.Exec(ctx, workspace.ExecRequest{
 			Scope:       workspace.Scope{TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID},
 			WorkspaceID: started.Summary.WorkspaceID, IdempotencyKey: request.IdempotencyKey,

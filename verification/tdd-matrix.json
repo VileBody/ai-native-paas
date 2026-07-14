@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 991,
-  "discovered_unique_test_name_count": 989,
+  "discovered_go_test_count": 992,
+  "discovered_unique_test_name_count": 990,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1018,10 +1018,10 @@
       "id": "C5",
       "level": "cross-domain application",
       "name": "TestQuota_ReservationCommittedBeforeExternalApply",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/commerce_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/project/mcp/handler_test.go",
       "test_name": "TestQuota_ReservationCommittedBeforeExternalApply",
-      "test_ref": "test/pivot/commerce_v2_test.go::TestQuota_ReservationCommittedBeforeExternalApply"
+      "test_ref": "internal/project/mcp/handler_test.go::TestQuota_ReservationCommittedBeforeExternalApply"
     },
     {
       "family": "C",
@@ -1589,8 +1589,8 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 54,
-      "REUSED": 103
+      "LIVE_ONLY": 53,
+      "REUSED": 104
     },
     "unmapped": 0
   }
