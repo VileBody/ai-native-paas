@@ -38,6 +38,9 @@ Implemented:
   deliveries are retained as stale receipts without regressing the head.
 - Preview branch/environment bindings and deletion metadata are durable;
   deletion publishes a cleanup intent instead of mutating runtime directly.
+- Merge request plan summaries are published through the GitLab Notes API from
+  action counts and customer cost ranges only. Exact marker recovery handles a
+  lost response without exposing resource/provider values.
 
 Evidence:
 
@@ -53,18 +56,20 @@ Evidence:
   `TestPostgres_WorkspaceCommitReceiptMigrationAndRoundTrip` passed. The pod
   was deleted immediately after the test.
 - Pivot matrix discovers executable evidence for S2, S3, S4, S5, S6, S7,
-  S9, S10, S13, S14 and S17; the complete matrix remains mapped at 157
-  requirements and now discovers 890 Go test/fuzz targets.
+  S9, S10, S12, S13, S14 and S17; the complete matrix remains mapped at 157
+  requirements and now discovers 893 Go test/fuzz targets.
 - Managed PostgreSQL migration `004_branch_environment_cleanup.sql`, the full
   tagged Source suite and the real Store round-trip passed in temporary
   in-cluster test pods; see
   `docs/evidence/phase-4/source-reconciliation-and-cleanup-2026-07-14.md`.
+- The GitLab Notes adapter, sanitized renderer and lost-response recovery pass
+  the S12 contract; see
+  `docs/evidence/phase-4/gitlab-plan-summary-notes-2026-07-14.md`.
 
 Remaining source gates:
 
 - GitLab.com live token isolation, rename/transfer, archive and 429 tests;
-- merge request plan-summary comments and runtime consumption of preview
-  cleanup intents;
+- runtime consumption of preview cleanup intents;
 - live signed-image proof for the implemented task-UID and command-scoped
   identity-FD boundary; see
   `docs/evidence/phase-3/workspace-command-identity-separation-2026-07-14.md`.

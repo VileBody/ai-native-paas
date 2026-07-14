@@ -141,6 +141,46 @@ func TestGitLab_FindOpenMergeRequestUsesExactSourceAndTarget(t *testing.T) {
 	}
 }
 
+func TestGitLab_CreateAndFindMergeRequestNoteUsesNotesAPI(t *testing.T) {
+	marker := "<!-- ai-native-paas-plan-summary:v1 sha256:" + strings.Repeat("a", 64) + " -->"
+	body := marker + "\n### Platform plan summary"
+	posts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v4/projects/42/merge_requests/9/notes" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		switch r.Method {
+		case http.MethodPost:
+			posts++
+			var request map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Fatal(err)
+			}
+			if request["body"] != body {
+				t.Fatalf("body=%q", request["body"])
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": 17, "body": body})
+		case http.MethodGet:
+			if r.URL.Query().Get("sort") != "desc" || r.URL.Query().Get("order_by") != "created_at" || r.URL.Query().Get("per_page") != "100" {
+				t.Fatalf("query=%s", r.URL.RawQuery)
+			}
+			_ = json.NewEncoder(w).Encode([]map[string]any{{"id": 17, "body": body}})
+		default:
+			t.Fatalf("unexpected method %s", r.Method)
+		}
+	}))
+	defer server.Close()
+	client := gitlab.Client{BaseURL: server.URL}
+	created, err := client.CreateMergeRequestNote(context.Background(), 42, 9, body)
+	if err != nil || created.ID != 17 || created.Body != body || posts != 1 {
+		t.Fatalf("created=%+v posts=%d err=%v", created, posts, err)
+	}
+	found, ok, err := client.FindMergeRequestNoteByMarker(context.Background(), 42, 9, marker)
+	if err != nil || !ok || found != created {
+		t.Fatalf("found=%+v ok=%v err=%v", found, ok, err)
+	}
+}
+
 func TestGitLab_BootstrapRepositoryUsesExactBaseAndBatchCommit(t *testing.T) {
 	var body struct {
 		Branch        string `json:"branch"`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,18 +38,21 @@ type Provider struct {
 	Correlations                                            map[string]int64
 	Heads                                                   map[string]string
 	MergeRequests                                           map[string]application.ProviderMergeRequest
+	MergeRequestNotes                                       map[string]application.ProviderMergeRequestNote
 	CreateCalls, ProtectCalls, CredentialCalls, RevokeCalls int
 	MergeRequestCalls                                       int
+	MergeRequestNoteCalls                                   int
 	LastMergeRequest                                        application.CreateMergeRequestRequest
 	LostResponseOnce                                        bool
 	MergeRequestLostResponseOnce                            bool
+	MergeRequestNoteLostResponseOnce                        bool
 	ProtectError                                            error
 	RevokeError                                             error
 	Token                                                   string
 }
 
 func NewProvider() *Provider {
-	return &Provider{NextID: 100, Repositories: map[int64]application.ProviderRepository{}, Correlations: map[string]int64{}, Heads: map[string]string{}, MergeRequests: map[string]application.ProviderMergeRequest{}, Token: "super-secret-token"}
+	return &Provider{NextID: 100, Repositories: map[int64]application.ProviderRepository{}, Correlations: map[string]int64{}, Heads: map[string]string{}, MergeRequests: map[string]application.ProviderMergeRequest{}, MergeRequestNotes: map[string]application.ProviderMergeRequestNote{}, Token: "super-secret-token"}
 }
 func key(id int64, branch string) string { return fmt.Sprintf("%d:%s", id, branch) }
 func mergeRequestKey(id int64, source, target string) string {
@@ -142,6 +146,34 @@ func (p *Provider) FindOpenMergeRequest(_ context.Context, projectID int64, sour
 	defer p.mu.Unlock()
 	value, ok := p.MergeRequests[mergeRequestKey(projectID, sourceBranch, targetBranch)]
 	return value, ok, nil
+}
+func noteKey(projectID, mergeRequestIID int64, marker string) string {
+	return fmt.Sprintf("%d:%d:%s", projectID, mergeRequestIID, marker)
+}
+func (p *Provider) CreateMergeRequestNote(_ context.Context, projectID, mergeRequestIID int64, body string) (application.ProviderMergeRequestNote, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.MergeRequestNoteCalls++
+	note := application.ProviderMergeRequestNote{ID: int64(p.MergeRequestNoteCalls), Body: body}
+	marker := noteMarker(body)
+	p.MergeRequestNotes[noteKey(projectID, mergeRequestIID, marker)] = note
+	if p.MergeRequestNoteLostResponseOnce {
+		p.MergeRequestNoteLostResponseOnce = false
+		return application.ProviderMergeRequestNote{}, errors.New("lost response after merge request note create")
+	}
+	return note, nil
+}
+func (p *Provider) FindMergeRequestNoteByMarker(_ context.Context, projectID, mergeRequestIID int64, marker string) (application.ProviderMergeRequestNote, bool, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	note, ok := p.MergeRequestNotes[noteKey(projectID, mergeRequestIID, marker)]
+	return note, ok, nil
+}
+func noteMarker(body string) string {
+	if end := strings.IndexByte(body, '\n'); end >= 0 {
+		return body[:end]
+	}
+	return body
 }
 func (p *Provider) SetHead(id int64, branch, sha string) {
 	p.mu.Lock()

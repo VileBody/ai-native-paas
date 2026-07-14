@@ -108,6 +108,10 @@ type ProviderMergeRequest struct {
 	IID                                                             int64
 	State, SourceBranch, TargetBranch, HeadSHA, WebURL, Description string
 }
+type ProviderMergeRequestNote struct {
+	ID   int64
+	Body string
+}
 
 type BootstrapFile struct {
 	Path       string
@@ -138,6 +142,8 @@ type GitProvider interface {
 	RevokeCredential(context.Context, int64, string) error
 	CreateMergeRequest(context.Context, CreateMergeRequestRequest) (ProviderMergeRequest, error)
 	FindOpenMergeRequest(context.Context, int64, string, string) (ProviderMergeRequest, bool, error)
+	CreateMergeRequestNote(context.Context, int64, int64, string) (ProviderMergeRequestNote, error)
+	FindMergeRequestNoteByMarker(context.Context, int64, int64, string) (ProviderMergeRequestNote, bool, error)
 }
 
 type PushEvent struct {

@@ -235,6 +235,44 @@ func (c *Client) FindOpenMergeRequest(ctx context.Context, projectID int64, sour
 	return application.ProviderMergeRequest{}, false, nil
 }
 
+func (c *Client) CreateMergeRequestNote(ctx context.Context, projectID, mergeRequestIID int64, body string) (application.ProviderMergeRequestNote, error) {
+	if projectID <= 0 || mergeRequestIID <= 0 || strings.TrimSpace(body) == "" || len(body) > 16<<10 {
+		return application.ProviderMergeRequestNote{}, errors.New("gitlab merge request note request is invalid")
+	}
+	var note struct {
+		ID   int64  `json:"id"`
+		Body string `json:"body"`
+	}
+	path := "/projects/" + strconv.FormatInt(projectID, 10) + "/merge_requests/" + strconv.FormatInt(mergeRequestIID, 10) + "/notes"
+	if err := c.do(ctx, http.MethodPost, path, map[string]string{"body": body}, &note); err != nil {
+		return application.ProviderMergeRequestNote{}, err
+	}
+	if note.ID <= 0 || note.Body == "" {
+		return application.ProviderMergeRequestNote{}, errors.New("gitlab merge request note response is invalid")
+	}
+	return application.ProviderMergeRequestNote{ID: note.ID, Body: note.Body}, nil
+}
+
+func (c *Client) FindMergeRequestNoteByMarker(ctx context.Context, projectID, mergeRequestIID int64, marker string) (application.ProviderMergeRequestNote, bool, error) {
+	if projectID <= 0 || mergeRequestIID <= 0 || strings.TrimSpace(marker) == "" || len(marker) > 256 || strings.ContainsAny(marker, "\r\n") {
+		return application.ProviderMergeRequestNote{}, false, errors.New("gitlab merge request note marker is invalid")
+	}
+	var notes []struct {
+		ID   int64  `json:"id"`
+		Body string `json:"body"`
+	}
+	path := "/projects/" + strconv.FormatInt(projectID, 10) + "/merge_requests/" + strconv.FormatInt(mergeRequestIID, 10) + "/notes?sort=desc&order_by=created_at&per_page=100"
+	if err := c.do(ctx, http.MethodGet, path, nil, &notes); err != nil {
+		return application.ProviderMergeRequestNote{}, false, err
+	}
+	for _, note := range notes {
+		if note.ID > 0 && strings.HasPrefix(note.Body, marker+"\n") {
+			return application.ProviderMergeRequestNote{ID: note.ID, Body: note.Body}, true, nil
+		}
+	}
+	return application.ProviderMergeRequestNote{}, false, nil
+}
+
 func (c *Client) BootstrapRepository(ctx context.Context, request application.BootstrapRepositoryRequest) (string, error) {
 	if request.ProviderProjectID <= 0 || strings.TrimSpace(request.Branch) == "" || strings.TrimSpace(request.ExpectedBaseSHA) == "" || strings.TrimSpace(request.CommitMessage) == "" || len(request.Files) == 0 || len(request.Files) > 100 {
 		return "", errors.New("gitlab bootstrap request is invalid")

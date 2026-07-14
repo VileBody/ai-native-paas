@@ -4,15 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	sourceapp "github.com/keir-research/ai-native-paas/internal/source/application"
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
+	"github.com/keir-research/ai-native-paas/internal/source/gitlab"
 	"github.com/keir-research/ai-native-paas/internal/source/memory"
 	"github.com/keir-research/ai-native-paas/internal/source/testkit"
 	sourcehook "github.com/keir-research/ai-native-paas/internal/source/webhook"
+	commercev2 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v2"
+	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 )
 
@@ -195,5 +201,88 @@ func TestSource_DeletedBranchProducesEnvironmentCleanupIntent(t *testing.T) {
 		if strings.Contains(record.Topic, "runtime.delete") || strings.Contains(record.Topic, "purge") {
 			t.Fatalf("source attempted direct runtime deletion: %s", record.Topic)
 		}
+	}
+}
+
+func TestSource_MergeRequestPublishesPlanSummaryWithoutSecrets(t *testing.T) {
+	fixture := newSourceV2Fixture(t)
+	branch := "agent/plan-summary"
+	head := strings.Repeat("b", 40)
+	planHash := "sha256:" + strings.Repeat("c", 64)
+	fixture.provider.SetHead(fixture.repository.ProviderProjectID, branch, head)
+	mergeRequest, err := fixture.service.CreateMergeRequest(context.Background(), sourceapp.CreateMergeRequestCommand{
+		TenantID: "tenant-1", ActorID: "agent-1", RepositoryID: fixture.repository.ID,
+		SourceBranch: branch, TargetBranch: "main", ExpectedHeadSHA: head, SourcePlanHash: planHash,
+		TaskID: "task-1", CorrelationID: "correlation-1", Title: "Plan summary", IdempotencyKey: "mr-summary-create",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const secretSentinel = "provider-secret-sentinel"
+	plan := infrastructurev1.PlanSummary{
+		PlanRef: infrastructurev1.PlanRef{
+			PlanID: "plan-1", ProjectID: fixture.repository.ProjectID, WorkspaceID: "workspace-1", SourceSHA: head,
+			PlanHash: planHash, StateGeneration: 7, CreatedAt: fixture.clock.Now(),
+		},
+		Changes: []infrastructurev1.ResourceChange{
+			{Address: "twc_server." + secretSentinel, Provider: secretSentinel, ResourceType: "twc_server", Action: infrastructurev1.ActionCreate, ExternalID: secretSentinel},
+			{Address: "twc_server.api", Provider: "timeweb", ResourceType: "twc_server", Action: infrastructurev1.ActionUpdate},
+			{Address: "twc_database.old", Provider: "timeweb", ResourceType: "twc_database", Action: infrastructurev1.ActionDelete},
+		},
+		Destructive: true, RequiresApproval: true, EstimateVersion: "estimate-version-1", EstimateFingerprint: "sha256:" + strings.Repeat("d", 64),
+	}
+	estimate := commercev2.CostEstimate{
+		EstimateID: "estimate-1", Version: plan.EstimateVersion, PlanHash: planHash, RateCardID: "beta-25",
+		Lines:   []commercev2.EstimateLine{{Meter: secretSentinel, Quantity: 1, Unit: "resource-month", ProviderCost: commercev2.Money{Currency: "RUB", MinorUnit: 100}, CustomerCost: commercev2.Money{Currency: "RUB", MinorUnit: 125}, PriceKnown: true}},
+		Minimum: commercev2.Money{Currency: "RUB", MinorUnit: 125}, Maximum: commercev2.Money{Currency: "RUB", MinorUnit: 750},
+		ApprovalRequired: true, ExpiresAt: fixture.clock.Now().Add(30 * time.Minute),
+	}
+	var noteBody string
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.URL.Path != fmt.Sprintf("/api/v4/projects/%d/merge_requests/%d/notes", fixture.repository.ProviderProjectID, mergeRequest.ProviderIID) {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		switch r.Method {
+		case http.MethodGet:
+			_, _ = io.WriteString(w, `[]`)
+		case http.MethodPost:
+			var request struct {
+				Body string `json:"body"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Fatal(err)
+			}
+			noteBody = request.Body
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": 17, "body": request.Body})
+		default:
+			t.Fatalf("unexpected method %s", r.Method)
+		}
+	}))
+	defer server.Close()
+	fixture.service.Provider = &gitlab.Client{BaseURL: server.URL, AdminToken: secretSentinel}
+	command := sourceapp.PublishMergeRequestPlanSummaryCommand{
+		TenantID: "tenant-1", ActorID: "agent-1", RepositoryID: fixture.repository.ID, ProviderIID: mergeRequest.ProviderIID,
+		Plan: plan, Estimate: estimate, IdempotencyKey: "publish-plan-summary-1",
+	}
+	first, err := fixture.service.PublishMergeRequestPlanSummary(context.Background(), command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := fixture.service.PublishMergeRequestPlanSummary(context.Background(), command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second || first.ProviderNoteID != 17 || requests != 2 {
+		t.Fatalf("first=%+v second=%+v requests=%d", first, second, requests)
+	}
+	for _, expected := range []string{"| CREATE | 1 |", "| UPDATE | 1 |", "| DELETE | 1 |", "RUB 125–750 minor units", "Approval: `required`", planHash} {
+		if !strings.Contains(noteBody, expected) {
+			t.Fatalf("summary missing %q: %s", expected, noteBody)
+		}
+	}
+	if strings.Contains(noteBody, secretSentinel) || strings.Contains(noteBody, "twc_server.api") || strings.Contains(noteBody, "ProviderCost") {
+		t.Fatalf("sensitive/provider detail leaked: %s", noteBody)
 	}
 }
