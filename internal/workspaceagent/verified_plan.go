@@ -7,7 +7,10 @@ import (
 	"strings"
 )
 
-var planDigestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+var (
+	planDigestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	commitSHAPattern  = regexp.MustCompile(`^[0-9a-f]{40,64}$`)
+)
 
 func validateVerifiedApplyArguments(arguments []string) (string, string, error) {
 	if len(arguments) != 2 || !planDigestPattern.MatchString(arguments[0]) {
@@ -27,4 +30,15 @@ func validateReceiptPlanPath(value string) (string, error) {
 		return "", errors.New("plan path must be canonical and relative")
 	}
 	return clean, nil
+}
+
+func validateVerifiedPlanArguments(arguments []string) (string, string, error) {
+	if len(arguments) != 2 || !commitSHAPattern.MatchString(arguments[1]) {
+		return "", "", errors.New("canonical plan path and exact source revision are required")
+	}
+	planPath, err := validateReceiptPlanPath(arguments[0])
+	if err != nil {
+		return "", "", err
+	}
+	return planPath, arguments[1], nil
 }

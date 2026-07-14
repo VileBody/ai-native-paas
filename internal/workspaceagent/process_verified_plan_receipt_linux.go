@@ -3,14 +3,17 @@
 package workspaceagent
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,11 +21,11 @@ import (
 )
 
 func ExecuteVerifiedTofuPlan(arguments []string) error {
-	if len(arguments) != 1 {
-		return errors.New("canonical relative plan path is required")
-	}
-	planPath, err := validateReceiptPlanPath(arguments[0])
+	planPath, expectedSourceSHA, err := validateVerifiedPlanArguments(arguments)
 	if err != nil {
+		return err
+	}
+	if err := verifyWorkspaceSource(expectedSourceSHA, planPath); err != nil {
 		return err
 	}
 	configFile := os.Getenv("WORKSPACE_AGENT_CONFIG_FILE")
@@ -104,4 +107,41 @@ func ExecuteVerifiedTofuPlan(arguments []string) error {
 		return fmt.Errorf("submit authenticated OpenTofu plan receipt: %w", err)
 	}
 	return nil
+}
+
+func verifyWorkspaceSource(expected, planPath string) error {
+	git, err := exec.LookPath("git")
+	if err != nil {
+		return errors.New("Git executable is unavailable")
+	}
+	head := exec.Command(git, "rev-parse", "--verify", "HEAD^{commit}")
+	rawHead, err := head.Output()
+	actual := strings.TrimSpace(string(rawHead))
+	if err != nil || subtle.ConstantTimeCompare([]byte(actual), []byte(expected)) != 1 {
+		return errors.New("workspace source revision does not match command binding")
+	}
+	trackedPlan := exec.Command(git, "ls-files", "--error-unmatch", "--", planPath)
+	if err := trackedPlan.Run(); err == nil {
+		return errors.New("OpenTofu plan artifact path must not be tracked by Git")
+	} else if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 1 {
+		return errors.New("inspect OpenTofu plan artifact path")
+	}
+	status := exec.Command(git, "status", "--porcelain=v1", "-z", "--untracked-files=normal")
+	rawStatus, err := status.Output()
+	if err != nil || !onlyUntrackedPlan(rawStatus, planPath) {
+		return errors.New("workspace source tree is not clean")
+	}
+	return nil
+}
+
+func onlyUntrackedPlan(raw []byte, planPath string) bool {
+	for _, entry := range bytes.Split(raw, []byte{0}) {
+		if len(entry) == 0 {
+			continue
+		}
+		if len(entry) < 4 || string(entry[:2]) != "??" || string(entry[3:]) != planPath {
+			return false
+		}
+	}
+	return true
 }

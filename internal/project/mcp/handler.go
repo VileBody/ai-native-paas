@@ -238,7 +238,7 @@ func (h Handler) invokeWorkspace(ctx context.Context, verified agentv2.VerifiedI
 		}
 		spec := workspacev1.CommandSpec{Argv: append([]string(nil), arguments.Argv...), WorkingDir: arguments.WorkingDir,
 			EnvironmentRefs: cloneStringMap(arguments.EnvironmentRefs), TimeoutSeconds: arguments.TimeoutSeconds, OutputLimitBytes: arguments.OutputLimitBytes}
-		if strings.TrimSpace(arguments.WorkspaceID) == "" || strings.TrimSpace(arguments.Kind) == "" || spec.Validate() != nil || requiresGovernedInfrastructureTool(arguments.Kind, spec.Argv) {
+		if strings.TrimSpace(arguments.WorkspaceID) == "" || strings.TrimSpace(arguments.Kind) == "" || spec.Validate() != nil || requiresGovernedInfrastructureTool(arguments.Kind, spec.Argv) || requiresGovernedSourceTool(spec.Argv) {
 			return nil, errInvalidWorkspaceArguments
 		}
 		return h.Workspaces.Exec(ctx, workspace.ExecRequest{
@@ -325,7 +325,7 @@ func (h Handler) invokeInfrastructure(ctx context.Context, verified agentv2.Veri
 			outputLimit = 1 << 20
 		}
 		spec := workspacev1.CommandSpec{
-			Argv:       []string{"workspace-agent", "verified-tofu-plan", arguments.PlanPath},
+			Argv:       []string{"workspace-agent", "verified-tofu-plan", arguments.PlanPath, revision.CommitSHA},
 			WorkingDir: arguments.WorkingDir, EnvironmentRefs: cloneStringMap(arguments.EnvironmentRefs),
 			TimeoutSeconds: timeout, OutputLimitBytes: outputLimit,
 		}
@@ -444,6 +444,23 @@ func requiresGovernedInfrastructureTool(kind string, argv []string) bool {
 		return true
 	}
 	allowed := map[string]struct{}{"fmt": {}, "validate": {}, "plan": {}, "show": {}, "providers": {}, "version": {}, "graph": {}, "output": {}}
+	_, ok := allowed[strings.ToLower(strings.TrimSpace(argv[1]))]
+	return !ok
+}
+
+func requiresGovernedSourceTool(argv []string) bool {
+	if len(argv) == 0 || argv[0] != "git" {
+		return false
+	}
+	if len(argv) < 2 {
+		return true
+	}
+	// All repository mutation and remote access goes through Project MCP
+	// receipts, exact-base policy and attestation. Generic exec is limited to
+	// local, read-only inspection and cannot smuggle global git options.
+	allowed := map[string]struct{}{
+		"diff": {}, "grep": {}, "log": {}, "ls-files": {}, "rev-parse": {}, "show": {}, "status": {},
+	}
 	_, ok := allowed[strings.ToLower(strings.TrimSpace(argv[1]))]
 	return !ok
 }

@@ -142,7 +142,7 @@ func TestProjectMCP_ExactPlanApprovalGatesVerifiedWorkspaceApply(t *testing.T) {
 		"plan_path":"saved.plan","working_dir":"infrastructure"
 	}`)
 	waitingPlan := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, planRequest)
-	if waitingPlan.Code != http.StatusOK || !strings.Contains(waitingPlan.Body.String(), "WAITING_DEPENDENCY") || workspaces.exec.Kind != "infra_plan" || workspaces.exec.Spec.Argv[0] != "workspace-agent" {
+	if waitingPlan.Code != http.StatusOK || !strings.Contains(waitingPlan.Body.String(), "WAITING_DEPENDENCY") || workspaces.exec.Kind != "infra_plan" || workspaces.exec.Spec.Argv[0] != "workspace-agent" || workspaces.exec.Spec.Argv[3] != strings.Repeat("a", 40) {
 		t.Fatalf("waiting plan status=%d body=%s request=%#v", waitingPlan.Code, waitingPlan.Body.String(), workspaces.exec)
 	}
 	infrastructure := handler.Infrastructure.(*infraapp.Service)
@@ -211,6 +211,22 @@ func TestAgent_DeployWorkflowStartsFromExactRepositoryRevision(t *testing.T) {
 	response := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, requestPlan)
 	if response.Code != http.StatusForbidden || workspaces.exec.WorkspaceID != "" {
 		t.Fatalf("unbound revision plan status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
+	}
+}
+
+func TestProjectMCP_GenericExecCannotBypassGovernedGitMutation(t *testing.T) {
+	handler, access, workspaces := mcpFixture(t, []string{"agent.tool:workspace_exec"})
+	for _, argv := range []json.RawMessage{
+		json.RawMessage(`["git","commit","-am","bypass"]`),
+		json.RawMessage(`["git","push","origin","HEAD"]`),
+		json.RawMessage(`["git","-c","credential.helper=evil","status"]`),
+	} {
+		invocation := invocation(agentv2.ToolWorkspaceExec)
+		invocation.Arguments = json.RawMessage(`{"workspace_id":"workspace-1","argv":` + string(argv) + `,"working_dir":"","timeout_seconds":60,"output_limit_bytes":4096,"kind":"command"}`)
+		response := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, invocation)
+		if response.Code != http.StatusBadRequest || workspaces.exec.WorkspaceID != "" {
+			t.Fatalf("governed git bypass status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
+		}
 	}
 }
 

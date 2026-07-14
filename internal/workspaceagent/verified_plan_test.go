@@ -28,3 +28,15 @@ func TestVerifiedTofuPlanReceipt_StripsAllBeforeAfterValues(t *testing.T) {
 		t.Fatalf("unsafe normalized receipt: %s", normalized)
 	}
 }
+
+func TestVerifiedTofuPlan_RequiresCanonicalPathAndExactSourceRevision(t *testing.T) {
+	sha := strings.Repeat("a", 40)
+	if path, source, err := validateVerifiedPlanArguments([]string{"infrastructure/saved.plan", sha}); err != nil || path != "infrastructure/saved.plan" || source != sha {
+		t.Fatalf("path=%q source=%q err=%v", path, source, err)
+	}
+	for _, arguments := range [][]string{{"../saved.plan", sha}, {"saved.plan", "main"}, {"saved.plan"}, {"saved.plan", sha, "extra"}} {
+		if _, _, err := validateVerifiedPlanArguments(arguments); err == nil {
+			t.Fatalf("unsafe verified plan arguments accepted: %#v", arguments)
+		}
+	}
+}
