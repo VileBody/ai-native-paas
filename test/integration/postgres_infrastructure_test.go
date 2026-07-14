@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -52,7 +51,7 @@ func migratedInfrastructureStore(t *testing.T) (*sql.DB, *infrapg.Store) {
 	return db, store
 }
 
-func TestPostgres_InfrastructureApprovalIsExactAndSingleUse(t *testing.T) {
+func TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan(t *testing.T) {
 	db, store := migratedInfrastructureStore(t)
 	now := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
 	service := &infraapp.Service{
@@ -102,28 +101,51 @@ func TestPostgres_InfrastructureApprovalIsExactAndSingleUse(t *testing.T) {
 	if _, err = service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", IdempotencyKey: "apply-pg", Authorization: mismatch}); !errors.Is(err, infraapp.ErrPermissionDenied) {
 		t.Fatalf("mismatched plan consumed approval: %v", err)
 	}
+	mismatch = authorization
+	mismatch.ActorID = "another-agent"
+	if _, err = service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", IdempotencyKey: "apply-pg", Authorization: mismatch}); !errors.Is(err, infraapp.ErrPermissionDenied) {
+		t.Fatalf("mismatched agent consumed approval: %v", err)
+	}
 
-	const workers = 8
+	const workers = 2
 	start := make(chan struct{})
-	var winners atomic.Int64
+	type applyResult struct {
+		key string
+		err error
+	}
+	results := make(chan applyResult, workers)
 	var group sync.WaitGroup
 	group.Add(workers)
 	for index := 0; index < workers; index++ {
+		index := index
 		go func() {
 			defer group.Done()
 			<-start
-			if _, applyErr := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", IdempotencyKey: "apply-pg", Authorization: authorization}); applyErr == nil {
-				winners.Add(1)
-			}
+			key := fmt.Sprintf("apply-pg-%d", index)
+			_, applyErr := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", IdempotencyKey: key, Authorization: authorization})
+			results <- applyResult{key: key, err: applyErr}
 		}()
 	}
 	close(start)
 	group.Wait()
-	if winners.Load() < 1 {
-		t.Fatalf("exact-plan authorization produced no successful caller")
+	close(results)
+	winners, conflicts, winningKey := 0, 0, ""
+	for result := range results {
+		switch {
+		case result.err == nil:
+			winners++
+			winningKey = result.key
+		case errors.Is(result.err, infraapp.ErrConflict):
+			conflicts++
+		default:
+			t.Fatalf("unexpected concurrent apply result for %s: %v", result.key, result.err)
+		}
+	}
+	if winners != 1 || conflicts != 1 {
+		t.Fatalf("single-use race winners=%d conflicts=%d", winners, conflicts)
 	}
 	service.Clock = infrastructureClock{now: now.Add(time.Hour)}
-	if _, err := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", IdempotencyKey: "apply-pg", Authorization: authorization}); err != nil {
+	if _, err := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", IdempotencyKey: winningKey, Authorization: authorization}); err != nil {
 		t.Fatalf("exact lost-response retry failed after authorization expiry: %v", err)
 	}
 	if _, err := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", IdempotencyKey: "different-apply", Authorization: authorization}); !errors.Is(err, infraapp.ErrConflict) {

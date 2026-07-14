@@ -1388,10 +1388,10 @@
       "id": "G24",
       "level": "PostgreSQL/concurrency",
       "name": "TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "test/integration/postgres_infrastructure_test.go",
       "test_name": "TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan"
+      "test_ref": "test/integration/postgres_infrastructure_test.go::TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan"
     },
     {
       "family": "G",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 12,
-      "REUSED": 79
+      "NEW": 11,
+      "REUSED": 80
     },
     "unmapped": 0
   }

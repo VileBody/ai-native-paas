@@ -218,13 +218,13 @@ func (s *Store) CreateApproval(ctx context.Context, grant infraapp.ApprovalGrant
 func (s *Store) AuthorizeApply(ctx context.Context, match infraapp.ApplyMatch) (infraapp.PlanRecord, error) {
 	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
-		return infraapp.PlanRecord{}, err
+		return infraapp.PlanRecord{}, mapConflict(err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	a := match.Authorization
 	plan, err := scanPlan(tx.QueryRowContext(ctx, `SELECT `+planColumns+` FROM infrastructure.plans WHERE id=$1 AND tenant_id=$2 AND project_id=$3 FOR UPDATE`, a.PlanID, match.TenantID, match.ProjectID))
 	if err != nil {
-		return infraapp.PlanRecord{}, mapNotFound(err)
+		return infraapp.PlanRecord{}, mapConflict(mapNotFound(err))
 	}
 	if !plan.ApplyStartedAt.IsZero() {
 		if plan.ApplyIdempotencyKey == match.IdempotencyKey && plan.ApplyAuthorizationFingerprint == match.AuthorizationFingerprint {
@@ -240,9 +240,12 @@ func (s *Store) AuthorizeApply(ctx context.Context, match infraapp.ApplyMatch) (
 			match.Now, a.ApprovalGrantID, match.TenantID, match.ProjectID, a.PlanID, a.PlanHash,
 			a.EstimateVersion, a.ReservationID, a.Target, a.ActorID)
 		if updateErr != nil {
-			return infraapp.PlanRecord{}, updateErr
+			return infraapp.PlanRecord{}, mapConflict(updateErr)
 		}
 		if rows, rowsErr := result.RowsAffected(); rowsErr != nil || rows != 1 {
+			if rowsErr != nil {
+				return infraapp.PlanRecord{}, mapConflict(rowsErr)
+			}
 			return infraapp.PlanRecord{}, infraapp.ErrPermissionDenied
 		}
 	}
@@ -252,16 +255,19 @@ func (s *Store) AuthorizeApply(ctx context.Context, match infraapp.ApplyMatch) (
 	plan.Version++
 	result, err := tx.ExecContext(ctx, `UPDATE infrastructure.plans SET apply_started_at=$1,apply_idempotency_key=$2,apply_authorization_fingerprint=$3,version=$4 WHERE id=$5 AND version=$6`, match.Now, match.IdempotencyKey, match.AuthorizationFingerprint, plan.Version, plan.Summary.PlanID, plan.Version-1)
 	if err != nil {
-		return infraapp.PlanRecord{}, err
+		return infraapp.PlanRecord{}, mapConflict(err)
 	}
 	if rows, rowsErr := result.RowsAffected(); rowsErr != nil || rows != 1 {
+		if rowsErr != nil {
+			return infraapp.PlanRecord{}, mapConflict(rowsErr)
+		}
 		return infraapp.PlanRecord{}, infraapp.ErrConflict
 	}
 	if err = audit(ctx, tx, match.TenantID, match.ProjectID, a.ActorID, "infrastructure.apply.authorized", a.PlanID, map[string]any{"plan_hash": a.PlanHash}, match.Now); err != nil {
-		return infraapp.PlanRecord{}, err
+		return infraapp.PlanRecord{}, mapConflict(err)
 	}
 	if err = tx.Commit(); err != nil {
-		return infraapp.PlanRecord{}, err
+		return infraapp.PlanRecord{}, mapConflict(err)
 	}
 	return plan, nil
 }

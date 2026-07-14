@@ -4,8 +4,8 @@ Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
 - Discovered Go tests/fuzz targets: **945**
-- Reused now: **79**
-- New local/contract tests required: **12**
+- Reused now: **80**
+- New local/contract tests required: **11**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -152,7 +152,7 @@ A release gate may become green only after every referenced test exists and pass
 | `G21` | LIVE_ONLY | security acceptance | `test/pivot/agent_workspace_test.go::TestAgent_NeverReceivesPlatformOrProviderMasterCredential` |
 | `G22` | NEW | cross-domain | `test/pivot/agent_workspace_test.go::TestAgent_SecretSetIsWriteOnlyAcrossMCPAndWorkspace` |
 | `G23` | LIVE_ONLY | application | `test/pivot/agent_workspace_test.go::TestAgent_CostThresholdPausesBeforeApplyAndNotifiesHuman` |
-| `G24` | NEW | PostgreSQL/concurrency | `test/pivot/agent_workspace_test.go::TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan` |
+| `G24` | REUSED | PostgreSQL/concurrency | `test/integration/postgres_infrastructure_test.go::TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan` |
 | `G25` | NEW | application | `test/pivot/agent_workspace_test.go::TestAgent_RepairLoopAndBudgetStopAutonomousSpend` |
 | `G26` | LIVE_ONLY | gateway acceptance | `test/pivot/agent_workspace_test.go::TestAgent_ProviderCapabilityUsageVisibleWithoutMasterCredential` |
 | `G27` | LIVE_ONLY | cross-domain | `test/pivot/agent_workspace_test.go::TestAgent_SuspendedTenantCanInspectButCannotMutate` |
