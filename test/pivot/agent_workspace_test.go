@@ -41,7 +41,7 @@ func TestInfraApply_RequiresMatchingPlanReservationAndApproval(t *testing.T) {
 		EstimateVersion: result.Estimate.Version, ReservationID: result.Reservation.ReservationID,
 		Target: "production", ActorID: "agent-1", ExpiresAt: now.Add(10 * time.Minute),
 	}
-	if _, err = service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-1", ProjectID: "project-1", Authorization: authorization}); !errors.Is(err, infraapp.ErrApprovalRequired) {
+	if _, err = service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-1", ProjectID: "project-1", IdempotencyKey: "apply-1", Authorization: authorization}); !errors.Is(err, infraapp.ErrApprovalRequired) {
 		t.Fatalf("apply without approval was not rejected: %v", err)
 	}
 	grant, err := service.GrantApproval(context.Background(), infraapp.GrantApprovalCommand{
@@ -54,14 +54,17 @@ func TestInfraApply_RequiresMatchingPlanReservationAndApproval(t *testing.T) {
 	authorization.ApprovalGrantID = grant.GrantID
 	mismatch := authorization
 	mismatch.ActorID = "agent-2"
-	if _, err = service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-1", ProjectID: "project-1", Authorization: mismatch}); !errors.Is(err, infraapp.ErrPermissionDenied) {
+	if _, err = service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-1", ProjectID: "project-1", IdempotencyKey: "apply-1", Authorization: mismatch}); !errors.Is(err, infraapp.ErrPermissionDenied) {
 		t.Fatalf("approval was not bound to exact actor: %v", err)
 	}
-	started, err := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-1", ProjectID: "project-1", Authorization: authorization})
+	started, err := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-1", ProjectID: "project-1", IdempotencyKey: "apply-1", Authorization: authorization})
 	if err != nil || started.ApplyStartedAt.IsZero() {
 		t.Fatalf("matching authorization rejected: record=%#v err=%v", started, err)
 	}
-	if _, err = service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-1", ProjectID: "project-1", Authorization: authorization}); !errors.Is(err, infraapp.ErrConflict) {
-		t.Fatalf("single-use approval/apply was reused: %v", err)
+	if replayed, replayErr := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-1", ProjectID: "project-1", IdempotencyKey: "apply-1", Authorization: authorization}); replayErr != nil || replayed.ApplyStartedAt != started.ApplyStartedAt {
+		t.Fatalf("exact apply retry was not idempotent: record=%#v err=%v", replayed, replayErr)
+	}
+	if _, err = service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-1", ProjectID: "project-1", IdempotencyKey: "different-apply", Authorization: authorization}); !errors.Is(err, infraapp.ErrConflict) {
+		t.Fatalf("single-use approval was reused by another command: %v", err)
 	}
 }

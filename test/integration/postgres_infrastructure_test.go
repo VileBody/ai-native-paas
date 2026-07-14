@@ -99,7 +99,7 @@ func TestPostgres_InfrastructureApprovalIsExactAndSingleUse(t *testing.T) {
 	}
 	mismatch := authorization
 	mismatch.PlanHash = "sha256:" + strings.Repeat("c", 64)
-	if _, err = service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", Authorization: mismatch}); !errors.Is(err, infraapp.ErrPermissionDenied) {
+	if _, err = service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", IdempotencyKey: "apply-pg", Authorization: mismatch}); !errors.Is(err, infraapp.ErrPermissionDenied) {
 		t.Fatalf("mismatched plan consumed approval: %v", err)
 	}
 
@@ -112,15 +112,22 @@ func TestPostgres_InfrastructureApprovalIsExactAndSingleUse(t *testing.T) {
 		go func() {
 			defer group.Done()
 			<-start
-			if _, applyErr := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", Authorization: authorization}); applyErr == nil {
+			if _, applyErr := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", IdempotencyKey: "apply-pg", Authorization: authorization}); applyErr == nil {
 				winners.Add(1)
 			}
 		}()
 	}
 	close(start)
 	group.Wait()
-	if winners.Load() != 1 {
-		t.Fatalf("exact-plan authorization winners=%d want=1", winners.Load())
+	if winners.Load() < 1 {
+		t.Fatalf("exact-plan authorization produced no successful caller")
+	}
+	service.Clock = infrastructureClock{now: now.Add(time.Hour)}
+	if _, err := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", IdempotencyKey: "apply-pg", Authorization: authorization}); err != nil {
+		t.Fatalf("exact lost-response retry failed after authorization expiry: %v", err)
+	}
+	if _, err := service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{TenantID: "tenant-pg", ProjectID: "project-pg", IdempotencyKey: "different-apply", Authorization: authorization}); !errors.Is(err, infraapp.ErrConflict) {
+		t.Fatalf("approval reused by a different apply command: %v", err)
 	}
 	var consumed, started int
 	if err := db.QueryRow(`SELECT count(*) FROM infrastructure.approval_grants WHERE id=$1 AND consumed_at IS NOT NULL`, grant.GrantID).Scan(&consumed); err != nil {
@@ -134,5 +141,68 @@ func TestPostgres_InfrastructureApprovalIsExactAndSingleUse(t *testing.T) {
 	}
 	if _, err := db.Exec(`UPDATE infrastructure.approval_grants SET actor_id='attacker' WHERE id=$1`, grant.GrantID); err == nil {
 		t.Fatal("approval identity mutation was accepted")
+	}
+}
+
+func TestPostgres_InfrastructureMigration004BackfillsStartedApply(t *testing.T) {
+	db, store := migratedInfrastructureStore(t)
+	now := time.Date(2026, 7, 14, 11, 0, 0, 0, time.UTC)
+	service := &infraapp.Service{
+		Store: store, Clock: infrastructureClock{now: now}, IDs: &infrastructureIDs{},
+		Prices: infraapp.PriceBook{
+			RateCard: commercev2.RateCard{RateCardID: "beta-upgrade", Version: "1", MarkupBasisPoints: 1000, Currency: "RUB", PriceSnapshotID: "prices-upgrade"},
+			Prices:   map[string]infraapp.UnitPrice{"twc_server": {Meter: "server.month", Unit: "server-month", ProviderMinorPerQuantity: 1000, Known: true}},
+		},
+	}
+	receipt := infrastructurev1.AgentPlanReceipt{
+		SessionID: "session-upgrade", ExecutionSessionID: "session-upgrade", CommandID: "command-upgrade",
+		ArtifactDigest: "sha256:" + strings.Repeat("d", 64), CapturedAt: now,
+		PlanJSON: []byte(`{"resource_changes":[{"address":"twc_server.legacy","provider_name":"timeweb","type":"twc_server","change":{"actions":["create"]}}]}`),
+	}
+	if err := store.PutPlanReceipt(context.Background(), workspace.PlanReceiptScope{
+		TenantID: "tenant-upgrade", ProjectID: "project-upgrade", WorkspaceID: "workspace-upgrade", TaskID: "task-upgrade", CommandID: "command-upgrade", ActorID: "agent-upgrade",
+	}, receipt); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := service.PlanFromReceipt(context.Background(), infraapp.ReceiptPlanCommand{
+		TenantID: "tenant-upgrade", ProjectID: "project-upgrade", ActorID: "agent-upgrade", WorkspaceID: "workspace-upgrade", CommandID: "command-upgrade",
+		Target: "staging", SourceSHA: strings.Repeat("e", 40), IdempotencyKey: "plan-upgrade", StateGeneration: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorization := infrastructurev1.ApplyAuthorization{
+		PlanID: plan.Summary.PlanID, PlanHash: plan.Summary.PlanHash, EstimateVersion: plan.Estimate.Version,
+		ReservationID: plan.Reservation.ReservationID, Target: "staging", ActorID: "agent-upgrade", ExpiresAt: now.Add(5 * time.Minute),
+	}
+	if _, err = service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{
+		TenantID: "tenant-upgrade", ProjectID: "project-upgrade", IdempotencyKey: "apply-upgrade", Authorization: authorization,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reconstruct the schema immediately before migration 004 while retaining
+	// the already-started apply row that made the original migration fail.
+	if _, err = db.Exec(`
+		ALTER TABLE infrastructure.plans DROP CONSTRAINT infrastructure_apply_binding_complete;
+		ALTER TABLE infrastructure.plans DROP COLUMN apply_idempotency_key, DROP COLUMN apply_authorization_fingerprint;
+		DELETE FROM infrastructure.schema_migrations WHERE version='004_idempotent_apply_dispatch.sql';
+	`); err != nil {
+		t.Fatal(err)
+	}
+	if err = store.Migrate(context.Background()); err != nil {
+		t.Fatalf("migrate schema 003 with a started apply to 004: %v", err)
+	}
+	var key, fingerprint string
+	if err = db.QueryRow(`SELECT apply_idempotency_key,apply_authorization_fingerprint FROM infrastructure.plans WHERE id=$1`, plan.Summary.PlanID).Scan(&key, &fingerprint); err != nil {
+		t.Fatal(err)
+	}
+	if key != "migration-legacy/"+plan.Summary.PlanID || fingerprint != "sha256:"+strings.Repeat("0", 64) {
+		t.Fatalf("unexpected migration binding key=%q fingerprint=%q", key, fingerprint)
+	}
+	if _, err = service.AuthorizeApply(context.Background(), infraapp.ApplyCommand{
+		TenantID: "tenant-upgrade", ProjectID: "project-upgrade", IdempotencyKey: "apply-upgrade", Authorization: authorization,
+	}); !errors.Is(err, infraapp.ErrConflict) {
+		t.Fatalf("pre-004 apply was replayed without a verifiable binding: %v", err)
 	}
 }

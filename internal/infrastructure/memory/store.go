@@ -118,6 +118,9 @@ func (s *Store) AuthorizeApply(_ context.Context, match infraapp.ApplyMatch) (in
 		return infraapp.PlanRecord{}, infraapp.ErrNotFound
 	}
 	if !plan.ApplyStartedAt.IsZero() {
+		if plan.ApplyIdempotencyKey == match.IdempotencyKey && plan.ApplyAuthorizationFingerprint == match.AuthorizationFingerprint {
+			return plan, nil
+		}
 		return infraapp.PlanRecord{}, infraapp.ErrConflict
 	}
 	if plan.Summary.PlanHash != a.PlanHash || plan.Estimate.Version != a.EstimateVersion || plan.Reservation.ReservationID != a.ReservationID || plan.Target != a.Target || !plan.Reservation.ExpiresAt.After(match.Now) || plan.Reservation.PlanHash != a.PlanHash {
@@ -132,6 +135,8 @@ func (s *Store) AuthorizeApply(_ context.Context, match infraapp.ApplyMatch) (in
 		s.approvals[grant.GrantID] = grant
 	}
 	plan.ApplyStartedAt = match.Now
+	plan.ApplyIdempotencyKey = match.IdempotencyKey
+	plan.ApplyAuthorizationFingerprint = match.AuthorizationFingerprint
 	plan.Version++
 	s.plans[a.PlanID] = plan
 	return plan, nil

@@ -79,7 +79,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 	return nil
 }
 
-const planColumns = `id,tenant_id,requested_by_actor_id,project_id,workspace_id,source_sha,plan_hash,state_generation,changes,destructive,requires_approval,estimate_version,estimate_fingerprint,artifact_digest,target,idempotency_key,idempotency_fingerprint,estimate,reservation,apply_started_at,created_at,version`
+const planColumns = `id,tenant_id,requested_by_actor_id,project_id,workspace_id,source_sha,plan_hash,state_generation,changes,destructive,requires_approval,estimate_version,estimate_fingerprint,artifact_digest,target,idempotency_key,idempotency_fingerprint,estimate,reservation,apply_started_at,apply_idempotency_key,apply_authorization_fingerprint,created_at,version`
 
 func (s *Store) PutPlanReceipt(ctx context.Context, scope workspace.PlanReceiptScope, receipt infrastructurev1.AgentPlanReceipt) error {
 	if s == nil || s.DB == nil || receipt.Validate() != nil || scope.TenantID == "" || scope.ProjectID == "" || scope.WorkspaceID == "" || scope.TaskID == "" || scope.CommandID != receipt.CommandID || scope.ActorID == "" {
@@ -133,13 +133,13 @@ func (s *Store) CreatePlan(ctx context.Context, record infraapp.PlanRecord) (inf
 		return infraapp.PlanRecord{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	result, err := tx.ExecContext(ctx, `INSERT INTO infrastructure.plans (`+planColumns+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) ON CONFLICT DO NOTHING`,
+	result, err := tx.ExecContext(ctx, `INSERT INTO infrastructure.plans (`+planColumns+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) ON CONFLICT DO NOTHING`,
 		record.Summary.PlanID, record.TenantID, record.RequestedByActorID, record.Summary.ProjectID, record.Summary.WorkspaceID,
 		record.Summary.SourceSHA, record.Summary.PlanHash, record.Summary.StateGeneration, changes,
 		record.Summary.Destructive, record.Summary.RequiresApproval, record.Summary.EstimateVersion,
 		record.Summary.EstimateFingerprint, record.ArtifactDigest, record.Target, record.IdempotencyKey,
 		record.IdempotencyFingerprint, estimate, reservation, nullableTime(record.ApplyStartedAt),
-		record.Summary.CreatedAt, record.Version)
+		nullableString(record.ApplyIdempotencyKey), nullableString(record.ApplyAuthorizationFingerprint), record.Summary.CreatedAt, record.Version)
 	if err != nil {
 		return infraapp.PlanRecord{}, err
 	}
@@ -227,6 +227,9 @@ func (s *Store) AuthorizeApply(ctx context.Context, match infraapp.ApplyMatch) (
 		return infraapp.PlanRecord{}, mapNotFound(err)
 	}
 	if !plan.ApplyStartedAt.IsZero() {
+		if plan.ApplyIdempotencyKey == match.IdempotencyKey && plan.ApplyAuthorizationFingerprint == match.AuthorizationFingerprint {
+			return plan, nil
+		}
 		return infraapp.PlanRecord{}, infraapp.ErrConflict
 	}
 	if plan.Summary.PlanHash != a.PlanHash || plan.Estimate.Version != a.EstimateVersion || plan.Reservation.ReservationID != a.ReservationID || plan.Target != a.Target || !plan.Reservation.ExpiresAt.After(match.Now) || plan.Reservation.PlanHash != a.PlanHash {
@@ -244,8 +247,10 @@ func (s *Store) AuthorizeApply(ctx context.Context, match infraapp.ApplyMatch) (
 		}
 	}
 	plan.ApplyStartedAt = match.Now
+	plan.ApplyIdempotencyKey = match.IdempotencyKey
+	plan.ApplyAuthorizationFingerprint = match.AuthorizationFingerprint
 	plan.Version++
-	result, err := tx.ExecContext(ctx, `UPDATE infrastructure.plans SET apply_started_at=$1,version=$2 WHERE id=$3 AND version=$4`, match.Now, plan.Version, plan.Summary.PlanID, plan.Version-1)
+	result, err := tx.ExecContext(ctx, `UPDATE infrastructure.plans SET apply_started_at=$1,apply_idempotency_key=$2,apply_authorization_fingerprint=$3,version=$4 WHERE id=$5 AND version=$6`, match.Now, match.IdempotencyKey, match.AuthorizationFingerprint, plan.Version, plan.Summary.PlanID, plan.Version-1)
 	if err != nil {
 		return infraapp.PlanRecord{}, err
 	}
@@ -267,12 +272,13 @@ func scanPlan(row rowScanner) (infraapp.PlanRecord, error) {
 	var record infraapp.PlanRecord
 	var changesRaw, estimateRaw, reservationRaw []byte
 	var applyStarted sql.NullTime
+	var applyIdempotencyKey, applyAuthorizationFingerprint sql.NullString
 	err := row.Scan(
 		&record.Summary.PlanID, &record.TenantID, &record.RequestedByActorID, &record.Summary.ProjectID, &record.Summary.WorkspaceID,
 		&record.Summary.SourceSHA, &record.Summary.PlanHash, &record.Summary.StateGeneration, &changesRaw,
 		&record.Summary.Destructive, &record.Summary.RequiresApproval, &record.Summary.EstimateVersion,
 		&record.Summary.EstimateFingerprint, &record.ArtifactDigest, &record.Target, &record.IdempotencyKey,
-		&record.IdempotencyFingerprint, &estimateRaw, &reservationRaw, &applyStarted,
+		&record.IdempotencyFingerprint, &estimateRaw, &reservationRaw, &applyStarted, &applyIdempotencyKey, &applyAuthorizationFingerprint,
 		&record.Summary.CreatedAt, &record.Version,
 	)
 	if err != nil {
@@ -289,6 +295,12 @@ func scanPlan(row rowScanner) (infraapp.PlanRecord, error) {
 	}
 	if applyStarted.Valid {
 		record.ApplyStartedAt = applyStarted.Time
+	}
+	if applyIdempotencyKey.Valid {
+		record.ApplyIdempotencyKey = applyIdempotencyKey.String
+	}
+	if applyAuthorizationFingerprint.Valid {
+		record.ApplyAuthorizationFingerprint = applyAuthorizationFingerprint.String
 	}
 	return record, nil
 }
@@ -332,6 +344,13 @@ func audit(ctx context.Context, tx *sql.Tx, tenantID, projectID, actorID, action
 
 func nullableTime(value time.Time) any {
 	if value.IsZero() {
+		return nil
+	}
+	return value
+}
+
+func nullableString(value string) any {
+	if value == "" {
 		return nil
 	}
 	return value

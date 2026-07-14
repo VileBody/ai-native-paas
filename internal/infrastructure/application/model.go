@@ -44,17 +44,19 @@ func (b PriceBook) Validate() error {
 }
 
 type PlanRecord struct {
-	TenantID               string
-	RequestedByActorID     string
-	IdempotencyKey         string
-	IdempotencyFingerprint string
-	Summary                infrastructurev1.PlanSummary
-	ArtifactDigest         string
-	Target                 string
-	Estimate               commercev2.CostEstimate
-	Reservation            commercev2.ExecutionReservation
-	Version                int64
-	ApplyStartedAt         time.Time
+	TenantID                      string
+	RequestedByActorID            string
+	IdempotencyKey                string
+	IdempotencyFingerprint        string
+	Summary                       infrastructurev1.PlanSummary
+	ArtifactDigest                string
+	Target                        string
+	Estimate                      commercev2.CostEstimate
+	Reservation                   commercev2.ExecutionReservation
+	Version                       int64
+	ApplyStartedAt                time.Time
+	ApplyIdempotencyKey           string
+	ApplyAuthorizationFingerprint string
 }
 
 type ApprovalGrant struct {
@@ -87,11 +89,13 @@ type PlanReceiptRecord struct {
 }
 
 type ApplyMatch struct {
-	TenantID         string
-	ProjectID        string
-	Authorization    infrastructurev1.ApplyAuthorization
-	ApprovalRequired bool
-	Now              time.Time
+	TenantID                 string
+	ProjectID                string
+	Authorization            infrastructurev1.ApplyAuthorization
+	ApprovalRequired         bool
+	Now                      time.Time
+	IdempotencyKey           string
+	AuthorizationFingerprint string
 }
 
 type Store interface {

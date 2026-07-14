@@ -379,7 +379,10 @@ func (h Handler) invokeInfrastructure(ctx context.Context, verified agentv2.Veri
 			ReservationID: arguments.ReservationID, ApprovalGrantID: request.ApprovalGrantID,
 			Target: arguments.Target, ActorID: verified.AgentID, ExpiresAt: plan.Reservation.ExpiresAt,
 		}
-		started, err := h.Infrastructure.AuthorizeApply(ctx, infraapp.ApplyCommand{TenantID: verified.TenantID, ProjectID: verified.ProjectID, Authorization: authorization})
+		started, err := h.Infrastructure.AuthorizeApply(ctx, infraapp.ApplyCommand{
+			TenantID: verified.TenantID, ProjectID: verified.ProjectID,
+			IdempotencyKey: request.IdempotencyKey, Authorization: authorization,
+		})
 		if err != nil {
 			return nil, err
 		}

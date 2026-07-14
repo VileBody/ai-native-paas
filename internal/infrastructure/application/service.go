@@ -251,9 +251,10 @@ func (s *Service) GetApprovalStatus(ctx context.Context, tenantID, projectID, pl
 }
 
 type ApplyCommand struct {
-	TenantID      string
-	ProjectID     string
-	Authorization infrastructurev1.ApplyAuthorization
+	TenantID       string
+	ProjectID      string
+	IdempotencyKey string
+	Authorization  infrastructurev1.ApplyAuthorization
 }
 
 func (s *Service) AuthorizeApply(ctx context.Context, command ApplyCommand) (PlanRecord, error) {
@@ -261,19 +262,36 @@ func (s *Service) AuthorizeApply(ctx context.Context, command ApplyCommand) (Pla
 		return PlanRecord{}, errors.New("infrastructure service is unavailable")
 	}
 	now := s.Clock.Now().UTC()
+	if strings.TrimSpace(command.IdempotencyKey) == "" || len(command.IdempotencyKey) > 128 {
+		return PlanRecord{}, errors.New("invalid infrastructure apply idempotency key")
+	}
 	plan, err := s.Store.GetPlan(ctx, command.TenantID, command.ProjectID, command.Authorization.PlanID)
 	if err != nil {
 		return PlanRecord{}, err
 	}
-	if err := command.Authorization.Validate(now, plan.Summary.RequiresApproval); err != nil {
+	validationTime := now
+	if !plan.ApplyStartedAt.IsZero() {
+		validationTime = plan.ApplyStartedAt.Add(-time.Nanosecond)
+	}
+	if err := command.Authorization.Validate(validationTime, plan.Summary.RequiresApproval); err != nil {
 		if plan.Summary.RequiresApproval && command.Authorization.ApprovalGrantID == "" {
 			return PlanRecord{}, ErrApprovalRequired
 		}
 		return PlanRecord{}, err
 	}
+	fingerprint, err := hashJSON(struct {
+		TenantID       string                              `json:"tenant_id"`
+		ProjectID      string                              `json:"project_id"`
+		IdempotencyKey string                              `json:"idempotency_key"`
+		Authorization  infrastructurev1.ApplyAuthorization `json:"authorization"`
+	}{command.TenantID, command.ProjectID, command.IdempotencyKey, command.Authorization})
+	if err != nil {
+		return PlanRecord{}, err
+	}
 	return s.Store.AuthorizeApply(ctx, ApplyMatch{
 		TenantID: command.TenantID, ProjectID: command.ProjectID,
 		Authorization: command.Authorization, ApprovalRequired: plan.Summary.RequiresApproval, Now: now,
+		IdempotencyKey: command.IdempotencyKey, AuthorizationFingerprint: fingerprint,
 	})
 }
 
