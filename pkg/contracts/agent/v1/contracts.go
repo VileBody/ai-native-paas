@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -194,6 +195,7 @@ type BudgetUsage struct {
 type TaskView struct {
 	TaskID            string       `json:"task_id"`
 	TenantID          string       `json:"tenant_id"`
+	ProjectID         string       `json:"project_id,omitempty"`
 	AgentID           string       `json:"agent_id"`
 	OnBehalfOfUserID  string       `json:"on_behalf_of_user_id"`
 	CorrelationID     string       `json:"correlation_id"`
@@ -204,19 +206,102 @@ type TaskView struct {
 	RepairCount       int64        `json:"repair_count"`
 }
 type AuditView struct {
-	AuditID          string    `json:"audit_id"`
-	TenantID         string    `json:"tenant_id"`
-	TaskID           string    `json:"task_id"`
-	AgentID          string    `json:"agent_id"`
-	OnBehalfOfUserID string    `json:"on_behalf_of_user_id"`
-	Tool             Tool      `json:"tool"`
-	CorrelationID    string    `json:"correlation_id"`
-	Outcome          string    `json:"outcome"`
-	ResourceType     string    `json:"resource_type,omitempty"`
-	ResourceID       string    `json:"resource_id,omitempty"`
-	OperationID      string    `json:"operation_id,omitempty"`
-	ErrorCode        string    `json:"error_code,omitempty"`
-	OccurredAt       time.Time `json:"occurred_at"`
+	AuditID          string        `json:"audit_id"`
+	TenantID         string        `json:"tenant_id"`
+	TaskID           string        `json:"task_id"`
+	AgentID          string        `json:"agent_id"`
+	OnBehalfOfUserID string        `json:"on_behalf_of_user_id"`
+	Tool             Tool          `json:"tool"`
+	Action           string        `json:"action,omitempty"`
+	CorrelationID    string        `json:"correlation_id"`
+	Outcome          string        `json:"outcome"`
+	ResourceType     string        `json:"resource_type,omitempty"`
+	ResourceID       string        `json:"resource_id,omitempty"`
+	OperationID      string        `json:"operation_id,omitempty"`
+	ErrorCode        string        `json:"error_code,omitempty"`
+	Evidence         AuditEvidence `json:"evidence,omitempty"`
+	OccurredAt       time.Time     `json:"occurred_at"`
+}
+
+// AuditEvidence is an allowlist of non-secret identifiers that joins an
+// agent task to work performed by Project MCP, workspace, build,
+// infrastructure and GitOps/runtime components. Arbitrary command arguments,
+// environment values and provider responses intentionally have no place in
+// this contract.
+type AuditEvidence struct {
+	IntentID            string `json:"intent_id,omitempty"`
+	ProjectID           string `json:"project_id,omitempty"`
+	WorkspaceID         string `json:"workspace_id,omitempty"`
+	WorkspaceCommandID  string `json:"workspace_command_id,omitempty"`
+	RepositoryID        string `json:"repository_id,omitempty"`
+	CommitSHA           string `json:"commit_sha,omitempty"`
+	BuildID             string `json:"build_id,omitempty"`
+	ArtifactDigest      string `json:"artifact_digest,omitempty"`
+	PlanID              string `json:"plan_id,omitempty"`
+	PlanHash            string `json:"plan_hash,omitempty"`
+	ApprovalRequestID   string `json:"approval_request_id,omitempty"`
+	ApprovalGrantID     string `json:"approval_grant_id,omitempty"`
+	ApprovalPayloadHash string `json:"approval_payload_hash,omitempty"`
+	ApplyOperationID    string `json:"apply_operation_id,omitempty"`
+	DeploymentID        string `json:"deployment_id,omitempty"`
+	ReleaseID           string `json:"release_id,omitempty"`
+	GitOpsRevision      string `json:"gitops_revision,omitempty"`
+	ReadyEndpoint       string `json:"ready_endpoint,omitempty"`
+}
+
+func (e AuditEvidence) Validate() error {
+	for name, value := range map[string]string{
+		"intent_id": e.IntentID, "project_id": e.ProjectID, "workspace_id": e.WorkspaceID,
+		"workspace_command_id": e.WorkspaceCommandID, "repository_id": e.RepositoryID,
+		"build_id": e.BuildID, "plan_id": e.PlanID, "approval_request_id": e.ApprovalRequestID,
+		"approval_grant_id": e.ApprovalGrantID, "apply_operation_id": e.ApplyOperationID,
+		"deployment_id": e.DeploymentID, "release_id": e.ReleaseID,
+	} {
+		if value != "" && !ValidID(value) {
+			return fmt.Errorf("invalid audit evidence %s", name)
+		}
+	}
+	for name, value := range map[string]string{"commit_sha": e.CommitSHA, "gitops_revision": e.GitOpsRevision} {
+		if value != "" && !validAuditRevision(value) {
+			return fmt.Errorf("invalid audit evidence %s", name)
+		}
+	}
+	for name, value := range map[string]string{"artifact_digest": e.ArtifactDigest, "plan_hash": e.PlanHash, "approval_payload_hash": e.ApprovalPayloadHash} {
+		if value != "" && !validAuditDigest(value) {
+			return fmt.Errorf("invalid audit evidence %s", name)
+		}
+	}
+	if e.ReadyEndpoint != "" {
+		parsed, err := url.Parse(e.ReadyEndpoint)
+		if err != nil || len(e.ReadyEndpoint) > 2048 || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+			return errors.New("invalid audit evidence ready_endpoint")
+		}
+	}
+	return nil
+}
+
+func validAuditRevision(value string) bool {
+	if len(value) < 7 || len(value) > 64 {
+		return false
+	}
+	for _, character := range value {
+		if (character < '0' || character > '9') && (character < 'a' || character > 'f') && (character < 'A' || character > 'F') {
+			return false
+		}
+	}
+	return true
+}
+
+func validAuditDigest(value string) bool {
+	if len(value) != len("sha256:")+64 || !strings.HasPrefix(value, "sha256:") {
+		return false
+	}
+	for _, character := range value[len("sha256:"):] {
+		if character < '0' || character > '9' && character < 'a' || character > 'f' {
+			return false
+		}
+	}
+	return true
 }
 
 func DecodeStrict(raw json.RawMessage, out any) error {

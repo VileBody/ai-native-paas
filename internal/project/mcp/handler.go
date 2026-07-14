@@ -14,6 +14,7 @@ import (
 	"time"
 
 	kernelv2 "github.com/keir-research/ai-native-paas/contracts/kernel/v2"
+	agentapp "github.com/keir-research/ai-native-paas/internal/agent/application"
 	"github.com/keir-research/ai-native-paas/internal/agent/enrollment"
 	attachmentsapp "github.com/keir-research/ai-native-paas/internal/attachments/application"
 	attachmentsdomain "github.com/keir-research/ai-native-paas/internal/attachments/domain"
@@ -66,6 +67,10 @@ type SecretCommands interface {
 	ListProjectSecretMetadata(context.Context, string, string, string) ([]attachmentsv1.SecretMetadata, error)
 }
 
+type TaskEvidenceRecorder interface {
+	RecordTaskEvidence(context.Context, agentapp.RecordTaskEvidenceCommand) error
+}
+
 var errInvalidWorkspaceArguments = errors.New("invalid workspace tool arguments")
 var errInvalidInfrastructureArguments = errors.New("invalid infrastructure tool arguments")
 var errInvalidRepositoryArguments = errors.New("invalid repository tool arguments")
@@ -80,6 +85,7 @@ type Handler struct {
 	SourceChanges  SourceChangeCommands
 	MergeRequests  RepositoryMergeRequests
 	Secrets        SecretCommands
+	Audit          TaskEvidenceRecorder
 	MaxBodyBytes   int64
 }
 
@@ -218,6 +224,19 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 			Error: &kernelv2.PublicError{Code: code, Message: message, Retryable: retryable},
 		})
 		return
+	}
+	if h.Audit != nil {
+		if err := h.Audit.RecordTaskEvidence(r.Context(), agentapp.RecordTaskEvidenceCommand{
+			TenantID: verified.TenantID, ProjectID: verified.ProjectID, AgentID: verified.AgentID,
+			TaskID: request.TaskID, CorrelationID: request.CorrelationID, Tool: request.Tool,
+			IdempotencyKey: request.IdempotencyKey, Evidence: projectToolAuditEvidence(request, result),
+		}); err != nil {
+			writeResponse(w, http.StatusServiceUnavailable, agentv2.InvocationResponse{
+				APIVersion: agentv2.APIVersion, InvocationID: "read-" + request.CorrelationID,
+				Error: &kernelv2.PublicError{Code: "AUDIT_UNAVAILABLE", Message: "operation evidence could not be persisted", Retryable: true},
+			})
+			return
+		}
 	}
 	raw, err := json.Marshal(result)
 	if err != nil {

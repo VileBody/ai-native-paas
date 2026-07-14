@@ -144,7 +144,7 @@ func TestRuntime_RollbackCreatesAuditableGitRevision(t *testing.T) {
 		t.Fatal("rollback release has no GitOps commit")
 	}
 	commit := snapshot.Commits[candidate.ID]
-	if commit.CommitSHA == "" || commit.ReleaseID != candidate.ID || commit.Path == "" || commit.ManifestHash == "" {
+	if commit.CommitSHA == "" || commit.ReleaseID != candidate.ID || commit.Path == "" || commit.ManifestHash == "" || rollback.GitOpsRevision != commit.CommitSHA {
 		t.Fatalf("rollback commit=%+v", commit)
 	}
 	audited := false

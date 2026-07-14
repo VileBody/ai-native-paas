@@ -464,7 +464,7 @@ func (s Service) Deploy(ctx context.Context, req runtimev1.DeployRequest) (runti
 		return runtimev1.DeploymentRef{}, err
 	}
 	if deployment.Phase != runtimev1.DeploymentPending {
-		return runtimev1.DeploymentRef{DeploymentID: deployment.ID, ReleaseID: release.ID, Phase: deployment.Phase}, nil
+		return runtimev1.DeploymentRef{DeploymentID: deployment.ID, ReleaseID: release.ID, Phase: deployment.Phase, GitOpsRevision: deployment.GitCommitSHA}, nil
 	}
 	bundle, err := s.Renderer.Render(RenderInput{Application: app, Environment: env, Release: release, Placement: placement, Cell: cell})
 	if err != nil {
@@ -483,7 +483,7 @@ func (s Service) Deploy(ctx context.Context, req runtimev1.DeployRequest) (runti
 	if err != nil {
 		return runtimev1.DeploymentRef{}, err
 	}
-	return runtimev1.DeploymentRef{DeploymentID: deployment.ID, ReleaseID: release.ID, Phase: runtimev1.DeploymentGitCommitted}, nil
+	return runtimev1.DeploymentRef{DeploymentID: deployment.ID, ReleaseID: release.ID, Phase: runtimev1.DeploymentGitCommitted, GitOpsRevision: commit.CommitSHA}, nil
 }
 
 func (s Service) recordGitCommit(ctx context.Context, releaseID, deploymentID string, commit CommitResult, actorID string) error {
@@ -770,7 +770,7 @@ func (s Service) deployExistingRelease(ctx context.Context, req runtimev1.Deploy
 		return runtimev1.DeploymentRef{}, err
 	}
 	if deployment.Phase != runtimev1.DeploymentPending {
-		return runtimev1.DeploymentRef{DeploymentID: deployment.ID, ReleaseID: release.ID, Phase: deployment.Phase}, nil
+		return runtimev1.DeploymentRef{DeploymentID: deployment.ID, ReleaseID: release.ID, Phase: deployment.Phase, GitOpsRevision: deployment.GitCommitSHA}, nil
 	}
 	bundle, err := s.Renderer.Render(RenderInput{Application: app, Environment: env, Release: release, Placement: placement, Cell: cell})
 	if err != nil {
@@ -783,7 +783,7 @@ func (s Service) deployExistingRelease(ctx context.Context, req runtimev1.Deploy
 	if err = s.recordGitCommit(ctx, release.ID, deployment.ID, commit, req.ActorID); err != nil {
 		return runtimev1.DeploymentRef{}, err
 	}
-	return runtimev1.DeploymentRef{DeploymentID: deployment.ID, ReleaseID: release.ID, Phase: runtimev1.DeploymentGitCommitted}, nil
+	return runtimev1.DeploymentRef{DeploymentID: deployment.ID, ReleaseID: release.ID, Phase: runtimev1.DeploymentGitCommitted, GitOpsRevision: commit.CommitSHA}, nil
 }
 
 func (s Service) RequestPlacementMigration(ctx context.Context, req ExplicitMigrationRequest) (domain.PlacementMigration, error) {
@@ -832,7 +832,7 @@ func (s Service) Status(ctx context.Context, deploymentID string) (runtimev1.Run
 			return value.ReleaseID
 		}
 		return value.PreviousRelease
-	}(), URL: value.URL, ReadyReplicas: value.ReadyReplicas}, err
+	}(), GitOpsRevision: value.GitCommitSHA, URL: value.URL, ReadyReplicas: value.ReadyReplicas}, err
 }
 
 func (s Service) StatusForTenant(ctx context.Context, tenantID, deploymentID string) (runtimev1.RuntimeStatus, error) {
@@ -856,7 +856,7 @@ func (s Service) StatusForTenant(ctx context.Context, tenantID, deploymentID str
 	if value.Phase == runtimev1.DeploymentReady {
 		active = value.ReleaseID
 	}
-	return runtimev1.RuntimeStatus{DeploymentID: value.ID, Phase: value.Phase, ActiveRelease: active, URL: value.URL, ReadyReplicas: value.ReadyReplicas}, nil
+	return runtimev1.RuntimeStatus{DeploymentID: value.ID, Phase: value.Phase, ActiveRelease: active, GitOpsRevision: value.GitCommitSHA, URL: value.URL, ReadyReplicas: value.ReadyReplicas}, nil
 }
 
 func mustJSON(v any) []byte { raw, _ := json.Marshal(v); return raw }

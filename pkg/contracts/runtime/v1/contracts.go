@@ -454,17 +454,19 @@ func (r DeployRequest) Validate() error {
 }
 
 type DeploymentRef struct {
-	DeploymentID string          `json:"deployment_id"`
-	ReleaseID    string          `json:"release_id"`
-	Phase        DeploymentPhase `json:"phase"`
+	DeploymentID   string          `json:"deployment_id"`
+	ReleaseID      string          `json:"release_id"`
+	Phase          DeploymentPhase `json:"phase"`
+	GitOpsRevision string          `json:"gitops_revision,omitempty"`
 }
 
 type RuntimeStatus struct {
-	DeploymentID  string          `json:"deployment_id"`
-	Phase         DeploymentPhase `json:"phase"`
-	ActiveRelease string          `json:"active_release"`
-	URL           string          `json:"url"`
-	ReadyReplicas int             `json:"ready_replicas"`
+	DeploymentID   string          `json:"deployment_id"`
+	Phase          DeploymentPhase `json:"phase"`
+	ActiveRelease  string          `json:"active_release"`
+	GitOpsRevision string          `json:"gitops_revision,omitempty"`
+	URL            string          `json:"url"`
+	ReadyReplicas  int             `json:"ready_replicas"`
 }
 
 type DeploymentService interface {

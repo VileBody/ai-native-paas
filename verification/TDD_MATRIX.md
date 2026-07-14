@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **964**
-- Reused now: **90**
-- New local/contract tests required: **1**
+- Discovered Go tests/fuzz targets: **969**
+- Reused now: **91**
+- New local/contract tests required: **0**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -156,7 +156,7 @@ A release gate may become green only after every referenced test exists and pass
 | `G25` | REUSED | application | `internal/agent/application/agent_tdd_test.go::TestAgent_RepairLoopAndBudgetStopAutonomousSpend` |
 | `G26` | LIVE_ONLY | gateway acceptance | `test/pivot/agent_workspace_test.go::TestAgent_ProviderCapabilityUsageVisibleWithoutMasterCredential` |
 | `G27` | LIVE_ONLY | cross-domain | `test/pivot/agent_workspace_test.go::TestAgent_SuspendedTenantCanInspectButCannotMutate` |
-| `G28` | NEW | acceptance | `test/pivot/agent_workspace_test.go::TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime` |
+| `G28` | REUSED | acceptance | `test/acceptance/agent_lifecycle_acceptance_test.go::TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime` |
 | `G29` | LIVE_ONLY | chaos/provider | `test/pivot/agent_workspace_test.go::TestAgent_CancelDuringApplyReconcilesActualExternalState` |
 | `G30` | REUSED | HTTP/security | `internal/identity/httpauth/middleware_test.go::TestAgent_APIRequiresOIDCOrMTLSAndRejectsIdentityHeadersInProduction` |
 | `E2E-1` | LIVE_ONLY | full system | `test/system/agentic_devops_e2e_test.go::TestSystem_OneButtonDeploySimpleGoService` |

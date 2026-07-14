@@ -98,6 +98,7 @@ const (
 type AgentTask struct {
 	ID                string               `json:"id"`
 	TenantID          string               `json:"tenant_id"`
+	ProjectID         string               `json:"project_id,omitempty"`
 	AgentID           string               `json:"agent_id"`
 	OnBehalfOfUserID  string               `json:"on_behalf_of_user_id"`
 	CorrelationID     string               `json:"correlation_id"`
@@ -112,7 +113,7 @@ type AgentTask struct {
 }
 
 func (t AgentTask) View() agentv1.TaskView {
-	return agentv1.TaskView{TaskID: t.ID, TenantID: t.TenantID, AgentID: t.AgentID, OnBehalfOfUserID: t.OnBehalfOfUserID, CorrelationID: t.CorrelationID, State: string(t.State), BudgetPolicy: t.BudgetPolicy, BudgetUsage: t.BudgetUsage, RepairFingerprint: t.RepairFingerprint, RepairCount: t.RepairCount}
+	return agentv1.TaskView{TaskID: t.ID, TenantID: t.TenantID, ProjectID: t.ProjectID, AgentID: t.AgentID, OnBehalfOfUserID: t.OnBehalfOfUserID, CorrelationID: t.CorrelationID, State: string(t.State), BudgetPolicy: t.BudgetPolicy, BudgetUsage: t.BudgetUsage, RepairFingerprint: t.RepairFingerprint, RepairCount: t.RepairCount}
 }
 
 type ApprovalState string
@@ -183,23 +184,25 @@ type Invocation struct {
 	UpdatedAt           time.Time       `json:"updated_at"`
 }
 type AuditRecord struct {
-	ID               string       `json:"id"`
-	TenantID         string       `json:"tenant_id"`
-	TaskID           string       `json:"task_id"`
-	AgentID          string       `json:"agent_id"`
-	OnBehalfOfUserID string       `json:"on_behalf_of_user_id"`
-	Tool             agentv1.Tool `json:"tool"`
-	CorrelationID    string       `json:"correlation_id"`
-	Outcome          string       `json:"outcome"`
-	ResourceType     string       `json:"resource_type,omitempty"`
-	ResourceID       string       `json:"resource_id,omitempty"`
-	OperationID      string       `json:"operation_id,omitempty"`
-	ErrorCode        string       `json:"error_code,omitempty"`
-	CreatedAt        time.Time    `json:"created_at"`
+	ID               string                `json:"id"`
+	TenantID         string                `json:"tenant_id"`
+	TaskID           string                `json:"task_id"`
+	AgentID          string                `json:"agent_id"`
+	OnBehalfOfUserID string                `json:"on_behalf_of_user_id"`
+	Tool             agentv1.Tool          `json:"tool"`
+	Action           string                `json:"action,omitempty"`
+	CorrelationID    string                `json:"correlation_id"`
+	Outcome          string                `json:"outcome"`
+	ResourceType     string                `json:"resource_type,omitempty"`
+	ResourceID       string                `json:"resource_id,omitempty"`
+	OperationID      string                `json:"operation_id,omitempty"`
+	ErrorCode        string                `json:"error_code,omitempty"`
+	Evidence         agentv1.AuditEvidence `json:"evidence,omitempty"`
+	CreatedAt        time.Time             `json:"created_at"`
 }
 
 func (a AuditRecord) View() agentv1.AuditView {
-	return agentv1.AuditView{AuditID: a.ID, TenantID: a.TenantID, TaskID: a.TaskID, AgentID: a.AgentID, OnBehalfOfUserID: a.OnBehalfOfUserID, Tool: a.Tool, CorrelationID: a.CorrelationID, Outcome: a.Outcome, ResourceType: a.ResourceType, ResourceID: a.ResourceID, OperationID: a.OperationID, ErrorCode: a.ErrorCode, OccurredAt: a.CreatedAt}
+	return agentv1.AuditView{AuditID: a.ID, TenantID: a.TenantID, TaskID: a.TaskID, AgentID: a.AgentID, OnBehalfOfUserID: a.OnBehalfOfUserID, Tool: a.Tool, Action: a.Action, CorrelationID: a.CorrelationID, Outcome: a.Outcome, ResourceType: a.ResourceType, ResourceID: a.ResourceID, OperationID: a.OperationID, ErrorCode: a.ErrorCode, Evidence: a.Evidence, OccurredAt: a.CreatedAt}
 }
 
 type OutboxRecord struct {

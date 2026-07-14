@@ -2,6 +2,8 @@ package devadapter
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	kernelv1 "github.com/keir-research/ai-native-paas/contracts/kernel/v1"
 	"github.com/keir-research/ai-native-paas/internal/agent/application"
@@ -167,17 +169,19 @@ func (r *Runtime) Deploy(_ context.Context, req runtimev1.DeployRequest, expecte
 	}
 	if id := r.ByKey[req.TenantID+":"+req.IdempotencyKey]; id != "" {
 		st := r.ByID[id]
-		return application.RuntimeResult{Deployment: runtimev1.DeploymentRef{DeploymentID: id, ReleaseID: st.ActiveRelease, Phase: st.Phase}, Status: &st}, nil
+		return application.RuntimeResult{Deployment: runtimev1.DeploymentRef{DeploymentID: id, ReleaseID: st.ActiveRelease, Phase: st.Phase, GitOpsRevision: st.GitOpsRevision}, Status: &st}, nil
 	}
 	id := fmt.Sprintf("deployment-%d", len(r.ByID)+1)
-	st := runtimev1.RuntimeStatus{DeploymentID: id, Phase: runtimev1.DeploymentReady, ActiveRelease: "release-" + id, URL: "https://app.invalid", ReadyReplicas: 1}
+	revisionHash := sha256.Sum256([]byte(req.Artifact.Digest))
+	revision := hex.EncodeToString(revisionHash[:])[:40]
+	st := runtimev1.RuntimeStatus{DeploymentID: id, Phase: runtimev1.DeploymentReady, ActiveRelease: "release-" + id, GitOpsRevision: revision, URL: "https://app.invalid", ReadyReplicas: 1}
 	r.ByID[id] = st
 	r.ByKey[req.TenantID+":"+req.IdempotencyKey] = id
 	if r.TimeoutOnce {
 		r.TimeoutOnce = false
 		return application.RuntimeResult{}, &application.ProviderError{Message: "gitops response lost", Retryable: true, OperationID: "op-" + id}
 	}
-	return application.RuntimeResult{Deployment: runtimev1.DeploymentRef{DeploymentID: id, ReleaseID: st.ActiveRelease, Phase: st.Phase}, Status: &st}, nil
+	return application.RuntimeResult{Deployment: runtimev1.DeploymentRef{DeploymentID: id, ReleaseID: st.ActiveRelease, Phase: st.Phase, GitOpsRevision: st.GitOpsRevision}, Status: &st}, nil
 }
 func (r *Runtime) Get(_ context.Context, tenant, id string) (application.RuntimeResult, error) {
 	r.mu.Lock()
@@ -190,7 +194,7 @@ func (r *Runtime) Get(_ context.Context, tenant, id string) (application.Runtime
 	if !ok {
 		return application.RuntimeResult{}, fmt.Errorf("deployment not found")
 	}
-	return application.RuntimeResult{Deployment: runtimev1.DeploymentRef{DeploymentID: id, ReleaseID: st.ActiveRelease, Phase: st.Phase}, Status: &st}, nil
+	return application.RuntimeResult{Deployment: runtimev1.DeploymentRef{DeploymentID: id, ReleaseID: st.ActiveRelease, Phase: st.Phase, GitOpsRevision: st.GitOpsRevision}, Status: &st}, nil
 }
 func (r *Runtime) Rollback(_ context.Context, tenant, deployment, release string, expected int64, key string) (application.RuntimeResult, error) {
 	r.mu.Lock()
@@ -201,7 +205,7 @@ func (r *Runtime) Rollback(_ context.Context, tenant, deployment, release string
 	}
 	st.ActiveRelease = release
 	r.ByID[deployment] = st
-	return application.RuntimeResult{Deployment: runtimev1.DeploymentRef{DeploymentID: deployment, ReleaseID: release, Phase: st.Phase}, Status: &st}, nil
+	return application.RuntimeResult{Deployment: runtimev1.DeploymentRef{DeploymentID: deployment, ReleaseID: release, Phase: st.Phase, GitOpsRevision: st.GitOpsRevision}, Status: &st}, nil
 }
 func (r *Runtime) Reconcile(context.Context, string, string) error {
 	r.mu.Lock()

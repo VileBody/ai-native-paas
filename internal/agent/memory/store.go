@@ -118,6 +118,9 @@ func (t *transaction) UpdateTask(v domain.AgentTask, e int64) error {
 	if o.Version != e {
 		return domain.NewError(domain.CodeConflict, "task stale")
 	}
+	if o.TenantID != v.TenantID || o.ProjectID != v.ProjectID || o.AgentID != v.AgentID || o.OnBehalfOfUserID != v.OnBehalfOfUserID || o.CorrelationID != v.CorrelationID || !o.CreatedAt.Equal(v.CreatedAt) {
+		return domain.NewError(domain.CodeConflict, "task identity immutable")
+	}
 	t.d.tasks[v.ID] = v
 	return nil
 }

@@ -17,6 +17,7 @@ import (
 	agentpostgres "github.com/keir-research/ai-native-paas/internal/agent/postgres"
 	"github.com/keir-research/ai-native-paas/internal/agent/testkit"
 	agentv1 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v1"
+	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
 	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
 	runtimev1 "github.com/keir-research/ai-native-paas/pkg/contracts/runtime/v1"
 )
@@ -61,7 +62,7 @@ func newPGAgentFixture(t *testing.T) *pgAgentFixture {
 	if _, err := svc.RegisterPrincipal(context.Background(), application.RegisterPrincipalCommand{ID: "agent-1", TenantID: "tenant-1", OnBehalfOfUserID: "user-1", Scopes: scopes, CredentialExpiresAt: clock.T.Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.StartTask(context.Background(), application.StartTaskCommand{ID: "task-1", TenantID: "tenant-1", AgentID: "agent-1", OnBehalfOfUserID: "user-1", CorrelationID: "corr-1", BudgetPolicy: agentv1.BudgetPolicy{MaxBuildCount: 3, MaxBuildMinutes: 3, MaxDeployCount: 3, RepairThreshold: 3}}); err != nil {
+	if _, err := svc.StartTask(context.Background(), application.StartTaskCommand{ID: "task-1", TenantID: "tenant-1", ProjectID: "project-1", AgentID: "agent-1", OnBehalfOfUserID: "user-1", CorrelationID: "corr-1", BudgetPolicy: agentv1.BudgetPolicy{MaxBuildCount: 3, MaxBuildMinutes: 3, MaxDeployCount: 3, RepairThreshold: 3}}); err != nil {
 		t.Fatal(err)
 	}
 	return &pgAgentFixture{db: db, store: store, svc: svc, clock: clock, builds: builds, runtime: runtime}
@@ -96,7 +97,7 @@ func TestPostgres_AgentMigrationsCleanInstallAndUpgrade(t *testing.T) {
 	if err := db.QueryRow(`SELECT count(*) FROM agent.schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 3 {
+	if count != 4 {
 		t.Fatalf("migrations=%d", count)
 	}
 	for _, table := range []string{"principals", "tasks", "invocations", "approval_requests", "approval_grants", "outbox", "audit"} {
@@ -104,6 +105,54 @@ func TestPostgres_AgentMigrationsCleanInstallAndUpgrade(t *testing.T) {
 		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='agent' AND table_name=$1)`, table).Scan(&ok); err != nil || !ok {
 			t.Fatalf("table %s ok=%v err=%v", table, ok, err)
 		}
+	}
+}
+
+func TestPostgres_AgentMigration004BackfillsProjectBoundTask(t *testing.T) {
+	db, store := migratedAgentStore(t)
+	now := time.Now().UTC()
+	legacyTask := domain.AgentTask{
+		ID: "task-legacy-project", TenantID: "tenant-legacy", ProjectID: "project-legacy", AgentID: "agent-legacy",
+		OnBehalfOfUserID: "user-legacy", CorrelationID: "corr-legacy", State: domain.TaskActive,
+		BudgetPolicy: agentv1.BudgetPolicy{RepairThreshold: 3}, Version: 1, CreatedAt: now, UpdatedAt: now,
+	}
+	payload, err := json.Marshal(legacyTask)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO agent.tasks(id,tenant_id,project_id,agent_id,state,version,payload,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		legacyTask.ID, legacyTask.TenantID, legacyTask.ProjectID, legacyTask.AgentID, legacyTask.State, legacyTask.Version, payload, now, now); err != nil {
+		t.Fatal(err)
+	}
+	// Reconstruct the exact task-table behavior after migration 003 while
+	// preserving its checksums and a payload already written by additive code.
+	if _, err := db.Exec(`
+		DROP TRIGGER agent_task_identity_immutable ON agent.tasks;
+		DROP FUNCTION agent.protect_task_identity();
+		DROP INDEX agent.agent_tasks_project_idx;
+		DROP TRIGGER agent_task_payload_consistency ON agent.tasks;
+		ALTER TABLE agent.tasks DROP COLUMN project_id;
+		CREATE OR REPLACE FUNCTION agent.check_task_payload() RETURNS trigger LANGUAGE plpgsql AS $body$
+		BEGIN
+		 IF NEW.payload->>'id' <> NEW.id OR NEW.payload->>'tenant_id' <> NEW.tenant_id OR NEW.payload->>'agent_id' <> NEW.agent_id OR NEW.payload->>'state' <> NEW.state OR (NEW.payload->>'version')::bigint <> NEW.version THEN RAISE EXCEPTION 'task payload drift' USING ERRCODE='23514'; END IF; RETURN NEW;
+		END $body$;
+		CREATE TRIGGER agent_task_payload_consistency BEFORE INSERT OR UPDATE ON agent.tasks FOR EACH ROW EXECUTE FUNCTION agent.check_task_payload();
+		DELETE FROM agent.schema_migrations WHERE version='004_project_bound_tasks.sql';
+	`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var projectID, payloadProjectID string
+	if err := db.QueryRow(`SELECT project_id,payload->>'project_id' FROM agent.tasks WHERE id=$1`, legacyTask.ID).Scan(&projectID, &payloadProjectID); err != nil {
+		t.Fatal(err)
+	}
+	if projectID != legacyTask.ProjectID || payloadProjectID != legacyTask.ProjectID {
+		t.Fatalf("project column=%q payload=%q", projectID, payloadProjectID)
+	}
+	if _, err := db.Exec(`UPDATE agent.tasks SET project_id='project-forged' WHERE id=$1`, legacyTask.ID); err == nil {
+		t.Fatal("migration did not restore immutable project binding")
 	}
 }
 func TestPostgres_AgentAggregateAndOutboxAreAtomic(t *testing.T) {
@@ -251,6 +300,57 @@ func TestPostgres_AgentAuditAndOutboxAreAppendOnly(t *testing.T) {
 		if _, err := f.db.Exec(q); err == nil {
 			t.Fatalf("mutation accepted: %s", q)
 		}
+	}
+}
+
+func TestPostgres_AgentTaskEvidenceIsDurableIdempotentAndAppendOnly(t *testing.T) {
+	f := newPGAgentFixture(t)
+	command := application.RecordTaskEvidenceCommand{
+		TenantID: "tenant-1", ProjectID: "project-1", AgentID: "agent-1", TaskID: "task-1", CorrelationID: "corr-1",
+		Tool: agentv2.ToolInfraPlan, IdempotencyKey: "plan-evidence-1",
+		Evidence: agentv1.AuditEvidence{
+			WorkspaceID: "workspace-1", WorkspaceCommandID: "command-plan-1", PlanID: "plan-1",
+			PlanHash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		},
+	}
+	if err := f.svc.RecordTaskEvidence(context.Background(), command); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.RecordTaskEvidence(context.Background(), command); err != nil {
+		t.Fatal(err)
+	}
+	conflict := command
+	conflict.Evidence.PlanHash = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	if err := f.svc.RecordTaskEvidence(context.Background(), conflict); err == nil || domain.AsError(err).Code != domain.CodeConflict {
+		t.Fatalf("changed idempotent evidence err=%v", err)
+	}
+	var count int
+	// The action is intentionally carried in the immutable JSON payload; the
+	// indexed tool column remains the v1 compatibility field.
+	if err := f.db.QueryRow(`SELECT count(*) FROM agent.audit WHERE payload->>'action'=$1`, string(agentv2.ToolInfraPlan)).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("evidence rows=%d", count)
+	}
+	audit, err := f.svc.AuditTrail(context.Background(), "tenant-1", "task-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, event := range audit {
+		if event.Action == string(agentv2.ToolInfraPlan) {
+			found = event.Evidence.PlanID == "plan-1" && event.Evidence.WorkspaceCommandID == "command-plan-1"
+		}
+	}
+	if !found {
+		t.Fatalf("durable evidence missing: %+v", audit)
+	}
+	if _, err := f.db.Exec(`UPDATE agent.audit SET payload=jsonb_set(payload,'{evidence,plan_id}','"forged"') WHERE payload->>'action'=$1`, string(agentv2.ToolInfraPlan)); err == nil {
+		t.Fatal("append-only evidence update unexpectedly succeeded")
+	}
+	if _, err := f.db.Exec(`UPDATE agent.tasks SET project_id='project-other' WHERE id='task-1'`); err == nil {
+		t.Fatal("project-bound task mutation unexpectedly succeeded")
 	}
 }
 func TestPostgres_AgentInvocationIdentityIsImmutable(t *testing.T) {

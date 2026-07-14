@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 964,
-  "discovered_unique_test_name_count": 962,
+  "discovered_go_test_count": 969,
+  "discovered_unique_test_name_count": 967,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1428,10 +1428,10 @@
       "id": "G28",
       "level": "acceptance",
       "name": "TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "test/acceptance/agent_lifecycle_acceptance_test.go",
       "test_name": "TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime"
+      "test_ref": "test/acceptance/agent_lifecycle_acceptance_test.go::TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime"
     },
     {
       "family": "G",
@@ -1590,8 +1590,7 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 1,
-      "REUSED": 90
+      "REUSED": 91
     },
     "unmapped": 0
   }

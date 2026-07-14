@@ -258,7 +258,7 @@ func (a *txAdapter) InsertTask(v domain.AgentTask) error {
 	if err != nil {
 		return err
 	}
-	_, err = a.tx.Exec(`INSERT INTO agent.tasks(id,tenant_id,agent_id,state,version,payload,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, v.ID, v.TenantID, v.AgentID, v.State, v.Version, raw, v.CreatedAt, v.UpdatedAt)
+	_, err = a.tx.Exec(`INSERT INTO agent.tasks(id,tenant_id,project_id,agent_id,state,version,payload,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, v.ID, v.TenantID, v.ProjectID, v.AgentID, v.State, v.Version, raw, v.CreatedAt, v.UpdatedAt)
 	return mapDB(err)
 }
 func (a *txAdapter) UpdateTask(v domain.AgentTask, e int64) error {

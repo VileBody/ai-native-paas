@@ -15,7 +15,10 @@ import (
 	"testing"
 	"time"
 
+	agentapp "github.com/keir-research/ai-native-paas/internal/agent/application"
 	"github.com/keir-research/ai-native-paas/internal/agent/enrollment"
+	agentmemory "github.com/keir-research/ai-native-paas/internal/agent/memory"
+	agenttestkit "github.com/keir-research/ai-native-paas/internal/agent/testkit"
 	attachmentsapp "github.com/keir-research/ai-native-paas/internal/attachments/application"
 	attachmentsmemory "github.com/keir-research/ai-native-paas/internal/attachments/memory"
 	attachmentstestkit "github.com/keir-research/ai-native-paas/internal/attachments/testkit"
@@ -24,6 +27,7 @@ import (
 	sourceapp "github.com/keir-research/ai-native-paas/internal/source/application"
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
 	"github.com/keir-research/ai-native-paas/internal/workspace"
+	agentv1 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v1"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
 	commercev2 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v2"
@@ -158,6 +162,24 @@ func mcpFixture(t *testing.T, scopes []string) (Handler, string, *workspaceComma
 	return Handler{Enrollment: service, Projects: projectReader{project: project, repo: repository}, Workspaces: workspaces, Infrastructure: infrastructure, SourceChanges: sourceChanges, MergeRequests: workspaces}, access, workspaces
 }
 
+func mcpAuditService(t *testing.T) *agentapp.Service {
+	t.Helper()
+	clock := &agenttestkit.Clock{T: time.Date(2026, 7, 14, 5, 0, 0, 0, time.UTC)}
+	service := &agentapp.Service{Store: agentmemory.New(), Clock: clock, IDs: &agenttestkit.IDs{}}
+	if _, err := service.RegisterPrincipal(context.Background(), agentapp.RegisterPrincipalCommand{
+		ID: "agent-1", TenantID: "tenant-1", OnBehalfOfUserID: "user-1", Scopes: []string{"*"}, CredentialExpiresAt: clock.T.Add(time.Hour),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.StartTask(context.Background(), agentapp.StartTaskCommand{
+		ID: "task-1", TenantID: "tenant-1", ProjectID: "project-1", AgentID: "agent-1", OnBehalfOfUserID: "user-1",
+		CorrelationID: "corr-1", IntentID: "intent-1", BudgetPolicy: agentv1.BudgetPolicy{RepairThreshold: 3},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return service
+}
+
 func TestProjectMCP_ExactPlanApprovalGatesVerifiedWorkspaceApply(t *testing.T) {
 	scopes := []string{
 		"agent.tool:workspace_exec", "agent.tool:infra_plan", "agent.tool:infra_get_plan",
@@ -248,6 +270,8 @@ func TestAgent_SecretSetIsWriteOnlyAcrossMCPAndWorkspace(t *testing.T) {
 	handler, access, workspaces := mcpFixture(t, []string{
 		"agent.tool:secret_set", "agent.tool:secret_list_metadata", "agent.tool:workspace_exec",
 	})
+	auditService := mcpAuditService(t)
+	handler.Audit = auditService
 	store := attachmentsmemory.New()
 	vault := attachmentstestkit.NewVault()
 	logger := &attachmentstestkit.Logger{}
@@ -327,6 +351,11 @@ func TestAgent_SecretSetIsWriteOnlyAcrossMCPAndWorkspace(t *testing.T) {
 	assertSecretAbsent(t, failedResponse.Body.Bytes(), sentinel, "public provider error")
 	assertSecretAbsent(t, mustJSON(t, store.Audit()), sentinel, "attachments audit")
 	assertSecretAbsent(t, mustJSON(t, store.Outbox()), sentinel, "attachments outbox")
+	audit, err := auditService.AuditTrail(context.Background(), "tenant-1", "task-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertSecretAbsent(t, mustJSON(t, audit), sentinel, "agent task evidence")
 	if logger.Contains(sentinel) {
 		t.Fatal("secret value leaked to structured logs")
 	}
@@ -585,5 +614,37 @@ func TestProjectMCP_WorkspaceToolsDeriveScopeAndProjectFromAccessCredential(t *t
 	rejected := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, crossScope)
 	if rejected.Code != http.StatusBadRequest || workspaces.created.IdempotencyKey != before.IdempotencyKey {
 		t.Fatalf("scope override status=%d body=%s request=%#v", rejected.Code, rejected.Body.String(), workspaces.created)
+	}
+}
+
+func TestProjectMCP_SuccessfulToolAppendsIdempotentTaskEvidence(t *testing.T) {
+	handler, access, _ := mcpFixture(t, []string{"agent.tool:workspace_create"})
+	service := mcpAuditService(t)
+	handler.Audit = service
+
+	create := invocation(agentv2.ToolWorkspaceCreate)
+	create.IdempotencyKey = "workspace-audit-1"
+	create.Arguments = json.RawMessage(`{"repository_id":"repo-1","commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","image_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cpu_millis":2000,"memory_mib":4096,"ttl_seconds":900,"network_profile":"isolated-governed"}`)
+	for attempt := 0; attempt < 2; attempt++ {
+		response := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, create)
+		if response.Code != http.StatusOK {
+			t.Fatalf("attempt=%d status=%d body=%s", attempt, response.Code, response.Body.String())
+		}
+	}
+	audit, err := service.AuditTrail(context.Background(), "tenant-1", "task-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for _, event := range audit {
+		if event.Action == string(agentv2.ToolWorkspaceCreate) {
+			count++
+			if event.Evidence.ProjectID != "project-1" || event.Evidence.WorkspaceID != "workspace-1" || event.AgentID != "agent-1" || event.CorrelationID != "corr-1" {
+				t.Fatalf("evidence=%+v event=%+v", event.Evidence, event)
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("workspace audit count=%d audit=%+v", count, audit)
 	}
 }

@@ -2,11 +2,14 @@ package application
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/keir-research/ai-native-paas/internal/agent/domain"
 	agentv1 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v1"
+	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
 	commercev1 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1"
 	"strings"
 	"time"
@@ -18,8 +21,19 @@ type RegisterPrincipalCommand struct {
 	CredentialExpiresAt            time.Time
 }
 type StartTaskCommand struct {
-	ID, TenantID, AgentID, OnBehalfOfUserID, CorrelationID string
-	BudgetPolicy                                           agentv1.BudgetPolicy
+	ID, TenantID, ProjectID, AgentID, OnBehalfOfUserID, CorrelationID string
+	IntentID                                                          string
+	BudgetPolicy                                                      agentv1.BudgetPolicy
+}
+
+// RecordTaskEvidenceCommand is an internal, trusted-producer contract. Its
+// identity fields must come from verified Project MCP scope, never from tool
+// arguments supplied by an agent.
+type RecordTaskEvidenceCommand struct {
+	TenantID, ProjectID, AgentID, TaskID, CorrelationID string
+	Tool                                                agentv2.Tool
+	IdempotencyKey                                      string
+	Evidence                                            agentv1.AuditEvidence
 }
 
 func (s *Service) RegisterPrincipal(ctx context.Context, c RegisterPrincipalCommand) (domain.AgentPrincipal, error) {
@@ -46,11 +60,11 @@ func (s *Service) StartTask(ctx context.Context, c StartTaskCommand) (domain.Age
 	if err := s.require(); err != nil {
 		return domain.AgentTask{}, err
 	}
-	if c.BudgetPolicy.Validate() != nil {
-		return domain.AgentTask{}, domain.NewError(domain.CodeInvalidArgument, "invalid task budget")
+	if c.BudgetPolicy.Validate() != nil || !agentv1.ValidID(c.ID) || !agentv1.ValidID(c.TenantID) || c.ProjectID != "" && !agentv1.ValidID(c.ProjectID) || !agentv1.ValidID(c.AgentID) || !agentv1.ValidID(c.OnBehalfOfUserID) || !agentv1.ValidID(c.CorrelationID) || c.IntentID != "" && !agentv1.ValidID(c.IntentID) {
+		return domain.AgentTask{}, domain.NewError(domain.CodeInvalidArgument, "invalid task identity or budget")
 	}
 	now := s.now()
-	t := domain.AgentTask{ID: c.ID, TenantID: c.TenantID, AgentID: c.AgentID, OnBehalfOfUserID: c.OnBehalfOfUserID, CorrelationID: c.CorrelationID, State: domain.TaskActive, BudgetPolicy: c.BudgetPolicy, Version: 1, CreatedAt: now, UpdatedAt: now}
+	t := domain.AgentTask{ID: c.ID, TenantID: c.TenantID, ProjectID: c.ProjectID, AgentID: c.AgentID, OnBehalfOfUserID: c.OnBehalfOfUserID, CorrelationID: c.CorrelationID, State: domain.TaskActive, BudgetPolicy: c.BudgetPolicy, Version: 1, CreatedAt: now, UpdatedAt: now}
 	err := s.Store.Transact(ctx, func(tx Tx) error {
 		p, ok := tx.GetPrincipal(c.AgentID)
 		if !ok {
@@ -62,9 +76,81 @@ func (s *Service) StartTask(ctx context.Context, c StartTaskCommand) (domain.Age
 		if _, ok := tx.GetTask(c.ID); ok {
 			return domain.NewError(domain.CodeConflict, "task exists")
 		}
-		return tx.InsertTask(t)
+		if err := tx.InsertTask(t); err != nil {
+			return err
+		}
+		return tx.AppendAudit(domain.AuditRecord{
+			ID: s.newID("audit"), TenantID: t.TenantID, TaskID: t.ID, AgentID: t.AgentID,
+			OnBehalfOfUserID: t.OnBehalfOfUserID, Action: "task_start", CorrelationID: t.CorrelationID,
+			Outcome: "STARTED", ResourceType: "task", ResourceID: t.ID,
+			Evidence: agentv1.AuditEvidence{IntentID: c.IntentID, ProjectID: c.ProjectID}, CreatedAt: now,
+		})
 	})
 	return t, err
+}
+
+// RecordTaskEvidence appends one idempotent, allowlisted event to the task
+// timeline. It lets Project MCP contribute workspace and infrastructure facts
+// to the same chain used by the legacy Agent façade without accepting raw
+// command arguments or provider payloads.
+func (s *Service) RecordTaskEvidence(ctx context.Context, c RecordTaskEvidenceCommand) error {
+	if err := s.require(); err != nil {
+		return err
+	}
+	if !agentv1.ValidID(c.TenantID) || !agentv1.ValidID(c.ProjectID) || !agentv1.ValidID(c.AgentID) || !agentv1.ValidID(c.TaskID) || !agentv1.ValidID(c.CorrelationID) || strings.TrimSpace(c.IdempotencyKey) == "" || len(c.IdempotencyKey) > 128 || !agentv2.ValidTool(c.Tool) {
+		return domain.NewError(domain.CodeInvalidArgument, "invalid task evidence identity")
+	}
+	if c.Evidence.ProjectID != "" && c.Evidence.ProjectID != c.ProjectID {
+		return domain.NewError(domain.CodePermissionDenied, "task evidence project mismatch")
+	}
+	c.Evidence.ProjectID = c.ProjectID
+	if err := c.Evidence.Validate(); err != nil {
+		return domain.Wrap(domain.CodeInvalidArgument, "invalid task evidence", err)
+	}
+	fingerprint, err := json.Marshal(struct {
+		TenantID, ProjectID, AgentID, TaskID, CorrelationID, Tool, IdempotencyKey string
+	}{c.TenantID, c.ProjectID, c.AgentID, c.TaskID, c.CorrelationID, string(c.Tool), c.IdempotencyKey})
+	if err != nil {
+		return domain.Wrap(domain.CodeInvalidArgument, "invalid task evidence", err)
+	}
+	sum := sha256.Sum256(fingerprint)
+	auditID := "audit-evidence-" + hex.EncodeToString(sum[:16])
+	return s.Store.Transact(ctx, func(tx Tx) error {
+		task, ok := tx.GetTask(c.TaskID)
+		if !ok || task.TenantID != c.TenantID || task.ProjectID == "" || task.ProjectID != c.ProjectID || task.AgentID != c.AgentID || task.CorrelationID != c.CorrelationID {
+			return domain.NewError(domain.CodePermissionDenied, "task evidence scope denied")
+		}
+		record := domain.AuditRecord{
+			ID: auditID, TenantID: c.TenantID, TaskID: c.TaskID, AgentID: c.AgentID,
+			OnBehalfOfUserID: task.OnBehalfOfUserID, Action: string(c.Tool), CorrelationID: c.CorrelationID,
+			Outcome: "SUCCEEDED", Evidence: c.Evidence, CreatedAt: s.now(),
+		}
+		record.ResourceType, record.ResourceID = evidenceResource(c.Evidence)
+		for _, existing := range tx.ListAudit(c.TenantID, c.TaskID) {
+			if existing.ID != auditID {
+				continue
+			}
+			if existing.TenantID == record.TenantID && existing.TaskID == record.TaskID && existing.AgentID == record.AgentID && existing.OnBehalfOfUserID == record.OnBehalfOfUserID && existing.Action == record.Action && existing.CorrelationID == record.CorrelationID && existing.Outcome == record.Outcome && existing.ResourceType == record.ResourceType && existing.ResourceID == record.ResourceID && existing.Evidence == record.Evidence {
+				return nil
+			}
+			return domain.NewError(domain.CodeConflict, "task evidence idempotency conflict")
+		}
+		return tx.AppendAudit(record)
+	})
+}
+
+func evidenceResource(e agentv1.AuditEvidence) (string, string) {
+	for _, candidate := range []struct{ kind, id string }{
+		{"deployment", e.DeploymentID}, {"release", e.ReleaseID}, {"apply_operation", e.ApplyOperationID},
+		{"approval_grant", e.ApprovalGrantID}, {"approval_request", e.ApprovalRequestID}, {"plan", e.PlanID},
+		{"build", e.BuildID}, {"commit", e.CommitSHA}, {"workspace_command", e.WorkspaceCommandID},
+		{"workspace", e.WorkspaceID}, {"project", e.ProjectID},
+	} {
+		if candidate.id != "" {
+			return candidate.kind, candidate.id
+		}
+	}
+	return "task", ""
 }
 func (s *Service) GetTask(ctx context.Context, tenant, id string) (agentv1.TaskView, error) {
 	if err := s.require(); err != nil {
@@ -371,7 +457,7 @@ func (s *Service) finalize(ctx context.Context, req agentv1.InvocationRequest, i
 			}
 		}
 		resourceType, resourceID, op := responseRefs(resp)
-		return tx.AppendAudit(domain.AuditRecord{ID: s.newID("audit"), TenantID: req.TenantID, TaskID: req.TaskID, AgentID: req.AgentID, OnBehalfOfUserID: t.OnBehalfOfUserID, Tool: req.Tool, CorrelationID: req.CorrelationID, Outcome: outcome, ResourceType: resourceType, ResourceID: resourceID, OperationID: op, ErrorCode: code, CreatedAt: s.now()})
+		return tx.AppendAudit(domain.AuditRecord{ID: s.newID("audit"), TenantID: req.TenantID, TaskID: req.TaskID, AgentID: req.AgentID, OnBehalfOfUserID: t.OnBehalfOfUserID, Tool: req.Tool, Action: string(req.Tool), CorrelationID: req.CorrelationID, Outcome: outcome, ResourceType: resourceType, ResourceID: resourceID, OperationID: op, ErrorCode: code, Evidence: invocationAuditEvidence(req, resp), CreatedAt: s.now()})
 	})
 }
 func responseRefs(r agentv1.InvocationResponse) (string, string, string) {
@@ -389,7 +475,7 @@ func (s *Service) auditDenied(ctx context.Context, req agentv1.InvocationRequest
 	}
 	return s.Store.Transact(ctx, func(tx Tx) error {
 		t, _ := tx.GetTask(req.TaskID)
-		return tx.AppendAudit(domain.AuditRecord{ID: s.newID("audit"), TenantID: req.TenantID, TaskID: req.TaskID, AgentID: req.AgentID, OnBehalfOfUserID: t.OnBehalfOfUserID, Tool: req.Tool, CorrelationID: req.CorrelationID, Outcome: "DENIED", ErrorCode: string(domain.AsError(err).Code), CreatedAt: s.now()})
+		return tx.AppendAudit(domain.AuditRecord{ID: s.newID("audit"), TenantID: req.TenantID, TaskID: req.TaskID, AgentID: req.AgentID, OnBehalfOfUserID: t.OnBehalfOfUserID, Tool: req.Tool, Action: string(req.Tool), CorrelationID: req.CorrelationID, Outcome: "DENIED", ErrorCode: string(domain.AsError(err).Code), CreatedAt: s.now()})
 	})
 }
 func (s *Service) failureResponse(id string, err error) agentv1.InvocationResponse {
@@ -435,7 +521,16 @@ func (s *Service) GrantApprovalForTenant(ctx context.Context, tenant, requestID,
 			return err
 		}
 		out = domain.ApprovalGrant{ID: s.newID("grant"), RequestID: r.ID, TenantID: r.TenantID, AgentID: r.AgentID, TaskID: r.TaskID, ApproverUserID: userID, Action: r.Action, Resource: r.Resource, PayloadHash: r.PayloadHash, ExpiresAt: r.ExpiresAt, Version: 1, CreatedAt: s.now()}
-		return tx.InsertApprovalGrant(out)
+		if err := tx.InsertApprovalGrant(out); err != nil {
+			return err
+		}
+		task, _ := tx.GetTask(r.TaskID)
+		return tx.AppendAudit(domain.AuditRecord{
+			ID: s.newID("audit"), TenantID: r.TenantID, TaskID: r.TaskID, AgentID: r.AgentID,
+			OnBehalfOfUserID: task.OnBehalfOfUserID, Action: "approval_grant", CorrelationID: task.CorrelationID,
+			Outcome: "GRANTED", ResourceType: "approval_grant", ResourceID: out.ID,
+			Evidence: agentv1.AuditEvidence{ApprovalRequestID: r.ID, ApprovalGrantID: out.ID, ApprovalPayloadHash: r.PayloadHash}, CreatedAt: s.now(),
+		})
 	})
 	return out, err
 }
@@ -458,7 +553,16 @@ func (s *Service) DenyApprovalForTenant(ctx context.Context, tenant, requestID, 
 		old := r.Version
 		r.Version++
 		r.UpdatedAt = s.now()
-		return tx.UpdateApprovalRequest(r, old)
+		if err := tx.UpdateApprovalRequest(r, old); err != nil {
+			return err
+		}
+		task, _ := tx.GetTask(r.TaskID)
+		return tx.AppendAudit(domain.AuditRecord{
+			ID: s.newID("audit"), TenantID: r.TenantID, TaskID: r.TaskID, AgentID: r.AgentID,
+			OnBehalfOfUserID: task.OnBehalfOfUserID, Action: "approval_denial", CorrelationID: task.CorrelationID,
+			Outcome: "DENIED", ResourceType: "approval_request", ResourceID: r.ID,
+			Evidence: agentv1.AuditEvidence{ApprovalRequestID: r.ID, ApprovalPayloadHash: r.PayloadHash}, CreatedAt: s.now(),
+		})
 	})
 }
 func (s *Service) RecordFailure(ctx context.Context, tenant, taskID, fingerprint string, platform bool) error {
