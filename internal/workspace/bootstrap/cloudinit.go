@@ -25,11 +25,13 @@ const (
 type CloudInitRenderer struct {
 	Issuer           CertificateIssuer
 	ControlPlaneURL  string
+	EgressGatewayURL string
 	MaximumByteCount int
 }
 
 type agentConfig struct {
 	ControlPlaneURL  string `json:"control_plane_url"`
+	EgressGatewayURL string `json:"egress_gateway_url"`
 	WorkspaceID      string `json:"workspace_id"`
 	CorrelationID    string `json:"correlation_id"`
 	CertificateFile  string `json:"certificate_file"`
@@ -60,6 +62,10 @@ func (r CloudInitRenderer) Render(ctx context.Context, request workspace.Provide
 	if err != nil || endpoint.Scheme != "https" || endpoint.Host == "" || endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" {
 		return "", errors.New("workspace agent control-plane URL is invalid")
 	}
+	gateway, err := url.Parse(strings.TrimSpace(r.EgressGatewayURL))
+	if err != nil || gateway.Scheme != "https" || gateway.Host == "" || gateway.User != nil || gateway.RawQuery != "" || gateway.Fragment != "" || gateway.Path != "" && gateway.Path != "/" || gateway.Port() == "" {
+		return "", errors.New("workspace agent egress gateway URL is invalid")
+	}
 	if r.Issuer == nil || strings.TrimSpace(request.CorrelationID) == "" {
 		return "", errors.New("workspace bootstrap dependencies are unavailable")
 	}
@@ -73,7 +79,7 @@ func (r CloudInitRenderer) Render(ctx context.Context, request workspace.Provide
 	}
 	defer bundle.Clear()
 	config, err := json.Marshal(agentConfig{
-		ControlPlaneURL: strings.TrimRight(endpoint.String(), "/"), WorkspaceID: request.WorkspaceID, CorrelationID: request.CorrelationID,
+		ControlPlaneURL: strings.TrimRight(endpoint.String(), "/"), EgressGatewayURL: strings.TrimRight(gateway.String(), "/"), WorkspaceID: request.WorkspaceID, CorrelationID: request.CorrelationID,
 		CertificateFile: agentCertPath, PrivateKeyFile: agentKeyPath, CAFile: agentCAPath,
 		JournalDirectory: agentJournalPath, WorkspaceRoot: agentWorkspaceRoot,
 	})

@@ -1,0 +1,56 @@
+name: workspace-egress-gateway
+
+on:
+  push:
+    paths:
+      - 'cmd/workspace-egress-gateway/**'
+      - 'internal/workspace/egressgateway/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.dockerignore'
+      - '.github/workflows/workspace-egress-gateway.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.25.x'
+          cache: true
+      - run: make fmt-check
+      - run: go vet ./cmd/workspace-egress-gateway ./internal/workspace/egressgateway
+      - run: go test -race -count=1 ./internal/workspace/egressgateway
+      - run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath ./cmd/workspace-egress-gateway
+
+  image:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ secrets.TWC_REGISTRY_HOST }}
+          username: ${{ secrets.TWC_REGISTRY_USERNAME }}
+          password: ${{ secrets.TWC_REGISTRY_TOKEN }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: cmd/workspace-egress-gateway/Dockerfile
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ${{ secrets.TWC_REGISTRY_HOST }}/ai-native-paas-workspace-egress-gateway:${{ github.sha }}

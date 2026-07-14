@@ -1,7 +1,7 @@
 [Unit]
 Description=Rootless BuildKit for AI-native PaaS workspace
-After=network-online.target
-Wants=network-online.target
+After=network-online.target ai-native-paas-workspace-agent.service
+Wants=network-online.target ai-native-paas-workspace-agent.service
 
 [Service]
 Type=simple
@@ -9,6 +9,9 @@ User=workspace-agent
 Group=workspace-agent
 Environment=HOME=/home/workspace-agent
 Environment=XDG_RUNTIME_DIR=/run/workspace-buildkit
+Environment=HTTP_PROXY=http://127.0.0.1:18081
+Environment=HTTPS_PROXY=http://127.0.0.1:18081
+Environment=NO_PROXY=127.0.0.1,localhost
 RuntimeDirectory=workspace-buildkit
 RuntimeDirectoryMode=0700
 ExecStart=/usr/local/bin/rootlesskit --net=slirp4netns --copy-up=/etc --disable-host-loopback /usr/local/bin/buildkitd --addr unix:///run/workspace-buildkit/buildkitd.sock

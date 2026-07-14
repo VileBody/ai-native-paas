@@ -162,7 +162,7 @@ func newProvider(t *testing.T, handler http.Handler) (*Provider, *httptest.Serve
 		BaseURL: server.URL + "/api/v1", Token: testToken, ProjectID: 2545534, ConfiguratorID: 123,
 		AvailabilityZone: "msk-1", BandwidthMbps: 100, SystemDiskMiB: 40960,
 		ImageIDs: map[string]string{testDigest: "image-uuid-1"}, EgressGatewayCIDRs: []string{"192.168.75.4/32"},
-		DNSResolverCIDRs: []string{"192.168.75.1/32"}, HTTPClient: server.Client(),
+		EgressGatewayPort: 8443, DNSResolverCIDRs: []string{"192.168.75.1/32"}, HTTPClient: server.Client(),
 		RenderCloudInit: func(context.Context, workspace.ProviderCreateRequest) (string, error) {
 			return "#cloud-config\nwrite_files: []\n", nil
 		},
@@ -209,6 +209,9 @@ func TestTimewebWorkspace_CreateFindDestroyIsPrivateFailClosedAndRecoverable(t *
 	for _, rule := range rules {
 		if rule["direction"] != "egress" || rule["cidr"] != "192.168.75.4/32" && rule["cidr"] != "192.168.75.1/32" {
 			t.Fatalf("firewall rule opens an unapproved path: %#v", rule)
+		}
+		if rule["cidr"] == "192.168.75.4/32" && rule["port"] != "8443" {
+			t.Fatalf("gateway firewall opens more than the proxy port: %#v", rule)
 		}
 	}
 	api.mu.Lock()

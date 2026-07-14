@@ -13,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -39,6 +38,8 @@ type Client struct {
 	mu              sync.RWMutex
 	certificate     tls.Certificate
 	identityURI     string
+	gateway         *url.URL
+	roots           *x509.CertPool
 }
 
 func NewClient(config Config) (*Client, error) {
@@ -61,6 +62,8 @@ func NewClient(config Config) (*Client, error) {
 		certificateFile: config.CertificateFile, privateKeyFile: config.PrivateKeyFile, caFile: config.CAFile,
 		certificate: pair, identityURI: identityURI,
 	}
+	gateway, _ := url.Parse(strings.TrimRight(config.EgressGatewayURL, "/"))
+	client.gateway = gateway
 	caRaw, err := readSecureFile(config.CAFile, 256<<10)
 	if err != nil {
 		caRaw, err = readSecureFile(config.CAFile+".previous", 256<<10)
@@ -72,9 +75,10 @@ func NewClient(config Config) (*Client, error) {
 	if !roots.AppendCertsFromPEM(caRaw) {
 		return nil, errors.New("parse workspace control-plane CA")
 	}
+	client.roots = roots
 	transport := &http.Transport{
 		Proxy:             nil,
-		DialContext:       (&net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		DialContext:       client.DialEgress,
 		ForceAttemptHTTP2: true,
 		TLSClientConfig: &tls.Config{
 			MinVersion: tls.VersionTLS13, RootCAs: roots,

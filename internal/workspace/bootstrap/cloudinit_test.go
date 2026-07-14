@@ -33,7 +33,7 @@ func bootstrapRequest() workspace.ProviderCreateRequest {
 
 func TestCloudInitRenderer_EmbedsOnlyEncodedShortLivedIdentityAndNoShell(t *testing.T) {
 	issuer := &issuerFake{}
-	renderer := CloudInitRenderer{Issuer: issuer, ControlPlaneURL: "https://workspace-gateway.example.com"}
+	renderer := CloudInitRenderer{Issuer: issuer, ControlPlaneURL: "https://workspace-gateway.example.com", EgressGatewayURL: "https://egress.example.com:8443"}
 	rendered, err := renderer.Render(context.Background(), bootstrapRequest())
 	if err != nil {
 		t.Fatal(err)
@@ -67,17 +67,17 @@ func TestCloudInitRenderer_EmbedsOnlyEncodedShortLivedIdentityAndNoShell(t *test
 		t.Fatal(err)
 	}
 	var config agentConfig
-	if err := json.Unmarshal(configRaw, &config); err != nil || config.CorrelationID != "correlation-1" || config.ControlPlaneURL != "https://workspace-gateway.example.com" || config.PrivateKeyFile != agentKeyPath || config.JournalDirectory != agentJournalPath || config.WorkspaceRoot != agentWorkspaceRoot {
+	if err := json.Unmarshal(configRaw, &config); err != nil || config.CorrelationID != "correlation-1" || config.ControlPlaneURL != "https://workspace-gateway.example.com" || config.EgressGatewayURL != "https://egress.example.com:8443" || config.PrivateKeyFile != agentKeyPath || config.JournalDirectory != agentJournalPath || config.WorkspaceRoot != agentWorkspaceRoot {
 		t.Fatalf("agent config=%#v err=%v", config, err)
 	}
 }
 
 func TestCloudInitRenderer_RejectsNonTLSControlPlaneAndSizeOverflow(t *testing.T) {
 	request := bootstrapRequest()
-	if _, err := (CloudInitRenderer{Issuer: &issuerFake{}, ControlPlaneURL: "http://workspace-gateway.example.com"}).Render(context.Background(), request); err == nil {
+	if _, err := (CloudInitRenderer{Issuer: &issuerFake{}, ControlPlaneURL: "http://workspace-gateway.example.com", EgressGatewayURL: "https://egress.example.com:8443"}).Render(context.Background(), request); err == nil {
 		t.Fatal("non-TLS workspace control plane accepted")
 	}
-	if _, err := (CloudInitRenderer{Issuer: &issuerFake{}, ControlPlaneURL: "https://workspace-gateway.example.com", MaximumByteCount: 64}).Render(context.Background(), request); err == nil {
+	if _, err := (CloudInitRenderer{Issuer: &issuerFake{}, ControlPlaneURL: "https://workspace-gateway.example.com", EgressGatewayURL: "https://egress.example.com:8443", MaximumByteCount: 64}).Render(context.Background(), request); err == nil {
 		t.Fatal("oversized cloud-init accepted")
 	}
 }

@@ -32,17 +32,18 @@ type OutputSink interface {
 }
 
 type Agent struct {
-	WorkspaceID string
-	Control     ControlPlane
-	Journal     *Journal
-	Resolver    EnvironmentResolver
-	Executor    CommandExecutor
-	Outputs     OutputSink
-	Policy      workspace.CommandPolicy
-	Now         func() time.Time
-	Log         func(string, ...any)
-	active      *activeCommand
-	results     chan commandCompletion
+	WorkspaceID       string
+	Control           ControlPlane
+	Journal           *Journal
+	Resolver          EnvironmentResolver
+	Executor          CommandExecutor
+	Outputs           OutputSink
+	Policy            workspace.CommandPolicy
+	Now               func() time.Time
+	Log               func(string, ...any)
+	SystemEnvironment map[string]string
+	active            *activeCommand
+	results           chan commandCompletion
 }
 
 type activeCommand struct {
@@ -205,10 +206,9 @@ func (a *Agent) handleExec(ctx context.Context, sessionID string, message worksp
 		}
 		return a.flushOutcomes(ctx, sessionID)
 	}
-	environment.SystemValues = map[string]string{
-		"PLATFORM_COMMAND_ID":           message.CommandID,
-		"PLATFORM_EXECUTION_SESSION_ID": sessionID,
-	}
+	environment.SystemValues = cloneSystemEnvironment(a.SystemEnvironment)
+	environment.SystemValues["PLATFORM_COMMAND_ID"] = message.CommandID
+	environment.SystemValues["PLATFORM_EXECUTION_SESSION_ID"] = sessionID
 	executionContext, cancel := context.WithCancel(ctx)
 	a.active = &activeCommand{commandID: message.CommandID, executionSessionID: sessionID, cancel: cancel}
 	spec := cloneCommandSpec(*message.Spec)
@@ -309,6 +309,16 @@ func (a *Agent) require() error {
 		return errors.New("workspace agent dependencies are unavailable")
 	}
 	return nil
+}
+
+func cloneSystemEnvironment(values map[string]string) map[string]string {
+	result := make(map[string]string, len(values)+2)
+	for name, value := range values {
+		if systemEnvironmentName(name) && value != "" && !strings.ContainsRune(value, '\x00') {
+			result[name] = value
+		}
+	}
+	return result
 }
 
 func (a *Agent) log(message string, values ...any) {

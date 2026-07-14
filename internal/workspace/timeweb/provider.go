@@ -38,6 +38,7 @@ type Config struct {
 	SystemDiskMiB      int64
 	ImageIDs           map[string]string
 	EgressGatewayCIDRs []string
+	EgressGatewayPort  int
 	DNSResolverCIDRs   []string
 	HTTPClient         *http.Client
 	RenderCloudInit    CloudInitRenderer
@@ -53,6 +54,7 @@ type Provider struct {
 	systemDiskMiB      int64
 	imageIDs           map[string]string
 	egressGatewayCIDRs []string
+	egressGatewayPort  int
 	dnsResolverCIDRs   []string
 	client             *http.Client
 	renderCloudInit    CloudInitRenderer
@@ -70,7 +72,7 @@ func New(config Config) (*Provider, error) {
 	if parsed.Scheme != "https" && !isLoopbackHost(parsed.Hostname()) {
 		return nil, errors.New("Timeweb API requires HTTPS")
 	}
-	if strings.TrimSpace(config.Token) == "" || config.ProjectID <= 0 || config.ConfiguratorID <= 0 || strings.TrimSpace(config.AvailabilityZone) == "" || config.BandwidthMbps < 1 || config.SystemDiskMiB < 10240 || len(config.ImageIDs) == 0 || len(config.EgressGatewayCIDRs) == 0 || len(config.DNSResolverCIDRs) == 0 || config.RenderCloudInit == nil {
+	if strings.TrimSpace(config.Token) == "" || config.ProjectID <= 0 || config.ConfiguratorID <= 0 || strings.TrimSpace(config.AvailabilityZone) == "" || config.BandwidthMbps < 1 || config.SystemDiskMiB < 10240 || len(config.ImageIDs) == 0 || len(config.EgressGatewayCIDRs) == 0 || config.EgressGatewayPort < 1 || config.EgressGatewayPort > 65535 || len(config.DNSResolverCIDRs) == 0 || config.RenderCloudInit == nil {
 		return nil, errors.New("Timeweb workspace provider configuration is incomplete")
 	}
 	for digest, imageID := range config.ImageIDs {
@@ -88,7 +90,7 @@ func New(config Config) (*Provider, error) {
 	return &Provider{
 		baseURL: parsed, token: config.Token, projectID: config.ProjectID, configuratorID: config.ConfiguratorID,
 		availabilityZone: config.AvailabilityZone, bandwidthMbps: config.BandwidthMbps, systemDiskMiB: config.SystemDiskMiB,
-		imageIDs: cloneMap(config.ImageIDs), egressGatewayCIDRs: sortedCopy(config.EgressGatewayCIDRs),
+		imageIDs: cloneMap(config.ImageIDs), egressGatewayCIDRs: sortedCopy(config.EgressGatewayCIDRs), egressGatewayPort: config.EgressGatewayPort,
 		dnsResolverCIDRs: sortedCopy(config.DNSResolverCIDRs), client: client, renderCloudInit: config.RenderCloudInit,
 	}, nil
 }
@@ -380,7 +382,7 @@ type rulesEnvelope struct {
 func (p *Provider) reconcileFirewallRules(ctx context.Context, groupID string) error {
 	desired := make(map[string]firewallRule)
 	for _, cidr := range p.egressGatewayCIDRs {
-		rule := firewallRule{Direction: "egress", Protocol: "tcp", CIDR: cidr, Port: "1-65535"}
+		rule := firewallRule{Direction: "egress", Protocol: "tcp", CIDR: cidr, Port: strconv.Itoa(p.egressGatewayPort)}
 		desired[firewallRuleKey(rule)] = rule
 	}
 	for _, cidr := range p.dnsResolverCIDRs {

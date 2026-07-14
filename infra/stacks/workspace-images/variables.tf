@@ -20,6 +20,18 @@ variable "location" {
   default     = "ru-3"
 }
 
+variable "availability_zone" {
+  description = "Moscow availability zone for the workspace NAT address."
+  type        = string
+  default     = "msk-1"
+}
+
+variable "router_preset_id" {
+  description = "Timeweb one-node 1 vCPU router preset in ru-3."
+  type        = number
+  default     = 2009
+}
+
 variable "image_staging_bucket_name" {
   description = "Human-readable name for the private custom-image staging bucket."
   type        = string

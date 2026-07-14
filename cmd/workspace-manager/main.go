@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -68,6 +69,8 @@ type config struct {
 	LogS3SecretKeyFile     string
 	LogEncryptionKeyFile   string
 	ControlPlaneURL        string
+	EgressGatewayURL       string
+	EgressGatewayPort      int
 	AllowedEgressHosts     []string
 	EgressGatewayCIDRs     []string
 	DNSResolverCIDRs       []string
@@ -132,7 +135,7 @@ func main() {
 		logger.Error("initialize OpenBao workspace issuer", "error", err)
 		os.Exit(1)
 	}
-	renderer := bootstrap.CloudInitRenderer{Issuer: issuer, ControlPlaneURL: settings.ControlPlaneURL}
+	renderer := bootstrap.CloudInitRenderer{Issuer: issuer, ControlPlaneURL: settings.ControlPlaneURL, EgressGatewayURL: settings.EgressGatewayURL}
 	timewebToken, err := readSecureFile(settings.TimewebTokenFile, 16<<10)
 	if err != nil {
 		logger.Error("load Timeweb workspace credential", "error", err)
@@ -170,7 +173,7 @@ func main() {
 		ConfiguratorID: settings.TimewebConfiguratorID, AvailabilityZone: settings.TimewebZone,
 		BandwidthMbps: settings.TimewebBandwidthMbps, SystemDiskMiB: settings.TimewebSystemDiskMiB,
 		ImageIDs: settings.WorkspaceImages, EgressGatewayCIDRs: settings.EgressGatewayCIDRs,
-		DNSResolverCIDRs: settings.DNSResolverCIDRs, RenderCloudInit: renderer.Render,
+		EgressGatewayPort: settings.EgressGatewayPort, DNSResolverCIDRs: settings.DNSResolverCIDRs, RenderCloudInit: renderer.Render,
 	})
 	if err != nil {
 		logger.Error("initialize Timeweb workspace provider", "error", err)
@@ -283,6 +286,7 @@ func loadConfig() (config, error) {
 		TimewebAPIURL:          env("TIMEWEB_API_URL", "https://api.timeweb.cloud/api/v1"), TimewebTokenFile: required("TIMEWEB_TOKEN_FILE"),
 		TimewebZone: env("TIMEWEB_AVAILABILITY_ZONE", "msk-1"), WorkspaceVPCID: required("WORKSPACE_VPC_ID"),
 		ControlPlaneURL: required("WORKSPACE_AGENT_PUBLIC_URL"), AllowedEgressHosts: csv("WORKSPACE_ALLOWED_EGRESS_HOSTS"),
+		EgressGatewayURL:   required("WORKSPACE_EGRESS_GATEWAY_URL"),
 		EgressGatewayCIDRs: csv("WORKSPACE_EGRESS_GATEWAY_CIDRS"), DNSResolverCIDRs: csv("WORKSPACE_DNS_RESOLVER_CIDRS"),
 		DeniedCIDRs:   csv("WORKSPACE_DENIED_CIDRS"),
 		LogS3Endpoint: required("WORKSPACE_LOG_S3_ENDPOINT"), LogS3Region: env("WORKSPACE_LOG_S3_REGION", "ru-1"),
@@ -309,6 +313,13 @@ func loadConfig() (config, error) {
 	if settings.TimewebSystemDiskMiB, err = integer("TIMEWEB_WORKSPACE_SYSTEM_DISK_MIB", 40960); err != nil || settings.TimewebSystemDiskMiB < 10240 {
 		return config{}, errors.New("TIMEWEB_WORKSPACE_SYSTEM_DISK_MIB is invalid")
 	}
+	gatewayURL, gatewayErr := url.Parse(settings.EgressGatewayURL)
+	if gatewayErr != nil || gatewayURL.Scheme != "https" || gatewayURL.Hostname() == "" || gatewayURL.Port() == "" {
+		return config{}, errors.New("WORKSPACE_EGRESS_GATEWAY_URL must be an HTTPS URL with an explicit port")
+	}
+	if settings.EgressGatewayPort, err = strconv.Atoi(gatewayURL.Port()); err != nil || settings.EgressGatewayPort < 1 || settings.EgressGatewayPort > 65535 {
+		return config{}, errors.New("WORKSPACE_EGRESS_GATEWAY_URL port is invalid")
+	}
 	if err := json.Unmarshal([]byte(required("WORKSPACE_IMAGE_MAP_JSON")), &settings.WorkspaceImages); err != nil || len(settings.WorkspaceImages) == 0 {
 		return config{}, errors.New("WORKSPACE_IMAGE_MAP_JSON is invalid")
 	}
@@ -318,7 +329,8 @@ func loadConfig() (config, error) {
 		"WORKSPACE_TRUST_DOMAIN": settings.TrustDomain, "OPENBAO_ADDR": settings.OpenBaoAddress,
 		"OPENBAO_TOKEN_FILE": settings.OpenBaoTokenFile, "TIMEWEB_TOKEN_FILE": settings.TimewebTokenFile,
 		"WORKSPACE_VPC_ID": settings.WorkspaceVPCID, "WORKSPACE_AGENT_PUBLIC_URL": settings.ControlPlaneURL,
-		"WORKSPACE_LOG_S3_ENDPOINT": settings.LogS3Endpoint, "WORKSPACE_LOG_S3_BUCKET": settings.LogS3Bucket,
+		"WORKSPACE_EGRESS_GATEWAY_URL": settings.EgressGatewayURL,
+		"WORKSPACE_LOG_S3_ENDPOINT":    settings.LogS3Endpoint, "WORKSPACE_LOG_S3_BUCKET": settings.LogS3Bucket,
 		"WORKSPACE_LOG_S3_ACCESS_KEY_FILE": settings.LogS3AccessKeyFile, "WORKSPACE_LOG_S3_SECRET_KEY_FILE": settings.LogS3SecretKeyFile,
 		"WORKSPACE_LOG_ENCRYPTION_KEY_FILE": settings.LogEncryptionKeyFile,
 	} {

@@ -6,6 +6,14 @@ output "workspace_vpc_cidr" {
   value = "192.168.75.0/24"
 }
 
+output "workspace_router_id" {
+  value = twc_router.workspace_nat.id
+}
+
+output "workspace_nat_ip" {
+  value = twc_floating_ip.workspace_nat.ip
+}
+
 output "image_staging_bucket_name" {
   value = twc_s3_bucket.image_staging.full_name
 }

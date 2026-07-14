@@ -1,7 +1,7 @@
 [Unit]
 Description=AI-native PaaS disposable workspace agent
-After=network-online.target ai-native-paas-buildkit.service cloud-final.service
-Wants=network-online.target ai-native-paas-buildkit.service
+After=network-online.target cloud-final.service
+Wants=network-online.target
 ConditionPathExists=/var/lib/ai-native-paas/identity/workspace-agent.json
 
 [Service]

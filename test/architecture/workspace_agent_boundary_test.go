@@ -24,9 +24,15 @@ func TestArchitecture_WorkspaceAgentIsOutboundOnlyAndExecIsIsolatedToExecutor(t 
 			}
 			body := string(raw)
 			for _, forbidden := range []string{"net.Listen(", "http.ListenAndServe(", "http.Serve(", "ssh.Listen("} {
+				if filepath.Base(path) == "local_proxy.go" && forbidden == "net.Listen(" {
+					continue
+				}
 				if strings.Contains(body, forbidden) {
 					t.Errorf("workspace agent exposes an inbound listener: %s contains %s", path, forbidden)
 				}
+			}
+			if filepath.Base(path) == "local_proxy.go" && (!strings.Contains(body, "IsLoopback()") || !strings.Contains(body, "net.SplitHostPort(address)")) {
+				t.Errorf("workspace local proxy is not constrained to a parsed loopback address: %s", path)
 			}
 			if strings.Contains(body, `"os/exec"`) && filepath.Base(path) != "executor.go" && !strings.HasPrefix(filepath.Base(path), "process_") {
 				t.Errorf("workspace command execution escaped the isolated executor: %s", path)

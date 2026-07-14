@@ -207,7 +207,7 @@ func commandEnvironment(values map[string]string, system ...map[string]string) [
 		}
 		sortStrings(systemNames)
 		for _, name := range systemNames {
-			if strings.HasPrefix(name, "PLATFORM_") && environmentVariableName(name) && !strings.ContainsRune(system[0][name], '\x00') {
+			if systemEnvironmentName(name) && environmentVariableName(name) && !strings.ContainsRune(system[0][name], '\x00') {
 				result = append(result, name+"="+system[0][name])
 			}
 		}
@@ -229,11 +229,15 @@ func environmentVariableName(value string) bool {
 
 func reservedEnvironmentName(value string) bool {
 	switch value {
-	case "HOME", "PATH", "SHELL", "LD_PRELOAD", "LD_LIBRARY_PATH", "GODEBUG", "GOTRACEBACK", "TMPDIR":
+	case "HOME", "PATH", "SHELL", "LD_PRELOAD", "LD_LIBRARY_PATH", "GODEBUG", "GOTRACEBACK", "TMPDIR", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY":
 		return true
 	default:
 		return strings.HasPrefix(value, "SYSTEMD_") || strings.HasPrefix(value, "PLATFORM_")
 	}
+}
+
+func systemEnvironmentName(value string) bool {
+	return strings.HasPrefix(value, "PLATFORM_") || value == "HTTP_PROXY" || value == "HTTPS_PROXY" || value == "NO_PROXY"
 }
 
 func sortStrings(values []string) {

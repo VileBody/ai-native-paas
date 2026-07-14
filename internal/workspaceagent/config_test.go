@@ -20,7 +20,7 @@ func TestWorkspaceAgentConfig_RequiresClosedSecureProductionInput(t *testing.T) 
 	directory := t.TempDir()
 	filename := filepath.Join(directory, "agent.json")
 	config := Config{
-		ControlPlaneURL: "https://workspace.example.com", WorkspaceID: "workspace-1", CorrelationID: "correlation-1",
+		ControlPlaneURL: "https://workspace.example.com", EgressGatewayURL: "https://egress.example.com:8443", WorkspaceID: "workspace-1", CorrelationID: "correlation-1",
 		CertificateFile: "/identity/agent.crt", PrivateKeyFile: "/identity/agent.key", CAFile: "/identity/ca.crt",
 		JournalDirectory: "/state/journal", WorkspaceRoot: "/workspace",
 	}
@@ -50,6 +50,11 @@ func TestWorkspaceAgentConfig_RequiresClosedSecureProductionInput(t *testing.T) 
 	config.ControlPlaneURL = "https://workspace.example.com/untrusted-prefix"
 	if err := config.Validate(); err == nil {
 		t.Fatal("control-plane URL path prefix accepted")
+	}
+	config.ControlPlaneURL = "https://workspace.example.com"
+	config.EgressGatewayURL = "https://egress.example.com"
+	if err := config.Validate(); err == nil {
+		t.Fatal("egress gateway without an explicit governed port accepted")
 	}
 }
 

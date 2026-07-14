@@ -60,6 +60,14 @@ func main() {
 		logger.Error("initialize workspace-agent mTLS client", "error", err)
 		os.Exit(1)
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+	proxy, err := workspaceagent.StartLocalProxy(ctx, "127.0.0.1:18081", client)
+	if err != nil {
+		logger.Error("initialize workspace local egress proxy", "error", err)
+		os.Exit(1)
+	}
+	defer proxy.Close()
 	journal, err := workspaceagent.NewJournal(config.JournalDirectory, config.WorkspaceID, time.Now)
 	if err != nil {
 		logger.Error("initialize workspace-agent journal", "error", err)
@@ -71,10 +79,9 @@ func main() {
 		Executor: workspaceagent.Executor{WorkspaceRoot: config.WorkspaceRoot, Policy: workspace.DefaultCommandPolicy(), Now: time.Now, RequireCgroup: true},
 		Outputs:  workspaceagent.FileOutputSink{Directory: filepath.Join(config.JournalDirectory, "output")},
 		Policy:   workspace.DefaultCommandPolicy(), Now: time.Now,
-		Log: func(message string, values ...any) { logger.Info(message, values...) },
+		SystemEnvironment: map[string]string{"HTTP_PROXY": proxy.URL(), "HTTPS_PROXY": proxy.URL(), "NO_PROXY": "127.0.0.1,localhost"},
+		Log:               func(message string, values ...any) { logger.Info(message, values...) },
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer stop()
 	if err := agent.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		logger.Error("workspace-agent stopped", "error", err)
 		os.Exit(1)

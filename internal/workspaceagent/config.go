@@ -18,6 +18,7 @@ var identityPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
 
 type Config struct {
 	ControlPlaneURL  string `json:"control_plane_url"`
+	EgressGatewayURL string `json:"egress_gateway_url"`
 	WorkspaceID      string `json:"workspace_id"`
 	CorrelationID    string `json:"correlation_id"`
 	CertificateFile  string `json:"certificate_file"`
@@ -52,6 +53,10 @@ func (c Config) Validate() error {
 	endpoint, err := url.Parse(strings.TrimSpace(c.ControlPlaneURL))
 	if err != nil || endpoint.Scheme != "https" || endpoint.Host == "" || endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" || endpoint.RawPath != "" || endpoint.Path != "" && endpoint.Path != "/" {
 		return errors.New("workspace agent control-plane URL is invalid")
+	}
+	gateway, err := url.Parse(strings.TrimSpace(c.EgressGatewayURL))
+	if err != nil || gateway.Scheme != "https" || gateway.Host == "" || gateway.User != nil || gateway.RawQuery != "" || gateway.Fragment != "" || gateway.RawPath != "" || gateway.Path != "" && gateway.Path != "/" || gateway.Port() == "" {
+		return errors.New("workspace agent egress gateway URL is invalid")
 	}
 	if !identityPattern.MatchString(c.WorkspaceID) || !identityPattern.MatchString(c.CorrelationID) {
 		return errors.New("workspace agent identity is invalid")

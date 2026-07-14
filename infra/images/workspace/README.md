@@ -12,6 +12,11 @@ short-lived mTLS bootstrap files. The agent has no listener. Its systemd unit
 has a delegated cgroup subtree, and each command is born in its own cgroup so
 timeout/cancel can use `cgroup.kill` even if a child calls `setsid()`.
 
+The only listener is an unprivileged proxy bound to `127.0.0.1:18081`. Both
+agent commands and rootless BuildKit use it; every outbound HTTPS stream is
+then carried through the mTLS workspace egress gateway. The Timeweb firewall
+does not permit a direct Internet fallback.
+
 Locked upstream versions are sourced from their official release channels:
 OpenTofu 1.12.4, BuildKit 0.31.1, RootlessKit 3.0.2, Helm 3.21.3,
 Kustomize 5.8.1, Cosign 3.1.1 and Syft 1.46.0. Updating any one of them is an
