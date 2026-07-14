@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 924,
-  "discovered_unique_test_name_count": 922,
+  "discovered_go_test_count": 926,
+  "discovered_unique_test_name_count": 924,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -498,10 +498,10 @@
       "id": "R3",
       "level": "integration/fuzz",
       "name": "TestGitOps_KustomizeRenderIsDeterministicAndPathSafe",
-      "status": "NEW",
-      "test_file": "test/pivot/runtime_gitops_test.go",
+      "status": "REUSED",
+      "test_file": "internal/runtime/gitops/kustomize_test.go",
       "test_name": "TestGitOps_KustomizeRenderIsDeterministicAndPathSafe",
-      "test_ref": "test/pivot/runtime_gitops_test.go::TestGitOps_KustomizeRenderIsDeterministicAndPathSafe"
+      "test_ref": "internal/runtime/gitops/kustomize_test.go::TestGitOps_KustomizeRenderIsDeterministicAndPathSafe"
     },
     {
       "family": "R",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 31,
-      "REUSED": 60
+      "NEW": 30,
+      "REUSED": 61
     },
     "unmapped": 0
   }

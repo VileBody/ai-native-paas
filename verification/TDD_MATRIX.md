@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **924**
-- Reused now: **60**
-- New local/contract tests required: **31**
+- Discovered Go tests/fuzz targets: **926**
+- Reused now: **61**
+- New local/contract tests required: **30**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -63,7 +63,7 @@ A release gate may become green only after every referenced test exists and pass
 | `B15` | REUSED | contract/crypto | `internal/build/provenance/provenance_test.go::TestBuild_ProvenanceBindsSourceSpecBuilderAndOutputDigest` |
 | `R1` | LIVE_ONLY | application | `test/pivot/runtime_gitops_test.go::TestGitOps_CommitMayModifyOnlyProjectEnvironmentPath` |
 | `R2` | LIVE_ONLY | integration/golden | `test/pivot/runtime_gitops_test.go::TestGitOps_HelmRenderIsDeterministicForPinnedInputs` |
-| `R3` | NEW | integration/fuzz | `test/pivot/runtime_gitops_test.go::TestGitOps_KustomizeRenderIsDeterministicAndPathSafe` |
+| `R3` | REUSED | integration/fuzz | `internal/runtime/gitops/kustomize_test.go::TestGitOps_KustomizeRenderIsDeterministicAndPathSafe` |
 | `R4` | LIVE_ONLY | policy | `test/pivot/runtime_gitops_test.go::TestGitOps_ForbiddenClusterScopedResourceRejectedBeforeCommit` |
 | `R5` | LIVE_ONLY | policy | `test/pivot/runtime_gitops_test.go::TestGitOps_PrivilegedWorkloadRejectedRegardlessOfHelmSource` |
 | `R6` | LIVE_ONLY | manifest contract + real Argo | `test/pivot/runtime_gitops_test.go::TestArgoProject_AllowsOnlyExpectedRepositoryClusterAndNamespaces` |
