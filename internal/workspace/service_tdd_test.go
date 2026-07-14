@@ -254,7 +254,7 @@ func TestWorkspace_CommitReceiptRequiresRunningCommandAndSourceBinding(t *testin
 	ready := f.ready(t)
 	view, err := f.service.Exec(context.Background(), ExecRequest{
 		Scope: f.scope, WorkspaceID: ready.WorkspaceID, Kind: "repository_commit", SerializationKey: "repository:repo-1", IdempotencyKey: "commit-receipt-1",
-		Spec: workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-git-commit"}, TimeoutSeconds: 300, OutputLimitBytes: 4096},
+		Spec: workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-git-commit", "repo-1", strings.Repeat("a", 40), "agent/task-1", "agent-1", "task-1", "corr-1", "sha256:" + strings.Repeat("d", 64), "change"}, TimeoutSeconds: 300, OutputLimitBytes: 4096},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -264,7 +264,7 @@ func TestWorkspace_CommitReceiptRequiresRunningCommandAndSourceBinding(t *testin
 	}
 	statement := sourcev2.CommitStatement{
 		RepositoryID: "repo-1", BaseSHA: strings.Repeat("a", 40), CommitSHA: strings.Repeat("b", 40), Branch: "agent/task-1",
-		AgentID: "agent-1", TaskID: "task-1", CorrelationID: "corr-1", IssuedAt: f.clock.Now(),
+		AgentID: "agent-1", TaskID: "task-1", CorrelationID: "corr-1", SourcePlanHash: "sha256:" + strings.Repeat("d", 64), IssuedAt: f.clock.Now(),
 	}
 	canonical, _ := statement.Canonical()
 	statementDigest := sha256.Sum256(canonical)
@@ -293,6 +293,53 @@ func TestWorkspace_CommitReceiptRequiresRunningCommandAndSourceBinding(t *testin
 	tampered.Statement.RepositoryID = "repo-2"
 	if err := f.service.RecordCommitReceipt(context.Background(), request, tampered); err == nil {
 		t.Fatal("cross-repository commit receipt was accepted")
+	}
+}
+
+func TestSource_ProductionGitOpsPathRequiresApprovalPolicy(t *testing.T) {
+	f := newFixture()
+	f.spec.SourceRevision = &sourcev2.SourceRevision{RepositoryID: "repo-1", CommitSHA: strings.Repeat("a", 40)}
+	ready := f.ready(t)
+	mutation := sourcev2.PatchMutation{Path: "deploy/environments/production/deployment.yaml", ContentBase64: base64.StdEncoding.EncodeToString([]byte("apiVersion: apps/v1\n"))}
+	plan, err := f.service.PlanSourceChange(context.Background(), SourceChangePlanRequest{
+		Scope: f.scope, WorkspaceID: ready.WorkspaceID, RepositoryID: "repo-1", BaseSHA: strings.Repeat("a", 40),
+		TargetBranch: "agent/task-1", TaskID: "task-1", Files: []sourcev2.PatchMutation{mutation}, IdempotencyKey: "source-plan-1",
+	})
+	if err != nil || !plan.RequiresApproval || plan.PlanHash == "" {
+		t.Fatalf("plan=%#v err=%v", plan, err)
+	}
+	if _, err := f.service.CheckSourceApproval(context.Background(), f.scope, plan.PlanID, "forged"); err == nil {
+		t.Fatal("forged source approval was accepted")
+	}
+	grant, err := f.service.GrantSourceApproval(context.Background(), GrantSourceApprovalRequest{
+		TenantID: f.scope.TenantID, ProjectID: f.scope.ProjectID, PlanID: plan.PlanID,
+		ApproverUserID: "human-1", ExpiresAt: f.clock.Now().Add(5 * time.Minute),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorized, err := f.service.AuthorizeSourceCommit(context.Background(), AuthorizeSourceCommitRequest{
+		Scope: f.scope, WorkspaceID: ready.WorkspaceID, RepositoryID: "repo-1", BaseSHA: strings.Repeat("a", 40),
+		TargetBranch: "agent/task-1", TaskID: "task-1", PlanID: plan.PlanID, PlanHash: plan.PlanHash,
+		ApprovalGrantID: grant.GrantID, IdempotencyKey: "source-commit-1",
+	})
+	if err != nil || authorized.AuthorizedAt.IsZero() {
+		t.Fatalf("authorized=%#v err=%v", authorized, err)
+	}
+	replayed, err := f.service.AuthorizeSourceCommit(context.Background(), AuthorizeSourceCommitRequest{
+		Scope: f.scope, WorkspaceID: ready.WorkspaceID, RepositoryID: "repo-1", BaseSHA: strings.Repeat("a", 40),
+		TargetBranch: "agent/task-1", TaskID: "task-1", PlanID: plan.PlanID, PlanHash: plan.PlanHash,
+		ApprovalGrantID: grant.GrantID, IdempotencyKey: "source-commit-1",
+	})
+	if err != nil || !replayed.AuthorizedAt.Equal(authorized.AuthorizedAt) {
+		t.Fatalf("replayed=%#v err=%v", replayed, err)
+	}
+	if _, err := f.service.AuthorizeSourceCommit(context.Background(), AuthorizeSourceCommitRequest{
+		Scope: f.scope, WorkspaceID: ready.WorkspaceID, RepositoryID: "repo-1", BaseSHA: strings.Repeat("a", 40),
+		TargetBranch: "agent/task-1", TaskID: "task-1", PlanID: plan.PlanID, PlanHash: plan.PlanHash,
+		ApprovalGrantID: grant.GrantID, IdempotencyKey: "different-command",
+	}); !errors.Is(err, ErrNotFound) && !errors.Is(err, ErrConflict) {
+		t.Fatalf("consumed approval returned %v", err)
 	}
 }
 

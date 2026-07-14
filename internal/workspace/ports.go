@@ -27,6 +27,11 @@ type Store interface {
 	ReleaseSerialization(context.Context, string, string, string) error
 	PutCommitReceipt(context.Context, CommitReceiptScope, sourcev2.AgentCommitReceipt) error
 	GetCommitReceipt(context.Context, string, string, string) (sourcev2.AgentCommitReceipt, error)
+	CreateSourceChangePlan(context.Context, SourceChangePlan) (SourceChangePlan, error)
+	GetSourceChangePlan(context.Context, string, string, string) (SourceChangePlan, error)
+	CreateSourceApproval(context.Context, SourceApprovalGrant) (SourceApprovalGrant, error)
+	GetActiveSourceApproval(context.Context, string, string, string, string, string, time.Time) (SourceApprovalGrant, error)
+	AuthorizeSourceCommit(context.Context, SourceCommitAuthorization) (SourceChangePlan, error)
 }
 
 type NetworkIsolation struct {

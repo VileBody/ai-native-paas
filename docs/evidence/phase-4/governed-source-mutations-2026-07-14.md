@@ -18,9 +18,12 @@ Implemented:
   command-scoped receipt in PostgreSQL.
 - Pushes verify the repository URL, exact parent revision, commit trailers,
   protected paths and secret scan again, then use only `--force-with-lease`.
-- Production GitOps paths fail closed with `APPROVAL_REQUIRED`; a caller
-  supplied approval identifier is not trusted until the source approval
-  service is implemented.
+- Every patch creates an immutable content-hashed source change plan.
+  Production GitOps paths wait for a human grant bound to plan hash,
+  workspace, branch and agent. The grant is consumed once when commit is
+  authorized; identical lost-response replay is idempotent.
+- The special commit and push paths recompute the actual Git tree change set
+  and require it to equal the authorized plan hash.
 
 Evidence:
 
@@ -28,16 +31,16 @@ Evidence:
 - Real local Git gates pass for exact checkout after mutable branch movement,
   concurrent expected-base push conflict, submodule policy, credential
   non-persistence, secret sentinel blocking and signed attestation.
-- Managed PostgreSQL migration `004_commit_receipts.sql` was applied through a
+- Managed PostgreSQL migrations `004_commit_receipts.sql` and
+  `005_source_change_governance.sql` were applied through a
   temporary in-cluster test pod and
   `TestPostgres_WorkspaceCommitReceiptMigrationAndRoundTrip` passed. The pod
   was deleted immediately after the test.
-- Pivot matrix now discovers 869 Go test/fuzz functions; S2, S3, S5, S6, S7,
-  S14 and S17 are executable `REUSED` evidence.
+- Pivot matrix discovers executable evidence for S2, S3, S4, S5, S6, S7,
+  S14 and S17.
 
 Remaining source gates:
 
-- exact source-plan approval storage and human grant path for production;
 - GitLab.com live token isolation, rename/transfer, archive and 429 tests;
 - merge request creation/comment adapter and branch cleanup intent;
 - command-runner UID separation so task processes cannot read the workspace

@@ -126,7 +126,8 @@ func mcpFixture(t *testing.T, scopes []string) (Handler, string, *workspaceComma
 			Prices:   map[string]infraapp.UnitPrice{"twc_server": {Meter: "server.month", Unit: "server-month", ProviderMinorPerQuantity: 1000, Known: true}},
 		},
 	}
-	return Handler{Enrollment: service, Projects: projectReader{project: project, repo: repository}, Workspaces: workspaces, Infrastructure: infrastructure}, access, workspaces
+	sourceChanges := &workspace.Service{Store: workspace.NewMemoryStore(), Clock: clock, IDs: &mcpIDs{}}
+	return Handler{Enrollment: service, Projects: projectReader{project: project, repo: repository}, Workspaces: workspaces, Infrastructure: infrastructure, SourceChanges: sourceChanges}, access, workspaces
 }
 
 func TestProjectMCP_ExactPlanApprovalGatesVerifiedWorkspaceApply(t *testing.T) {
@@ -255,25 +256,45 @@ func TestProjectMCP_GovernedRepositoryCommandsUseVerifiedBindings(t *testing.T) 
 	if response.Code != http.StatusOK || workspaces.exec.Kind != "repository_checkout" || workspaces.exec.Spec.Argv[2] != "repo-1" || workspaces.exec.Spec.Argv[3] != "https://gitlab.com/beta/booking.git" || workspaces.exec.Spec.Argv[4] != strings.Repeat("a", 40) {
 		t.Fatalf("checkout status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
 	}
+	applyPatch := invocation(agentv2.ToolRepositoryApplyPatch)
+	applyPatch.IdempotencyKey = "source-patch-1"
+	applyPatch.Arguments = json.RawMessage(`{
+		"workspace_id":"workspace-1","target_branch":"agent/task-1",
+		"files":[{"path":"README.md","content_base64":"dXBkYXRlZAo="}]
+	}`)
+	response = request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, applyPatch)
+	if response.Code != http.StatusOK || workspaces.exec.Kind != "repository_patch" {
+		t.Fatalf("patch status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
+	}
+	var patchEnvelope agentv2.InvocationResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &patchEnvelope); err != nil {
+		t.Fatal(err)
+	}
+	var patchResult struct {
+		Plan workspace.SourceChangePlan `json:"plan"`
+	}
+	if err := json.Unmarshal(patchEnvelope.Result, &patchResult); err != nil || patchResult.Plan.PlanID == "" {
+		t.Fatalf("patch result=%#v err=%v", patchResult, err)
+	}
 
 	commit := invocation(agentv2.ToolRepositoryCommit)
 	commit.IdempotencyKey = "source-commit-1"
-	commit.Arguments = json.RawMessage(`{"workspace_id":"workspace-1","branch":"agent/task-1","message":"Implement governed change"}`)
+	commit.Arguments, _ = json.Marshal(repositoryCommitArguments{WorkspaceID: "workspace-1", ChangePlanID: patchResult.Plan.PlanID, Branch: "agent/task-1", Message: "Implement governed change"})
 	response = request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, commit)
-	if response.Code != http.StatusOK || workspaces.exec.Kind != "repository_commit" || workspaces.exec.Spec.Argv[5] != "agent-1" || workspaces.exec.Spec.Argv[6] != "task-1" || workspaces.exec.Spec.Argv[7] != "corr-1" || !strings.Contains(response.Body.String(), "WAITING_DEPENDENCY") {
+	if response.Code != http.StatusOK || workspaces.exec.Kind != "repository_commit" || workspaces.exec.Spec.Argv[5] != "agent-1" || workspaces.exec.Spec.Argv[6] != "task-1" || workspaces.exec.Spec.Argv[7] != "corr-1" || workspaces.exec.Spec.Argv[8] != patchResult.Plan.PlanHash || !strings.Contains(response.Body.String(), "WAITING_DEPENDENCY") {
 		t.Fatalf("commit status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
 	}
 
 	push := invocation(agentv2.ToolRepositoryPush)
 	push.IdempotencyKey = "source-push-1"
 	push.Arguments = json.RawMessage(`{
-		"workspace_id":"workspace-1","branch":"agent/task-1",
+		"workspace_id":"workspace-1","change_plan_id":"` + patchResult.Plan.PlanID + `","branch":"agent/task-1",
 		"commit_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","expected_remote_sha":"absent",
 		"environment_refs":{"GIT_USERNAME":"credential://gitlab-project-1/username","GIT_TOKEN":"credential://gitlab-project-1/token"},
 		"credential_leases":["gitlab-project-1"]
 	}`)
 	response = request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, push)
-	if response.Code != http.StatusOK || workspaces.exec.Kind != "repository_push" || workspaces.exec.Spec.Argv[7] != "absent" || workspaces.exec.Spec.Argv[5] != strings.Repeat("a", 40) {
+	if response.Code != http.StatusOK || workspaces.exec.Kind != "repository_push" || workspaces.exec.Spec.Argv[8] != "absent" || workspaces.exec.Spec.Argv[5] != strings.Repeat("a", 40) || workspaces.exec.Spec.Argv[7] != patchResult.Plan.PlanHash {
 		t.Fatalf("push status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
 	}
 }
@@ -282,16 +303,16 @@ func TestProjectMCP_ProductionPatchFailsClosedWithoutExactSourceApproval(t *test
 	handler, access, workspaces := mcpFixture(t, []string{"agent.tool:repository_apply_patch"})
 	patch := invocation(agentv2.ToolRepositoryApplyPatch)
 	patch.Arguments = json.RawMessage(`{
-		"workspace_id":"workspace-1",
+		"workspace_id":"workspace-1","target_branch":"agent/task-1",
 		"files":[{"path":"deploy/environments/production/deployment.yaml","content_base64":"YXBpVmVyc2lvbjogdjEK"}]
 	}`)
 	response := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, patch)
-	if response.Code != http.StatusPreconditionRequired || workspaces.exec.Kind != "" || !strings.Contains(response.Body.String(), "APPROVAL_REQUIRED") {
+	if response.Code != http.StatusOK || workspaces.exec.Kind != "" || !strings.Contains(response.Body.String(), "WAITING_APPROVAL") {
 		t.Fatalf("production patch status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
 	}
 	patch.ApprovalGrantID = "forged-grant"
 	response = request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, patch)
-	if response.Code != http.StatusPreconditionRequired || workspaces.exec.Kind != "" {
+	if response.Code != http.StatusForbidden || workspaces.exec.Kind != "" {
 		t.Fatalf("forged approval status=%d body=%s command=%#v", response.Code, response.Body.String(), workspaces.exec)
 	}
 }

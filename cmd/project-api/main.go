@@ -55,6 +55,7 @@ func main() {
 		platformprofile.Prod("infrastructure-postgres-exact-plan-gate"),
 		platformprofile.Prod("versioned-beta-rate-card"),
 		platformprofile.Prod("governed-workspace-git-mutations"),
+		platformprofile.Prod("exact-source-change-approval"),
 	); err != nil {
 		log.Fatal(err)
 	}
@@ -140,9 +141,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	projectHandler := projecthttp.Handler{Projects: projects, Infrastructure: infrastructureService, MaxBodyBytes: 64 << 10}
+	projectHandler := projecthttp.Handler{Projects: projects, Infrastructure: infrastructureService, SourceChanges: workspaceService, MaxBodyBytes: 64 << 10}
 	enrollmentHandler := enrollmenthttp.Handler{Enrollment: enrollmentService, MaxBodyBytes: 64 << 10}
-	mcpHandler := projectmcp.Handler{Enrollment: enrollmentService, Projects: source, Workspaces: workspaceService, Infrastructure: infrastructureService, MaxBodyBytes: agentv2.MaximumArgumentsBytes + (64 << 10)}
+	mcpHandler := projectmcp.Handler{Enrollment: enrollmentService, Projects: source, Workspaces: workspaceService, Infrastructure: infrastructureService, SourceChanges: workspaceService, MaxBodyBytes: agentv2.MaximumArgumentsBytes + (64 << 10)}
 	humanHandler := (httpauth.Middleware{
 		Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}},
 	}).Wrap(projectHandler)

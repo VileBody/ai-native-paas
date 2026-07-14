@@ -220,7 +220,7 @@ func TestWorkspaceAgentHTTP_CommitReceiptRequiresMTLSIdentitySignature(t *testin
 	handler.CommitReceipts = writer
 	statement := sourcev2.CommitStatement{
 		RepositoryID: "repo-1", BaseSHA: strings.Repeat("a", 40), CommitSHA: strings.Repeat("b", 40), Branch: "agent/task-1",
-		AgentID: "agent-1", TaskID: "task-1", CorrelationID: "corr-1", IssuedAt: clock.now,
+		AgentID: "agent-1", TaskID: "task-1", CorrelationID: "corr-1", SourcePlanHash: "sha256:" + strings.Repeat("d", 64), IssuedAt: clock.now,
 	}
 	canonical, _ := statement.Canonical()
 	statementDigest := sha256.Sum256(canonical)

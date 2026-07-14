@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 870,
-  "discovered_unique_test_name_count": 868,
+  "discovered_go_test_count": 872,
+  "discovered_unique_test_name_count": 870,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -178,10 +178,10 @@
       "id": "S4",
       "level": "application",
       "name": "TestSource_ProductionGitOpsPathRequiresApprovalPolicy",
-      "status": "NEW",
-      "test_file": "test/pivot/source_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/workspace/service_tdd_test.go",
       "test_name": "TestSource_ProductionGitOpsPathRequiresApprovalPolicy",
-      "test_ref": "test/pivot/source_v2_test.go::TestSource_ProductionGitOpsPathRequiresApprovalPolicy"
+      "test_ref": "internal/workspace/service_tdd_test.go::TestSource_ProductionGitOpsPathRequiresApprovalPolicy"
     },
     {
       "family": "S",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 73,
-      "NEW": 47,
-      "REUSED": 37
+      "NEW": 46,
+      "REUSED": 38
     },
     "unmapped": 0
   }

@@ -82,15 +82,22 @@ func TestSource_AgentCommitContainsSignedAttestationAndCorrelation(t *testing.T)
 	base := sourceGitOutput(t, repository, "rev-parse", "HEAD")
 	writeSourceFile(t, repository, "change.txt", "governed\n")
 	runSourceGit(t, repository, "add", "change.txt")
-	message := "governed change\n\nTask-ID: task-1\nOperation-ID: corr-1\nActor-ID: agent-1\nRepository-ID: repo-1"
+	contentDigest := sha256.Sum256([]byte("governed\n"))
+	changeSet, _ := json.Marshal(sourcev2.ChangeSet{
+		RepositoryID: "repo-1", BaseSHA: base, TargetBranch: "agent/task-1",
+		Files: []sourcev2.PatchFile{{Path: "change.txt", ContentHash: "sha256:" + hex.EncodeToString(contentDigest[:])}},
+	})
+	planDigest := sha256.Sum256(changeSet)
+	planHash := "sha256:" + hex.EncodeToString(planDigest[:])
+	message := "governed change\n\nTask-ID: task-1\nOperation-ID: corr-1\nActor-ID: agent-1\nRepository-ID: repo-1\nSource-Plan-Hash: " + planHash
 	runSourceGit(t, repository, "commit", "-m", message)
 	commit := sourceGitOutput(t, repository, "rev-parse", "HEAD")
 	withSourceDirectory(t, repository, func() {
-		recovered, existing, err := exactCommitState(base, "repo-1", "agent-1", "task-1", "corr-1")
+		recovered, existing, err := exactCommitState(base, "repo-1", "agent/task-1", "agent-1", "task-1", "corr-1", planHash)
 		if err != nil || !existing || recovered != commit {
 			t.Fatalf("governed commit recovery=%q existing=%v err=%v", recovered, existing, err)
 		}
-		receipt, err := signCommitReceipt("command-1", "session-1", []string{"repo-1", base, "agent/task-1", "agent-1", "task-1", "corr-1", "governed change"}, commit)
+		receipt, err := signCommitReceipt("command-1", "session-1", []string{"repo-1", base, "agent/task-1", "agent-1", "task-1", "corr-1", planHash, "governed change"}, commit)
 		if err != nil || receipt.Validate() != nil {
 			t.Fatalf("receipt=%#v err=%v", receipt, err)
 		}

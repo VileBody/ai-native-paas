@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -138,9 +139,6 @@ func ExecuteVerifiedGitApplyPatch(arguments []string) error {
 			return errors.New("duplicate repository patch path")
 		}
 		seen[mutation.Path] = struct{}{}
-		if protectedProductionPath(mutation.Path) {
-			return errors.New("production GitOps path requires a verified source approval")
-		}
 		if err := rejectSymlinkPath(mutation.Path); err != nil {
 			return err
 		}
@@ -184,7 +182,7 @@ func ExecuteVerifiedGitApplyPatch(arguments []string) error {
 }
 
 func ExecuteVerifiedGitCommit(arguments []string) error {
-	if len(arguments) != 7 || !repositoryIDPattern.MatchString(arguments[0]) || !commitSHAPattern.MatchString(arguments[1]) || !sourcev2.ValidBranch(arguments[2]) || !repositoryIDPattern.MatchString(arguments[3]) || !repositoryIDPattern.MatchString(arguments[4]) || !repositoryIDPattern.MatchString(arguments[5]) || !validCommitTitle(arguments[6]) {
+	if len(arguments) != 8 || !repositoryIDPattern.MatchString(arguments[0]) || !commitSHAPattern.MatchString(arguments[1]) || !sourcev2.ValidBranch(arguments[2]) || !repositoryIDPattern.MatchString(arguments[3]) || !repositoryIDPattern.MatchString(arguments[4]) || !repositoryIDPattern.MatchString(arguments[5]) || !planDigestPattern.MatchString(arguments[6]) || !validCommitTitle(arguments[7]) {
 		return errors.New("verified repository commit binding is invalid")
 	}
 	if err := requireWorkspaceDirectory(); err != nil {
@@ -197,7 +195,7 @@ func ExecuteVerifiedGitCommit(arguments []string) error {
 	if err != nil {
 		return err
 	}
-	commitSHA, recoverExisting, err := exactCommitState(arguments[1], arguments[0], arguments[3], arguments[4], arguments[5])
+	commitSHA, recoverExisting, err := exactCommitState(arguments[1], arguments[0], arguments[2], arguments[3], arguments[4], arguments[5], arguments[6])
 	if err != nil {
 		return err
 	}
@@ -206,10 +204,8 @@ func ExecuteVerifiedGitCommit(arguments []string) error {
 		if err != nil || len(paths) == 0 {
 			return errors.New("repository has no committable changes")
 		}
-		for _, changedPath := range paths {
-			if protectedProductionPath(changedPath) {
-				return errors.New("production GitOps path requires a verified source approval")
-			}
+		if err := verifyActualChangeSet(arguments[0], arguments[1], arguments[2], arguments[6], paths); err != nil {
+			return err
 		}
 		if rule, path, found := scanChangedFiles(paths); found {
 			return fmt.Errorf("repository secret scan blocked rule %s in %s", rule, path)
@@ -220,7 +216,7 @@ func ExecuteVerifiedGitCommit(arguments []string) error {
 		if err := runGit("add", "-A", "--"); err != nil {
 			return errors.New("stage repository changes")
 		}
-		message := arguments[6] + "\n\nTask-ID: " + arguments[4] + "\nOperation-ID: " + arguments[5] + "\nActor-ID: " + arguments[3] + "\nRepository-ID: " + arguments[0]
+		message := arguments[7] + "\n\nTask-ID: " + arguments[4] + "\nOperation-ID: " + arguments[5] + "\nActor-ID: " + arguments[3] + "\nRepository-ID: " + arguments[0] + "\nSource-Plan-Hash: " + arguments[6]
 		if err := runGit("-c", "user.name=AI Native Platform Agent", "-c", "user.email=agent@platform.invalid", "commit", "--no-gpg-sign", "--no-verify", "-m", message); err != nil {
 			return errors.New("create governed repository commit")
 		}
@@ -251,7 +247,7 @@ func ExecuteVerifiedGitCommit(arguments []string) error {
 }
 
 func ExecuteVerifiedGitPush(arguments []string) error {
-	if len(arguments) != 6 || !repositoryIDPattern.MatchString(arguments[0]) || !sourcev2.ValidBranch(arguments[2]) || !commitSHAPattern.MatchString(arguments[3]) || !commitSHAPattern.MatchString(arguments[4]) || arguments[5] != "absent" && !commitSHAPattern.MatchString(arguments[5]) {
+	if len(arguments) != 7 || !repositoryIDPattern.MatchString(arguments[0]) || !sourcev2.ValidBranch(arguments[2]) || !commitSHAPattern.MatchString(arguments[3]) || !commitSHAPattern.MatchString(arguments[4]) || !planDigestPattern.MatchString(arguments[5]) || arguments[6] != "absent" && !commitSHAPattern.MatchString(arguments[6]) {
 		return errors.New("verified repository push binding is invalid")
 	}
 	cloneURL, err := verifiedCloneURL(arguments[1])
@@ -279,10 +275,8 @@ func ExecuteVerifiedGitPush(arguments []string) error {
 	if err != nil || len(paths) == 0 {
 		return errors.New("inspect governed repository commit")
 	}
-	for _, changedPath := range paths {
-		if protectedProductionPath(changedPath) {
-			return errors.New("production GitOps path requires a verified source approval")
-		}
+	if err := verifyActualChangeSet(arguments[0], arguments[3], arguments[2], arguments[5], paths); err != nil {
+		return err
 	}
 	if rule, path, found := scanChangedFiles(paths); found {
 		return fmt.Errorf("repository secret scan blocked rule %s in %s", rule, path)
@@ -291,10 +285,10 @@ func ExecuteVerifiedGitPush(arguments []string) error {
 		return err
 	}
 	message, err := gitOutput("show", "-s", "--format=%B", arguments[4])
-	if err != nil || !strings.Contains(string(message), "Repository-ID: "+arguments[0]) {
+	if err != nil || !strings.Contains(string(message), "Repository-ID: "+arguments[0]) || !strings.Contains(string(message), "Source-Plan-Hash: "+arguments[5]) {
 		return errors.New("repository commit lacks governed identity trailer")
 	}
-	expected := arguments[5]
+	expected := arguments[6]
 	if expected == "absent" {
 		expected = ""
 	}
@@ -431,13 +425,8 @@ func rejectSymlinkPath(value string) error {
 	return nil
 }
 
-func protectedProductionPath(value string) bool {
-	clean := filepath.ToSlash(filepath.Clean(value))
-	return clean == "deploy/environments/production" || strings.HasPrefix(clean, "deploy/environments/production/")
-}
-
 func changedPaths() ([]string, error) {
-	tracked, err := gitOutput("diff", "--name-only", "-z", "HEAD", "--")
+	tracked, err := gitOutput("diff", "--name-only", "--no-renames", "-z", "HEAD", "--")
 	if err != nil {
 		return nil, err
 	}
@@ -466,7 +455,7 @@ func changedPaths() ([]string, error) {
 }
 
 func changedPathsBetween(baseSHA, commitSHA string) ([]string, error) {
-	raw, err := gitOutput("diff", "--name-only", "-z", baseSHA, commitSHA, "--")
+	raw, err := gitOutput("diff", "--name-only", "--no-renames", "-z", baseSHA, commitSHA, "--")
 	if err != nil {
 		return nil, err
 	}
@@ -552,7 +541,7 @@ func validCommitTitle(value string) bool {
 	return trimmed == value && len(value) > 0 && len(value) <= 256 && !strings.ContainsAny(value, "\r\n\x00")
 }
 
-func exactCommitState(baseSHA, repositoryID, agentID, taskID, correlationID string) (string, bool, error) {
+func exactCommitState(baseSHA, repositoryID, branch, agentID, taskID, correlationID, planHash string) (string, bool, error) {
 	head, err := gitOutput("rev-parse", "--verify", "HEAD^{commit}")
 	if err != nil {
 		return "", false, errors.New("resolve workspace repository head")
@@ -563,22 +552,51 @@ func exactCommitState(baseSHA, repositoryID, agentID, taskID, correlationID stri
 	}
 	parent, err := gitOutput("rev-parse", "--verify", "HEAD^1")
 	message, messageErr := gitOutput("show", "-s", "--format=%B", "HEAD")
-	if err != nil || messageErr != nil || strings.TrimSpace(string(parent)) != baseSHA || !strings.Contains(string(message), "Repository-ID: "+repositoryID) || !strings.Contains(string(message), "Actor-ID: "+agentID) || !strings.Contains(string(message), "Task-ID: "+taskID) || !strings.Contains(string(message), "Operation-ID: "+correlationID) {
+	if err != nil || messageErr != nil || strings.TrimSpace(string(parent)) != baseSHA || !strings.Contains(string(message), "Repository-ID: "+repositoryID) || !strings.Contains(string(message), "Actor-ID: "+agentID) || !strings.Contains(string(message), "Task-ID: "+taskID) || !strings.Contains(string(message), "Operation-ID: "+correlationID) || !strings.Contains(string(message), "Source-Plan-Hash: "+planHash) {
 		return "", false, errors.New("workspace repository head conflicts with exact base")
 	}
 	paths, err := changedPathsBetween(baseSHA, actual)
 	if err != nil || len(paths) == 0 {
 		return "", false, errors.New("inspect recovered governed repository commit")
 	}
-	for _, changedPath := range paths {
-		if protectedProductionPath(changedPath) {
-			return "", false, errors.New("production GitOps path requires a verified source approval")
-		}
+	if err := verifyActualChangeSet(repositoryID, baseSHA, branch, planHash, paths); err != nil {
+		return "", false, err
 	}
 	if rule, path, found := scanChangedFiles(paths); found {
 		return "", false, fmt.Errorf("repository secret scan blocked rule %s in %s", rule, path)
 	}
 	return actual, true, nil
+}
+
+func verifyActualChangeSet(repositoryID, baseSHA, branch, expectedHash string, paths []string) error {
+	files := make([]sourcev2.PatchFile, 0, len(paths))
+	for _, path := range paths {
+		file := sourcev2.PatchFile{Path: path, ContentHash: "sha256:" + strings.Repeat("0", 64)}
+		info, err := os.Lstat(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			file.Delete = true
+		} else if err != nil || !info.Mode().IsRegular() || info.Size() > 4<<20 {
+			return errors.New("source change plan contains an unhashable file")
+		} else {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				return errors.New("hash source change plan file")
+			}
+			digest := sha256.Sum256(raw)
+			file.ContentHash = "sha256:" + hex.EncodeToString(digest[:])
+		}
+		files = append(files, file)
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
+	raw, err := json.Marshal(sourcev2.ChangeSet{RepositoryID: repositoryID, BaseSHA: baseSHA, TargetBranch: branch, Files: files})
+	if err != nil {
+		return errors.New("canonicalize actual source change set")
+	}
+	digest := sha256.Sum256(raw)
+	if "sha256:"+hex.EncodeToString(digest[:]) != expectedHash {
+		return errors.New("actual repository changes do not match approved source plan")
+	}
+	return nil
 }
 
 func commandBinding() (string, string, error) {
@@ -629,7 +647,7 @@ func signCommitReceipt(commandID, sessionID string, arguments []string, commitSH
 	issuedAt := time.Now().UTC()
 	statement := sourcev2.CommitStatement{
 		RepositoryID: arguments[0], BaseSHA: arguments[1], CommitSHA: commitSHA, Branch: arguments[2],
-		AgentID: arguments[3], TaskID: arguments[4], CorrelationID: arguments[5], IssuedAt: issuedAt,
+		AgentID: arguments[3], TaskID: arguments[4], CorrelationID: arguments[5], SourcePlanHash: arguments[6], IssuedAt: issuedAt,
 	}
 	canonical, err := statement.Canonical()
 	if err != nil {

@@ -45,6 +45,13 @@ type InfrastructureCommands interface {
 	AuthorizeApply(context.Context, infraapp.ApplyCommand) (infraapp.PlanRecord, error)
 }
 
+type SourceChangeCommands interface {
+	PlanSourceChange(context.Context, workspace.SourceChangePlanRequest) (workspace.SourceChangePlan, error)
+	GetSourceChangePlan(context.Context, string, string, string) (workspace.SourceChangePlan, error)
+	CheckSourceApproval(context.Context, workspace.Scope, string, string) (workspace.SourceChangePlan, error)
+	AuthorizeSourceCommit(context.Context, workspace.AuthorizeSourceCommitRequest) (workspace.SourceChangePlan, error)
+}
+
 var errInvalidWorkspaceArguments = errors.New("invalid workspace tool arguments")
 var errInvalidInfrastructureArguments = errors.New("invalid infrastructure tool arguments")
 var errInvalidRepositoryArguments = errors.New("invalid repository tool arguments")
@@ -55,6 +62,7 @@ type Handler struct {
 	Projects       ProjectReader
 	Workspaces     WorkspaceCommands
 	Infrastructure InfrastructureCommands
+	SourceChanges  SourceChangeCommands
 	MaxBodyBytes   int64
 }
 
@@ -147,7 +155,7 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 		switch {
 		case errors.Is(err, errInvalidRepositoryArguments):
 			status, code, message, retryable = http.StatusBadRequest, "INVALID_ARGUMENT", "invalid repository tool arguments", false
-		case errors.Is(err, errSourceApprovalRequired):
+		case errors.Is(err, errSourceApprovalRequired), errors.Is(err, workspace.ErrSourceApprovalRequired):
 			status, code, message, retryable = http.StatusPreconditionRequired, "APPROVAL_REQUIRED", "production GitOps path requires an exact source approval", false
 		case errors.Is(err, errInvalidInfrastructureArguments):
 			status, code, message, retryable = http.StatusBadRequest, "INVALID_ARGUMENT", "invalid infrastructure tool arguments", false
@@ -203,6 +211,7 @@ type repositoryBranchArguments struct {
 
 type repositoryPatchArguments struct {
 	WorkspaceID      string                   `json:"workspace_id"`
+	TargetBranch     string                   `json:"target_branch"`
 	Files            []sourcev2.PatchMutation `json:"files"`
 	WorkingDir       string                   `json:"working_dir,omitempty"`
 	TimeoutSeconds   int64                    `json:"timeout_seconds,omitempty"`
@@ -211,6 +220,7 @@ type repositoryPatchArguments struct {
 
 type repositoryCommitArguments struct {
 	WorkspaceID      string `json:"workspace_id"`
+	ChangePlanID     string `json:"change_plan_id"`
 	Branch           string `json:"branch"`
 	Message          string `json:"message"`
 	WorkingDir       string `json:"working_dir,omitempty"`
@@ -220,6 +230,7 @@ type repositoryCommitArguments struct {
 
 type repositoryPushArguments struct {
 	WorkspaceID       string            `json:"workspace_id"`
+	ChangePlanID      string            `json:"change_plan_id"`
 	Branch            string            `json:"branch"`
 	CommitSHA         string            `json:"commit_sha"`
 	ExpectedRemoteSHA string            `json:"expected_remote_sha"`
@@ -231,7 +242,7 @@ type repositoryPushArguments struct {
 }
 
 func (h Handler) invokeRepository(ctx context.Context, verified agentv2.VerifiedInvocationContext, request agentv2.InvocationRequest) (any, error) {
-	if h.Workspaces == nil || h.Projects == nil {
+	if h.Workspaces == nil || h.Projects == nil || h.SourceChanges == nil {
 		return nil, errors.New("repository workspace service is unavailable")
 	}
 	scope := workspace.Scope{TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID}
@@ -294,7 +305,7 @@ func (h Handler) invokeRepository(ctx context.Context, verified agentv2.Verified
 		return queue(arguments.WorkspaceID, request.IdempotencyKey, "repository_diff", "", []string{"git", "diff", "--no-ext-diff", "--stat", "--"}, revision.SourceRoot, nil, nil, arguments.TimeoutSeconds, arguments.OutputLimitBytes)
 	case agentv2.ToolRepositoryApplyPatch:
 		var arguments repositoryPatchArguments
-		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || len(arguments.Files) == 0 || len(arguments.Files) > 126 {
+		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || !sourcev2.ValidBranch(arguments.TargetBranch) || len(arguments.Files) == 0 || len(arguments.Files) > 126 {
 			return nil, errInvalidRepositoryArguments
 		}
 		revision, err := revisionFor(arguments.WorkspaceID)
@@ -309,9 +320,6 @@ func (h Handler) invokeRepository(ctx context.Context, verified agentv2.Verified
 			if file.Validate() != nil {
 				return nil, errInvalidRepositoryArguments
 			}
-			if protectedSourcePath(file.Path) {
-				return nil, errSourceApprovalRequired
-			}
 			raw, _ := json.Marshal(file)
 			encoded := base64.RawURLEncoding.EncodeToString(raw)
 			if len(encoded) > 4096 {
@@ -319,10 +327,29 @@ func (h Handler) invokeRepository(ctx context.Context, verified agentv2.Verified
 			}
 			argv = append(argv, encoded)
 		}
-		return queue(arguments.WorkspaceID, request.IdempotencyKey, "repository_patch", "repository:"+repository.ID, argv, revision.SourceRoot, nil, nil, arguments.TimeoutSeconds, arguments.OutputLimitBytes)
+		plan, err := h.SourceChanges.PlanSourceChange(ctx, workspace.SourceChangePlanRequest{
+			Scope: scope, WorkspaceID: arguments.WorkspaceID, RepositoryID: repository.ID, BaseSHA: revision.CommitSHA,
+			TargetBranch: arguments.TargetBranch, TaskID: request.TaskID, Files: arguments.Files, IdempotencyKey: request.IdempotencyKey,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if plan.RequiresApproval {
+			if request.ApprovalGrantID == "" {
+				return map[string]any{"status": "WAITING_APPROVAL", "plan": plan}, nil
+			}
+			if _, err := h.SourceChanges.CheckSourceApproval(ctx, scope, plan.PlanID, request.ApprovalGrantID); err != nil {
+				return nil, err
+			}
+		}
+		command, err := queue(arguments.WorkspaceID, request.IdempotencyKey, "repository_patch", "repository:"+repository.ID, argv, revision.SourceRoot, nil, nil, arguments.TimeoutSeconds, arguments.OutputLimitBytes)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"plan": plan, "command": command}, nil
 	case agentv2.ToolRepositoryCommit:
 		var arguments repositoryCommitArguments
-		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || !sourcev2.ValidBranch(arguments.Branch) || !validCommitMessage(arguments.Message) {
+		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || strings.TrimSpace(arguments.ChangePlanID) == "" || !sourcev2.ValidBranch(arguments.Branch) || !validCommitMessage(arguments.Message) {
 			return nil, errInvalidRepositoryArguments
 		}
 		revision, err := revisionFor(arguments.WorkspaceID)
@@ -332,8 +359,20 @@ func (h Handler) invokeRepository(ctx context.Context, verified agentv2.Verified
 		if !matchesSourceRoot(arguments.WorkingDir, revision.SourceRoot) {
 			return nil, errInvalidRepositoryArguments
 		}
+		plan, err := h.SourceChanges.GetSourceChangePlan(ctx, verified.TenantID, verified.ProjectID, arguments.ChangePlanID)
+		if err != nil {
+			return nil, err
+		}
+		authorized, err := h.SourceChanges.AuthorizeSourceCommit(ctx, workspace.AuthorizeSourceCommitRequest{
+			Scope: scope, WorkspaceID: arguments.WorkspaceID, RepositoryID: repository.ID, BaseSHA: revision.CommitSHA,
+			TargetBranch: arguments.Branch, TaskID: request.TaskID, PlanID: plan.PlanID, PlanHash: plan.PlanHash,
+			ApprovalGrantID: request.ApprovalGrantID, IdempotencyKey: request.IdempotencyKey,
+		})
+		if err != nil {
+			return nil, err
+		}
 		command, err := queue(arguments.WorkspaceID, request.IdempotencyKey, "repository_commit", "repository:"+repository.ID,
-			[]string{"workspace-agent", "verified-git-commit", repository.ID, revision.CommitSHA, arguments.Branch, verified.AgentID, request.TaskID, request.CorrelationID, arguments.Message},
+			[]string{"workspace-agent", "verified-git-commit", repository.ID, revision.CommitSHA, arguments.Branch, verified.AgentID, request.TaskID, request.CorrelationID, authorized.PlanHash, arguments.Message},
 			revision.SourceRoot, nil, nil, arguments.TimeoutSeconds, arguments.OutputLimitBytes)
 		if err != nil {
 			return nil, err
@@ -348,7 +387,7 @@ func (h Handler) invokeRepository(ctx context.Context, verified agentv2.Verified
 		return map[string]any{"status": "WAITING_DEPENDENCY", "command": command}, nil
 	case agentv2.ToolRepositoryPush:
 		var arguments repositoryPushArguments
-		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || !sourcev2.ValidBranch(arguments.Branch) || !validCommitSHA(arguments.CommitSHA) || arguments.ExpectedRemoteSHA != "absent" && !validCommitSHA(arguments.ExpectedRemoteSHA) || !exactGitCredentialRefs(arguments.EnvironmentRefs, arguments.CredentialLeases) {
+		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || strings.TrimSpace(arguments.ChangePlanID) == "" || !sourcev2.ValidBranch(arguments.Branch) || !validCommitSHA(arguments.CommitSHA) || arguments.ExpectedRemoteSHA != "absent" && !validCommitSHA(arguments.ExpectedRemoteSHA) || !exactGitCredentialRefs(arguments.EnvironmentRefs, arguments.CredentialLeases) {
 			return nil, errInvalidRepositoryArguments
 		}
 		revision, err := revisionFor(arguments.WorkspaceID)
@@ -358,8 +397,15 @@ func (h Handler) invokeRepository(ctx context.Context, verified agentv2.Verified
 		if !matchesSourceRoot(arguments.WorkingDir, revision.SourceRoot) {
 			return nil, errInvalidRepositoryArguments
 		}
+		plan, err := h.SourceChanges.GetSourceChangePlan(ctx, verified.TenantID, verified.ProjectID, arguments.ChangePlanID)
+		if err != nil {
+			return nil, err
+		}
+		if plan.WorkspaceID != arguments.WorkspaceID || plan.RepositoryID != repository.ID || plan.BaseSHA != revision.CommitSHA || plan.TargetBranch != arguments.Branch || plan.ActorID != verified.AgentID || plan.TaskID != request.TaskID || plan.AuthorizedAt.IsZero() {
+			return nil, workspace.ErrPolicyDenied
+		}
 		return queue(arguments.WorkspaceID, request.IdempotencyKey, "repository_push", "repository:"+repository.ID,
-			[]string{"workspace-agent", "verified-git-push", repository.ID, strings.TrimRight(repository.WebURL, "/") + ".git", arguments.Branch, revision.CommitSHA, arguments.CommitSHA, arguments.ExpectedRemoteSHA},
+			[]string{"workspace-agent", "verified-git-push", repository.ID, strings.TrimRight(repository.WebURL, "/") + ".git", arguments.Branch, revision.CommitSHA, arguments.CommitSHA, plan.PlanHash, arguments.ExpectedRemoteSHA},
 			revision.SourceRoot, arguments.EnvironmentRefs, arguments.CredentialLeases, arguments.TimeoutSeconds, arguments.OutputLimitBytes)
 	default:
 		return nil, errors.New("repository tool is unavailable")

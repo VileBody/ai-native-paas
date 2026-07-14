@@ -360,6 +360,147 @@ func (s *Store) GetCommitReceipt(ctx context.Context, tenantID, projectID, comma
 	return receipt, nil
 }
 
+const sourcePlanColumns = `id,tenant_id,project_id,workspace_id,repository_id,base_sha,target_branch,actor_id,task_id,files,plan_hash,requires_approval,idempotency_key,request_fingerprint,authorized_idempotency_key,authorization_fingerprint,authorized_at,created_at,expires_at`
+
+func (s *Store) CreateSourceChangePlan(ctx context.Context, candidate workspace.SourceChangePlan) (workspace.SourceChangePlan, error) {
+	files, err := json.Marshal(candidate.Files)
+	if err != nil {
+		return workspace.SourceChangePlan{}, err
+	}
+	result, err := s.DB.ExecContext(ctx, `INSERT INTO workspace.source_change_plans (`+sourcePlanColumns+`) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) ON CONFLICT(tenant_id,project_id,idempotency_key) DO NOTHING`,
+		candidate.PlanID, candidate.TenantID, candidate.ProjectID, candidate.WorkspaceID, candidate.RepositoryID, candidate.BaseSHA, candidate.TargetBranch,
+		candidate.ActorID, candidate.TaskID, files, candidate.PlanHash, candidate.RequiresApproval, candidate.IdempotencyKey, candidate.RequestFingerprint,
+		candidate.AuthorizedIdempotencyKey, candidate.AuthorizationFingerprint, nullableTime(candidate.AuthorizedAt), candidate.CreatedAt, candidate.ExpiresAt)
+	if err != nil {
+		return workspace.SourceChangePlan{}, err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return workspace.SourceChangePlan{}, err
+	}
+	if rows == 1 {
+		return candidate, nil
+	}
+	existing, err := scanSourcePlan(s.DB.QueryRowContext(ctx, `SELECT `+sourcePlanColumns+` FROM workspace.source_change_plans WHERE tenant_id=$1 AND project_id=$2 AND idempotency_key=$3`, candidate.TenantID, candidate.ProjectID, candidate.IdempotencyKey))
+	if err != nil {
+		return workspace.SourceChangePlan{}, mapNotFound(err)
+	}
+	if existing.RequestFingerprint != candidate.RequestFingerprint {
+		return workspace.SourceChangePlan{}, workspace.ErrConflict
+	}
+	return existing, nil
+}
+
+func (s *Store) GetSourceChangePlan(ctx context.Context, tenantID, projectID, planID string) (workspace.SourceChangePlan, error) {
+	plan, err := scanSourcePlan(s.DB.QueryRowContext(ctx, `SELECT `+sourcePlanColumns+` FROM workspace.source_change_plans WHERE tenant_id=$1 AND project_id=$2 AND id=$3`, tenantID, projectID, planID))
+	return plan, mapNotFound(err)
+}
+
+func (s *Store) CreateSourceApproval(ctx context.Context, candidate workspace.SourceApprovalGrant) (workspace.SourceApprovalGrant, error) {
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return workspace.SourceApprovalGrant{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `UPDATE workspace.source_approval_grants SET consumed_at=$1 WHERE plan_id=$2 AND consumed_at IS NULL AND expires_at<=$1`, candidate.CreatedAt, candidate.PlanID); err != nil {
+		return workspace.SourceApprovalGrant{}, err
+	}
+	result, err := tx.ExecContext(ctx, `
+INSERT INTO workspace.source_approval_grants(id,tenant_id,project_id,plan_id,plan_hash,workspace_id,repository_id,target_branch,actor_id,approver_user_id,created_at,expires_at,consumed_at)
+SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULL
+WHERE EXISTS (
+    SELECT 1 FROM workspace.source_change_plans
+    WHERE id=$4 AND tenant_id=$2 AND project_id=$3 AND plan_hash=$5 AND workspace_id=$6 AND repository_id=$7 AND target_branch=$8 AND actor_id=$9 AND requires_approval AND authorized_at IS NULL AND expires_at>$11
+)
+AND NOT EXISTS (
+    SELECT 1 FROM workspace.source_approval_grants
+    WHERE plan_id=$4 AND consumed_at IS NULL AND expires_at>$11
+)`, candidate.GrantID, candidate.TenantID, candidate.ProjectID, candidate.PlanID, candidate.PlanHash, candidate.WorkspaceID,
+		candidate.RepositoryID, candidate.TargetBranch, candidate.ActorID, candidate.ApproverUserID, candidate.CreatedAt, candidate.ExpiresAt)
+	if err := affected(result, err); err != nil {
+		return workspace.SourceApprovalGrant{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return workspace.SourceApprovalGrant{}, err
+	}
+	return candidate, nil
+}
+
+func (s *Store) GetActiveSourceApproval(ctx context.Context, tenantID, projectID, planID, grantID, actorID string, now time.Time) (workspace.SourceApprovalGrant, error) {
+	var grant workspace.SourceApprovalGrant
+	var consumed sql.NullTime
+	err := s.DB.QueryRowContext(ctx, `SELECT id,tenant_id,project_id,plan_id,plan_hash,workspace_id,repository_id,target_branch,actor_id,approver_user_id,created_at,expires_at,consumed_at FROM workspace.source_approval_grants WHERE id=$1 AND tenant_id=$2 AND project_id=$3 AND plan_id=$4 AND actor_id=$5 AND consumed_at IS NULL AND expires_at>$6`, grantID, tenantID, projectID, planID, actorID, now).Scan(
+		&grant.GrantID, &grant.TenantID, &grant.ProjectID, &grant.PlanID, &grant.PlanHash, &grant.WorkspaceID, &grant.RepositoryID, &grant.TargetBranch,
+		&grant.ActorID, &grant.ApproverUserID, &grant.CreatedAt, &grant.ExpiresAt, &consumed)
+	if consumed.Valid {
+		grant.ConsumedAt = consumed.Time
+	}
+	return grant, mapNotFound(err)
+}
+
+func (s *Store) AuthorizeSourceCommit(ctx context.Context, authorization workspace.SourceCommitAuthorization) (workspace.SourceChangePlan, error) {
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return workspace.SourceChangePlan{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	plan, err := scanSourcePlan(tx.QueryRowContext(ctx, `SELECT `+sourcePlanColumns+` FROM workspace.source_change_plans WHERE id=$1 AND tenant_id=$2 AND project_id=$3 FOR UPDATE`, authorization.PlanID, authorization.TenantID, authorization.ProjectID))
+	if err != nil {
+		return workspace.SourceChangePlan{}, mapNotFound(err)
+	}
+	if plan.PlanHash != authorization.PlanHash || plan.ActorID != authorization.ActorID {
+		return workspace.SourceChangePlan{}, workspace.ErrPolicyDenied
+	}
+	if !plan.AuthorizedAt.IsZero() {
+		if plan.AuthorizedIdempotencyKey != authorization.IdempotencyKey || plan.AuthorizationFingerprint != authorization.Fingerprint {
+			return workspace.SourceChangePlan{}, workspace.ErrConflict
+		}
+		if err := tx.Commit(); err != nil {
+			return workspace.SourceChangePlan{}, err
+		}
+		return plan, nil
+	}
+	if !plan.ExpiresAt.After(authorization.Now) {
+		return workspace.SourceChangePlan{}, workspace.ErrPolicyDenied
+	}
+	if authorization.ApprovalRequired {
+		result, err := tx.ExecContext(ctx, `UPDATE workspace.source_approval_grants SET consumed_at=$1 WHERE id=$2 AND tenant_id=$3 AND project_id=$4 AND plan_id=$5 AND plan_hash=$6 AND actor_id=$7 AND consumed_at IS NULL AND expires_at>$1`, authorization.Now, authorization.ApprovalGrantID, authorization.TenantID, authorization.ProjectID, authorization.PlanID, authorization.PlanHash, authorization.ActorID)
+		if err := affected(result, err); err != nil {
+			return workspace.SourceChangePlan{}, workspace.ErrPolicyDenied
+		}
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE workspace.source_change_plans SET authorized_idempotency_key=$1,authorization_fingerprint=$2,authorized_at=$3 WHERE id=$4 AND authorized_at IS NULL`, authorization.IdempotencyKey, authorization.Fingerprint, authorization.Now, authorization.PlanID)
+	if err := affected(result, err); err != nil {
+		return workspace.SourceChangePlan{}, err
+	}
+	plan.AuthorizedIdempotencyKey = authorization.IdempotencyKey
+	plan.AuthorizationFingerprint = authorization.Fingerprint
+	plan.AuthorizedAt = authorization.Now
+	if err := tx.Commit(); err != nil {
+		return workspace.SourceChangePlan{}, err
+	}
+	return plan, nil
+}
+
+func scanSourcePlan(row scanner) (workspace.SourceChangePlan, error) {
+	var plan workspace.SourceChangePlan
+	var files []byte
+	var authorized sql.NullTime
+	err := row.Scan(&plan.PlanID, &plan.TenantID, &plan.ProjectID, &plan.WorkspaceID, &plan.RepositoryID, &plan.BaseSHA, &plan.TargetBranch,
+		&plan.ActorID, &plan.TaskID, &files, &plan.PlanHash, &plan.RequiresApproval, &plan.IdempotencyKey, &plan.RequestFingerprint,
+		&plan.AuthorizedIdempotencyKey, &plan.AuthorizationFingerprint, &authorized, &plan.CreatedAt, &plan.ExpiresAt)
+	if err != nil {
+		return plan, err
+	}
+	if err := json.Unmarshal(files, &plan.Files); err != nil {
+		return plan, err
+	}
+	if authorized.Valid {
+		plan.AuthorizedAt = authorized.Time
+	}
+	return plan, nil
+}
+
 // ClaimOutbox leases unpublished intents to one worker. The row locks exist
 // only for the duration of this statement; the durable lease protects the
 // external effect after the transaction has committed.

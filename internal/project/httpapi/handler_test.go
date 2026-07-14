@@ -3,6 +3,8 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,7 +19,9 @@ import (
 	projectapp "github.com/keir-research/ai-native-paas/internal/project/application"
 	sourceapp "github.com/keir-research/ai-native-paas/internal/source/application"
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
+	"github.com/keir-research/ai-native-paas/internal/workspace"
 	commercev2 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v2"
+	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 )
 
 type httpInfraClock struct{ now time.Time }
@@ -141,6 +145,42 @@ func TestProjectHTTP_HumanApprovalIsBoundToStoredAgentAndTenantPlan(t *testing.T
 	}
 
 	crossProject := httptest.NewRequest(http.MethodGet, "/api/v2/projects/project-2/infrastructure/plans/"+plan.Summary.PlanID, nil)
+	crossProject.Header.Set("Authorization", "Bearer signed")
+	crossResponse := httptest.NewRecorder()
+	handler.ServeHTTP(crossResponse, crossProject)
+	if crossResponse.Code != http.StatusNotFound {
+		t.Fatalf("cross-project status=%d body=%s", crossResponse.Code, crossResponse.Body.String())
+	}
+}
+
+func TestProjectHTTP_SourceApprovalIsBoundToExactStoredChangePlan(t *testing.T) {
+	now := time.Now().UTC()
+	sourceChanges := &workspace.Service{Store: workspace.NewMemoryStore(), Clock: httpInfraClock{now: now}, IDs: &httpInfraIDs{}}
+	plan, err := sourceChanges.PlanSourceChange(context.Background(), workspace.SourceChangePlanRequest{
+		Scope:       workspace.Scope{TenantID: "tenant-1", ProjectID: "project-1", ActorID: "agent-1"},
+		WorkspaceID: "workspace-1", RepositoryID: "repo-1", BaseSHA: strings.Repeat("a", 40), TargetBranch: "agent/task-1", TaskID: "task-1",
+		Files:          []sourcev2.PatchMutation{{Path: "deploy/environments/production/deployment.yaml", ContentBase64: base64.StdEncoding.EncodeToString([]byte("apiVersion: apps/v1\n"))}},
+		IdempotencyKey: "source-plan-http",
+	})
+	if err != nil || !plan.RequiresApproval {
+		t.Fatalf("plan=%#v err=%v", plan, err)
+	}
+	handler := (httpauth.Middleware{Profile: platformprofile.Production, OIDC: oidcVerifier{}}).Wrap(Handler{SourceChanges: sourceChanges})
+	grantRequest := httptest.NewRequest(http.MethodPost, "/api/v2/projects/project-1/source/plans/"+plan.PlanID+"/approval", strings.NewReader(`{}`))
+	grantRequest.Header.Set("Authorization", "Bearer signed")
+	grantResponse := httptest.NewRecorder()
+	handler.ServeHTTP(grantResponse, grantRequest)
+	if grantResponse.Code != http.StatusCreated || !strings.Contains(grantResponse.Body.String(), `"plan_hash":"`+plan.PlanHash+`"`) || !strings.Contains(grantResponse.Body.String(), `"approver_user_id":"user-1"`) {
+		t.Fatalf("grant status=%d body=%s", grantResponse.Code, grantResponse.Body.String())
+	}
+	var grant workspace.SourceApprovalGrant
+	if err := json.Unmarshal(grantResponse.Body.Bytes(), &grant); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sourceChanges.CheckSourceApproval(context.Background(), workspace.Scope{TenantID: "tenant-1", ProjectID: "project-1", ActorID: "agent-1"}, plan.PlanID, grant.GrantID); err != nil {
+		t.Fatal(err)
+	}
+	crossProject := httptest.NewRequest(http.MethodGet, "/api/v2/projects/project-2/source/plans/"+plan.PlanID, nil)
 	crossProject.Header.Set("Authorization", "Bearer signed")
 	crossResponse := httptest.NewRecorder()
 	handler.ServeHTTP(crossResponse, crossProject)

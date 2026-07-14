@@ -14,12 +14,14 @@ import (
 	infraapp "github.com/keir-research/ai-native-paas/internal/infrastructure/application"
 	projectapp "github.com/keir-research/ai-native-paas/internal/project/application"
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
+	"github.com/keir-research/ai-native-paas/internal/workspace"
 	projectv2 "github.com/keir-research/ai-native-paas/pkg/contracts/project/v2"
 )
 
 type Handler struct {
 	Projects       *projectapp.Service
 	Infrastructure *infraapp.Service
+	SourceChanges  *workspace.Service
 	MaxBodyBytes   int64
 }
 
@@ -50,7 +52,62 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	if projectID, planID, action, ok := sourceChangeRoute(r.URL.Path); ok {
+		switch {
+		case action == "plan" && r.Method == http.MethodGet:
+			h.getSourcePlan(w, r, projectID, planID)
+		case action == "approval" && r.Method == http.MethodPost:
+			h.grantSourceApproval(w, r, projectID, planID)
+		default:
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "route not found")
+		}
+		return
+	}
 	writeError(w, http.StatusNotFound, "NOT_FOUND", "route not found")
+}
+
+func (h Handler) getSourcePlan(w http.ResponseWriter, r *http.Request, projectID, planID string) {
+	identity, ok := verifiedUser(r)
+	if !ok || h.SourceChanges == nil {
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "verified user identity is required")
+		return
+	}
+	plan, err := h.SourceChanges.GetSourceChangePlan(r.Context(), identity.TenantID, projectID, planID)
+	if err != nil {
+		writeSourceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, plan)
+}
+
+func (h Handler) grantSourceApproval(w http.ResponseWriter, r *http.Request, projectID, planID string) {
+	identity, ok := verifiedUser(r)
+	if !ok || h.SourceChanges == nil {
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "verified user identity is required")
+		return
+	}
+	var body approvalGrantRequest
+	if err := decode(r, h.limit(), &body); err != nil {
+		writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid source approval grant request")
+		return
+	}
+	ttl := body.ExpiresInSeconds
+	if ttl == 0 {
+		ttl = 600
+	}
+	if ttl < 60 || ttl > 600 {
+		writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "approval lifetime must be between 60 and 600 seconds")
+		return
+	}
+	grant, err := h.SourceChanges.GrantSourceApproval(r.Context(), workspace.GrantSourceApprovalRequest{
+		TenantID: identity.TenantID, ProjectID: projectID, PlanID: planID,
+		ApproverUserID: identity.UserID, ExpiresAt: time.Now().UTC().Add(time.Duration(ttl) * time.Second),
+	})
+	if err != nil {
+		writeSourceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, grant)
 }
 
 func (h Handler) getInfrastructurePlan(w http.ResponseWriter, r *http.Request, projectID, planID string) {
@@ -122,6 +179,33 @@ func infrastructureRoute(path string) (string, string, string, bool) {
 		return "", "", "", false
 	}
 	return parts[3], parts[6], "approval", true
+}
+
+func sourceChangeRoute(path string) (string, string, string, bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) < 7 || len(parts) > 8 || parts[0] != "api" || parts[1] != "v2" || parts[2] != "projects" || parts[4] != "source" || parts[5] != "plans" || parts[3] == "" || parts[6] == "" {
+		return "", "", "", false
+	}
+	if len(parts) == 7 {
+		return parts[3], parts[6], "plan", true
+	}
+	if parts[7] != "approval" {
+		return "", "", "", false
+	}
+	return parts[3], parts[6], "approval", true
+}
+
+func writeSourceError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, workspace.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "source change plan not found")
+	case errors.Is(err, workspace.ErrConflict):
+		writeError(w, http.StatusConflict, "CONFLICT", "source approval conflicts with current state")
+	case errors.Is(err, workspace.ErrPolicyDenied), errors.Is(err, workspace.ErrSourceApprovalRequired):
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "source approval denied")
+	default:
+		writeError(w, http.StatusServiceUnavailable, "UNAVAILABLE", "source governance is temporarily unavailable")
+	}
 }
 
 func writeInfrastructureError(w http.ResponseWriter, err error) {

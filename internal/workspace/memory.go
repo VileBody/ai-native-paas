@@ -11,21 +11,107 @@ import (
 )
 
 type MemoryStore struct {
-	mu             sync.Mutex
-	workspaces     map[string]Workspace
-	workspaceIdem  map[string]string
-	workspaceTasks map[string]string
-	commands       map[string]Command
-	commandIdem    map[string]string
-	serializations map[string]string
-	commitReceipts map[string]sourcev2.AgentCommitReceipt
+	mu              sync.Mutex
+	workspaces      map[string]Workspace
+	workspaceIdem   map[string]string
+	workspaceTasks  map[string]string
+	commands        map[string]Command
+	commandIdem     map[string]string
+	serializations  map[string]string
+	commitReceipts  map[string]sourcev2.AgentCommitReceipt
+	sourcePlans     map[string]SourceChangePlan
+	sourcePlanIdem  map[string]string
+	sourceApprovals map[string]SourceApprovalGrant
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
 		workspaces: make(map[string]Workspace), workspaceIdem: make(map[string]string), workspaceTasks: make(map[string]string),
 		commands: make(map[string]Command), commandIdem: make(map[string]string), serializations: make(map[string]string), commitReceipts: make(map[string]sourcev2.AgentCommitReceipt),
+		sourcePlans: make(map[string]SourceChangePlan), sourcePlanIdem: make(map[string]string), sourceApprovals: make(map[string]SourceApprovalGrant),
 	}
+}
+
+func (s *MemoryStore) CreateSourceChangePlan(_ context.Context, candidate SourceChangePlan) (SourceChangePlan, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := scopedKey(candidate.TenantID, candidate.ProjectID, candidate.IdempotencyKey)
+	if id, ok := s.sourcePlanIdem[key]; ok {
+		existing := s.sourcePlans[id]
+		if existing.RequestFingerprint != candidate.RequestFingerprint {
+			return SourceChangePlan{}, ErrConflict
+		}
+		return cloneSourcePlan(existing), nil
+	}
+	if _, exists := s.sourcePlans[candidate.PlanID]; exists {
+		return SourceChangePlan{}, ErrConflict
+	}
+	s.sourcePlans[candidate.PlanID] = cloneSourcePlan(candidate)
+	s.sourcePlanIdem[key] = candidate.PlanID
+	return cloneSourcePlan(candidate), nil
+}
+
+func (s *MemoryStore) GetSourceChangePlan(_ context.Context, tenantID, projectID, planID string) (SourceChangePlan, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	plan, ok := s.sourcePlans[planID]
+	if !ok || plan.TenantID != tenantID || plan.ProjectID != projectID {
+		return SourceChangePlan{}, ErrNotFound
+	}
+	return cloneSourcePlan(plan), nil
+}
+
+func (s *MemoryStore) CreateSourceApproval(_ context.Context, candidate SourceApprovalGrant) (SourceApprovalGrant, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, existing := range s.sourceApprovals {
+		if existing.PlanID == candidate.PlanID && existing.ConsumedAt.IsZero() && existing.ExpiresAt.After(candidate.CreatedAt) {
+			return SourceApprovalGrant{}, ErrConflict
+		}
+	}
+	s.sourceApprovals[candidate.GrantID] = candidate
+	return candidate, nil
+}
+
+func (s *MemoryStore) GetActiveSourceApproval(_ context.Context, tenantID, projectID, planID, grantID, actorID string, now time.Time) (SourceApprovalGrant, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	grant, ok := s.sourceApprovals[grantID]
+	if !ok || grant.TenantID != tenantID || grant.ProjectID != projectID || grant.PlanID != planID || grant.ActorID != actorID || !grant.ConsumedAt.IsZero() || !grant.ExpiresAt.After(now) {
+		return SourceApprovalGrant{}, ErrNotFound
+	}
+	return grant, nil
+}
+
+func (s *MemoryStore) AuthorizeSourceCommit(_ context.Context, authorization SourceCommitAuthorization) (SourceChangePlan, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	plan, ok := s.sourcePlans[authorization.PlanID]
+	if !ok || plan.TenantID != authorization.TenantID || plan.ProjectID != authorization.ProjectID || plan.PlanHash != authorization.PlanHash || plan.ActorID != authorization.ActorID {
+		return SourceChangePlan{}, ErrNotFound
+	}
+	if !plan.AuthorizedAt.IsZero() {
+		if plan.AuthorizedIdempotencyKey == authorization.IdempotencyKey && plan.AuthorizationFingerprint == authorization.Fingerprint {
+			return cloneSourcePlan(plan), nil
+		}
+		return SourceChangePlan{}, ErrConflict
+	}
+	if !plan.ExpiresAt.After(authorization.Now) {
+		return SourceChangePlan{}, ErrPolicyDenied
+	}
+	if authorization.ApprovalRequired {
+		grant, exists := s.sourceApprovals[authorization.ApprovalGrantID]
+		if !exists || grant.PlanID != plan.PlanID || grant.PlanHash != plan.PlanHash || grant.ActorID != plan.ActorID || !grant.ConsumedAt.IsZero() || !grant.ExpiresAt.After(authorization.Now) {
+			return SourceChangePlan{}, ErrPolicyDenied
+		}
+		grant.ConsumedAt = authorization.Now
+		s.sourceApprovals[grant.GrantID] = grant
+	}
+	plan.AuthorizedIdempotencyKey = authorization.IdempotencyKey
+	plan.AuthorizationFingerprint = authorization.Fingerprint
+	plan.AuthorizedAt = authorization.Now
+	s.sourcePlans[plan.PlanID] = plan
+	return cloneSourcePlan(plan), nil
 }
 
 func (s *MemoryStore) PutCommitReceipt(_ context.Context, scope CommitReceiptScope, receipt sourcev2.AgentCommitReceipt) error {
@@ -253,6 +339,11 @@ func cloneWorkspace(value Workspace) Workspace {
 	value.Spec.CredentialLeases = append([]string(nil), value.Spec.CredentialLeases...)
 	value.ProviderDiskIDs = append([]string(nil), value.ProviderDiskIDs...)
 	value.ProviderFirewallGroupIDs = append([]string(nil), value.ProviderFirewallGroupIDs...)
+	return value
+}
+
+func cloneSourcePlan(value SourceChangePlan) SourceChangePlan {
+	value.Files = append([]sourcev2.PatchFile(nil), value.Files...)
 	return value
 }
 

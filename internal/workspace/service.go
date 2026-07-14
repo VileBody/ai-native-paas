@@ -396,7 +396,7 @@ func (s *Service) RecordCommitReceipt(ctx context.Context, request CredentialRes
 	if err != nil {
 		return err
 	}
-	if command.Kind != "repository_commit" || command.ActorID == "" || command.StartedAt == nil || workspaceValue.Spec.SourceRevision == nil || receipt.Statement.RepositoryID != workspaceValue.Spec.SourceRevision.RepositoryID || receipt.Statement.BaseSHA != workspaceValue.Spec.SourceRevision.CommitSHA || receipt.Statement.AgentID != command.ActorID || receipt.Statement.TaskID != command.TaskID || receipt.Attestation.IssuedAt.Before(*command.StartedAt) || receipt.Attestation.IssuedAt.After(s.Clock.Now().UTC().Add(time.Minute)) {
+	if command.Kind != "repository_commit" || command.ActorID == "" || command.StartedAt == nil || workspaceValue.Spec.SourceRevision == nil || len(command.Spec.Argv) < 9 || receipt.Statement.RepositoryID != workspaceValue.Spec.SourceRevision.RepositoryID || receipt.Statement.BaseSHA != workspaceValue.Spec.SourceRevision.CommitSHA || receipt.Statement.AgentID != command.ActorID || receipt.Statement.TaskID != command.TaskID || receipt.Statement.SourcePlanHash != command.Spec.Argv[8] || receipt.Attestation.IssuedAt.Before(*command.StartedAt) || receipt.Attestation.IssuedAt.After(s.Clock.Now().UTC().Add(time.Minute)) {
 		return ErrPolicyDenied
 	}
 	return s.Store.PutCommitReceipt(ctx, CommitReceiptScope{

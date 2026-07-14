@@ -117,18 +117,19 @@ func (p PatchMutation) Validate() error {
 // mTLS private key. The control plane verifies the signature against the
 // certificate used for the receipt request before persisting it.
 type CommitStatement struct {
-	RepositoryID  string    `json:"repository_id"`
-	BaseSHA       string    `json:"base_sha"`
-	CommitSHA     string    `json:"commit_sha"`
-	Branch        string    `json:"branch"`
-	AgentID       string    `json:"agent_id"`
-	TaskID        string    `json:"task_id"`
-	CorrelationID string    `json:"correlation_id"`
-	IssuedAt      time.Time `json:"issued_at"`
+	RepositoryID   string    `json:"repository_id"`
+	BaseSHA        string    `json:"base_sha"`
+	CommitSHA      string    `json:"commit_sha"`
+	Branch         string    `json:"branch"`
+	AgentID        string    `json:"agent_id"`
+	TaskID         string    `json:"task_id"`
+	CorrelationID  string    `json:"correlation_id"`
+	SourcePlanHash string    `json:"source_plan_hash"`
+	IssuedAt       time.Time `json:"issued_at"`
 }
 
 func (s CommitStatement) Canonical() ([]byte, error) {
-	if strings.TrimSpace(s.RepositoryID) == "" || !fullSHA.MatchString(s.BaseSHA) || !fullSHA.MatchString(s.CommitSHA) || !safeBranch(s.Branch) || strings.TrimSpace(s.AgentID) == "" || strings.TrimSpace(s.TaskID) == "" || strings.TrimSpace(s.CorrelationID) == "" || s.IssuedAt.IsZero() {
+	if strings.TrimSpace(s.RepositoryID) == "" || !fullSHA.MatchString(s.BaseSHA) || !fullSHA.MatchString(s.CommitSHA) || !safeBranch(s.Branch) || strings.TrimSpace(s.AgentID) == "" || strings.TrimSpace(s.TaskID) == "" || strings.TrimSpace(s.CorrelationID) == "" || !digest.MatchString(s.SourcePlanHash) || s.IssuedAt.IsZero() {
 		return nil, errors.New("invalid commit statement")
 	}
 	return json.Marshal(s)

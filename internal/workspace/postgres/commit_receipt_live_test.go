@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -51,6 +52,8 @@ func TestPostgres_WorkspaceCommitReceiptMigrationAndRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
+		_, _ = db.Exec(`DELETE FROM workspace.source_approval_grants WHERE plan_id=$1`, "live-source-plan-"+suffix)
+		_, _ = db.Exec(`DELETE FROM workspace.source_change_plans WHERE id=$1`, "live-source-plan-"+suffix)
 		_, _ = db.Exec(`DELETE FROM workspace.commit_receipts WHERE command_id=$1`, commandID)
 		_, _ = db.Exec(`DELETE FROM workspace.commands WHERE id=$1`, commandID)
 		_, _ = db.Exec(`DELETE FROM workspace.workspaces WHERE id=$1`, workspaceID)
@@ -66,7 +69,7 @@ func TestPostgres_WorkspaceCommitReceiptMigrationAndRoundTrip(t *testing.T) {
 	}
 	statement := sourcev2.CommitStatement{
 		RepositoryID: "repo-1", BaseSHA: strings.Repeat("a", 40), CommitSHA: strings.Repeat("b", 40), Branch: "agent/task-1",
-		AgentID: "agent-1", TaskID: "task-1", CorrelationID: "corr-1", IssuedAt: now,
+		AgentID: "agent-1", TaskID: "task-1", CorrelationID: "corr-1", SourcePlanHash: "sha256:" + strings.Repeat("d", 64), IssuedAt: now,
 	}
 	canonical, _ := statement.Canonical()
 	statementHash := sha256.Sum256(canonical)
@@ -90,5 +93,40 @@ func TestPostgres_WorkspaceCommitReceiptMigrationAndRoundTrip(t *testing.T) {
 	}
 	if err := store.PutCommitReceipt(ctx, scope, receipt); err != nil {
 		t.Fatalf("idempotent receipt replay failed: %v", err)
+	}
+	sourcePlan := workspace.SourceChangePlan{
+		PlanID: "live-source-plan-" + suffix, TenantID: tenantID, ProjectID: projectID, WorkspaceID: workspaceID,
+		RepositoryID: "repo-1", BaseSHA: strings.Repeat("a", 40), TargetBranch: "agent/task-1", ActorID: "agent-1", TaskID: "task-1",
+		Files:    []sourcev2.PatchFile{{Path: "deploy/environments/production/deployment.yaml", ContentHash: "sha256:" + strings.Repeat("d", 64)}},
+		PlanHash: "sha256:" + strings.Repeat("e", 64), RequiresApproval: true, IdempotencyKey: "live-source-plan-" + suffix,
+		RequestFingerprint: "sha256:" + strings.Repeat("f", 64), CreatedAt: now, ExpiresAt: now.Add(10 * time.Minute),
+	}
+	if _, err := store.CreateSourceChangePlan(ctx, sourcePlan); err != nil {
+		t.Fatal(err)
+	}
+	grant := workspace.SourceApprovalGrant{
+		GrantID: "live-source-grant-" + suffix, TenantID: tenantID, ProjectID: projectID, PlanID: sourcePlan.PlanID,
+		PlanHash: sourcePlan.PlanHash, WorkspaceID: workspaceID, RepositoryID: "repo-1", TargetBranch: "agent/task-1", ActorID: "agent-1",
+		ApproverUserID: "human-1", CreatedAt: now, ExpiresAt: now.Add(5 * time.Minute),
+	}
+	if _, err := store.CreateSourceApproval(ctx, grant); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.GetActiveSourceApproval(ctx, tenantID, projectID, sourcePlan.PlanID, grant.GrantID, "agent-1", now); err != nil {
+		t.Fatal(err)
+	}
+	authorization := workspace.SourceCommitAuthorization{
+		TenantID: tenantID, ProjectID: projectID, PlanID: sourcePlan.PlanID, PlanHash: sourcePlan.PlanHash, ActorID: "agent-1",
+		ApprovalGrantID: grant.GrantID, IdempotencyKey: "live-source-commit-" + suffix, Fingerprint: "sha256:" + strings.Repeat("1", 64), Now: now.Add(time.Second), ApprovalRequired: true,
+	}
+	authorized, err := store.AuthorizeSourceCommit(ctx, authorization)
+	if err != nil || authorized.AuthorizedAt.IsZero() {
+		t.Fatalf("authorized=%#v err=%v", authorized, err)
+	}
+	if _, err := store.AuthorizeSourceCommit(ctx, authorization); err != nil {
+		t.Fatalf("idempotent source authorization replay failed: %v", err)
+	}
+	if _, err := store.GetActiveSourceApproval(ctx, tenantID, projectID, sourcePlan.PlanID, grant.GrantID, "agent-1", now.Add(2*time.Second)); !errors.Is(err, workspace.ErrNotFound) {
+		t.Fatalf("consumed source approval remains active: %v", err)
 	}
 }

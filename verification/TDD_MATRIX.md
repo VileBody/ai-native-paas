@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **870**
-- Reused now: **37**
-- New local/contract tests required: **47**
+- Discovered Go tests/fuzz targets: **872**
+- Reused now: **38**
+- New local/contract tests required: **46**
 - Live/provider/system tests required: **73**
 - Unmapped: **0**
 
@@ -31,7 +31,7 @@ A release gate may become green only after every referenced test exists and pass
 | `S1` | LIVE_ONLY | application + GitLab contract | `test/pivot/source_v2_test.go::TestSource_CreateProjectBootstrapsV2RepositoryLayout` |
 | `S2` | REUSED | real local Git integration | `internal/workspaceagent/source_v2_test.go::TestSource_CheckoutUsesExactCommitNotMutableBranchHead` |
 | `S3` | REUSED | fuzz + application | `internal/workspaceagent/source_v2_test.go::TestSource_PatchRejectsNonCanonicalAndGitInternalPaths` |
-| `S4` | NEW | application | `test/pivot/source_v2_test.go::TestSource_ProductionGitOpsPathRequiresApprovalPolicy` |
+| `S4` | REUSED | application | `internal/workspace/service_tdd_test.go::TestSource_ProductionGitOpsPathRequiresApprovalPolicy` |
 | `S5` | REUSED | Git integration | `internal/workspaceagent/source_v2_test.go::TestSource_AgentCommitContainsSignedAttestationAndCorrelation` |
 | `S6` | REUSED | Git integration + concurrency | `internal/workspaceagent/source_v2_test.go::TestSource_ConcurrentPushUsesExpectedBaseSHA` |
 | `S7` | REUSED | application | `internal/workspaceagent/source_v2_test.go::TestSource_SecretScannerBlocksCredentialBeforeCommit` |
