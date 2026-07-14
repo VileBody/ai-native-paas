@@ -16,12 +16,16 @@ import (
 	"time"
 
 	"github.com/keir-research/ai-native-paas/internal/agent/enrollment"
+	attachmentsapp "github.com/keir-research/ai-native-paas/internal/attachments/application"
+	attachmentsmemory "github.com/keir-research/ai-native-paas/internal/attachments/memory"
+	attachmentstestkit "github.com/keir-research/ai-native-paas/internal/attachments/testkit"
 	infraapp "github.com/keir-research/ai-native-paas/internal/infrastructure/application"
 	inframemory "github.com/keir-research/ai-native-paas/internal/infrastructure/memory"
 	sourceapp "github.com/keir-research/ai-native-paas/internal/source/application"
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
+	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
 	commercev2 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v2"
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
@@ -69,6 +73,16 @@ type workspaceCommands struct {
 	revision     sourcev2.SourceRevision
 	receipt      sourcev2.AgentCommitReceipt
 	mergeRequest sourceapp.CreateMergeRequestCommand
+}
+
+type failingSecretCommands struct{ err error }
+
+func (f failingSecretCommands) SetSecret(context.Context, attachmentsapp.SetSecretRequest) (attachmentsv1.SecretMetadata, attachmentsv1.AttachmentSnapshotRef, error) {
+	return attachmentsv1.SecretMetadata{}, attachmentsv1.AttachmentSnapshotRef{}, f.err
+}
+
+func (f failingSecretCommands) ListProjectSecretMetadata(context.Context, string, string, string) ([]attachmentsv1.SecretMetadata, error) {
+	return nil, f.err
 }
 
 func (w *workspaceCommands) CreateMergeRequest(_ context.Context, command sourceapp.CreateMergeRequestCommand) (sourceapp.CreateMergeRequestResult, error) {
@@ -227,6 +241,111 @@ func TestProjectMCP_ExactPlanApprovalGatesVerifiedWorkspaceApply(t *testing.T) {
 	if applied.Code != http.StatusOK || workspaces.exec.Kind != "infra_apply" || workspaces.exec.Spec.Argv[0] != "workspace-agent" || workspaces.exec.Spec.Argv[2] != "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" {
 		t.Fatalf("apply status=%d body=%s request=%#v", applied.Code, applied.Body.String(), workspaces.exec)
 	}
+}
+
+func TestAgent_SecretSetIsWriteOnlyAcrossMCPAndWorkspace(t *testing.T) {
+	const sentinel = "G22_SECRET_SENTINEL_never_return_8fa29c"
+	handler, access, workspaces := mcpFixture(t, []string{
+		"agent.tool:secret_set", "agent.tool:secret_list_metadata", "agent.tool:workspace_exec",
+	})
+	store := attachmentsmemory.New()
+	vault := attachmentstestkit.NewVault()
+	logger := &attachmentstestkit.Logger{}
+	attachments := &attachmentsapp.Service{
+		Store: store,
+		Environments: &attachmentstestkit.Environments{Values: map[string]attachmentsapp.EnvironmentRef{
+			"env-1":       {TenantID: "tenant-1", ApplicationID: "project-1", EnvironmentID: "env-1", Name: "staging", Ready: true},
+			"env-sibling": {TenantID: "tenant-1", ApplicationID: "project-2", EnvironmentID: "env-sibling", Name: "staging", Ready: true},
+		}},
+		Secrets: vault, Runtime: attachmentstestkit.NewRuntime(), Logger: logger,
+		Clock: attachmentstestkit.NewClock(), IDs: &attachmentsapp.SequentialIDs{},
+	}
+	handler.Secrets = attachments
+
+	set := invocation(agentv2.ToolSecretSet)
+	set.IdempotencyKey = "secret-set-1"
+	set.Arguments = json.RawMessage(`{"environment_id":"env-1","name":"API_TOKEN","value":"` + sentinel + `","scope":"runtime","phase":"runtime"}`)
+	written := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, set)
+	assertSecretAbsent(t, written.Body.Bytes(), sentinel, "secret_set response")
+	if written.Code != http.StatusOK || !vault.Contains(sentinel) {
+		t.Fatalf("secret_set status=%d vault_contains=%t", written.Code, vault.Contains(sentinel))
+	}
+	var writtenEnvelope agentv2.InvocationResponse
+	var writtenResult secretSetResult
+	if json.Unmarshal(written.Body.Bytes(), &writtenEnvelope) != nil || json.Unmarshal(writtenEnvelope.Result, &writtenResult) != nil {
+		t.Fatal("decode secret_set metadata response")
+	}
+	if writtenResult.Secret.Name != "API_TOKEN" || writtenResult.Secret.Version != 1 || writtenResult.Reference != "secret://project-1/env-1/API_TOKEN" || writtenResult.AttachmentSnapshot.SnapshotID == "" {
+		t.Fatalf("unexpected secret metadata: %+v", writtenResult)
+	}
+
+	replayed := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, set)
+	assertSecretAbsent(t, replayed.Body.Bytes(), sentinel, "idempotent secret_set response")
+	var replayedEnvelope agentv2.InvocationResponse
+	var replayedResult secretSetResult
+	if replayed.Code != http.StatusOK || json.Unmarshal(replayed.Body.Bytes(), &replayedEnvelope) != nil || json.Unmarshal(replayedEnvelope.Result, &replayedResult) != nil || replayedResult.Secret.Version != 1 || replayedResult.Reference != writtenResult.Reference {
+		t.Fatal("idempotent secret_set replay changed public metadata")
+	}
+
+	list := invocation(agentv2.ToolSecretListMetadata)
+	list.IdempotencyKey = "secret-list-1"
+	list.Arguments = json.RawMessage(`{"environment_id":"env-1"}`)
+	listed := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, list)
+	assertSecretAbsent(t, listed.Body.Bytes(), sentinel, "secret metadata list")
+	var listedEnvelope agentv2.InvocationResponse
+	var listedResult secretListResult
+	if listed.Code != http.StatusOK || json.Unmarshal(listed.Body.Bytes(), &listedEnvelope) != nil || json.Unmarshal(listedEnvelope.Result, &listedResult) != nil || len(listedResult.Secrets) != 1 || listedResult.Secrets[0].Name != "API_TOKEN" {
+		t.Fatal("secret metadata list did not return the written metadata")
+	}
+
+	sibling := list
+	sibling.IdempotencyKey = "secret-list-sibling"
+	sibling.Arguments = json.RawMessage(`{"environment_id":"env-sibling"}`)
+	siblingResponse := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, sibling)
+	if siblingResponse.Code != http.StatusForbidden {
+		t.Fatalf("sibling project environment list status=%d", siblingResponse.Code)
+	}
+	assertSecretAbsent(t, siblingResponse.Body.Bytes(), sentinel, "cross-project error")
+
+	exec := invocation(agentv2.ToolWorkspaceExec)
+	exec.IdempotencyKey = "workspace-with-secret-ref"
+	exec.Arguments = json.RawMessage(`{"workspace_id":"workspace-1","argv":["python","-c","print('configured')"],"working_dir":"","environment_refs":{"API_TOKEN":"` + writtenResult.Reference + `"},"timeout_seconds":60,"output_limit_bytes":4096,"kind":"command"}`)
+	executed := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, exec)
+	if executed.Code != http.StatusOK || workspaces.exec.Spec.EnvironmentRefs["API_TOKEN"] != writtenResult.Reference {
+		t.Fatalf("workspace reference dispatch status=%d reference=%q", executed.Code, workspaces.exec.Spec.EnvironmentRefs["API_TOKEN"])
+	}
+	assertSecretAbsent(t, executed.Body.Bytes(), sentinel, "workspace response")
+	assertSecretAbsent(t, mustJSON(t, workspaces.exec), sentinel, "workspace command")
+
+	handler.Secrets = failingSecretCommands{err: fmt.Errorf("provider failure contained %s", sentinel)}
+	failed := set
+	failed.IdempotencyKey = "secret-set-failed"
+	failedResponse := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, failed)
+	if failedResponse.Code != http.StatusServiceUnavailable {
+		t.Fatalf("secret provider failure status=%d", failedResponse.Code)
+	}
+	assertSecretAbsent(t, failedResponse.Body.Bytes(), sentinel, "public provider error")
+	assertSecretAbsent(t, mustJSON(t, store.Audit()), sentinel, "attachments audit")
+	assertSecretAbsent(t, mustJSON(t, store.Outbox()), sentinel, "attachments outbox")
+	if logger.Contains(sentinel) {
+		t.Fatal("secret value leaked to structured logs")
+	}
+}
+
+func assertSecretAbsent(t *testing.T, value []byte, secret, surface string) {
+	t.Helper()
+	if bytes.Contains(value, []byte(secret)) {
+		t.Fatalf("secret value leaked through %s", surface)
+	}
+}
+
+func mustJSON(t *testing.T, value any) []byte {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
 }
 
 func TestAgent_DeployWorkflowStartsFromExactRepositoryRevision(t *testing.T) {

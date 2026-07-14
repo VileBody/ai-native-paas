@@ -15,11 +15,15 @@ import (
 
 	kernelv2 "github.com/keir-research/ai-native-paas/contracts/kernel/v2"
 	"github.com/keir-research/ai-native-paas/internal/agent/enrollment"
+	attachmentsapp "github.com/keir-research/ai-native-paas/internal/attachments/application"
+	attachmentsdomain "github.com/keir-research/ai-native-paas/internal/attachments/domain"
 	infraapp "github.com/keir-research/ai-native-paas/internal/infrastructure/application"
 	sourceapp "github.com/keir-research/ai-native-paas/internal/source/application"
 	"github.com/keir-research/ai-native-paas/internal/source/domain"
 	"github.com/keir-research/ai-native-paas/internal/workspace"
+	agentv1 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v1"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
+	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
@@ -57,9 +61,15 @@ type RepositoryMergeRequests interface {
 	CreateMergeRequest(context.Context, sourceapp.CreateMergeRequestCommand) (sourceapp.CreateMergeRequestResult, error)
 }
 
+type SecretCommands interface {
+	SetSecret(context.Context, attachmentsapp.SetSecretRequest) (attachmentsv1.SecretMetadata, attachmentsv1.AttachmentSnapshotRef, error)
+	ListProjectSecretMetadata(context.Context, string, string, string) ([]attachmentsv1.SecretMetadata, error)
+}
+
 var errInvalidWorkspaceArguments = errors.New("invalid workspace tool arguments")
 var errInvalidInfrastructureArguments = errors.New("invalid infrastructure tool arguments")
 var errInvalidRepositoryArguments = errors.New("invalid repository tool arguments")
+var errInvalidSecretArguments = errors.New("invalid secret tool arguments")
 var errSourceApprovalRequired = errors.New("source approval required")
 
 type Handler struct {
@@ -69,6 +79,7 @@ type Handler struct {
 	Infrastructure InfrastructureCommands
 	SourceChanges  SourceChangeCommands
 	MergeRequests  RepositoryMergeRequests
+	Secrets        SecretCommands
 	MaxBodyBytes   int64
 }
 
@@ -149,6 +160,8 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 		result, err = h.invokeWorkspace(r.Context(), verified, request)
 	case agentv2.ToolInfraPlan, agentv2.ToolInfraGetPlan, agentv2.ToolInfraApply, agentv2.ToolApprovalRequest, agentv2.ToolApprovalGet:
 		result, err = h.invokeInfrastructure(r.Context(), verified, request)
+	case agentv2.ToolSecretSet, agentv2.ToolSecretListMetadata:
+		result, err = h.invokeSecrets(r.Context(), verified, request)
 	default:
 		writeResponse(w, http.StatusNotImplemented, agentv2.InvocationResponse{
 			APIVersion: agentv2.APIVersion, InvocationID: "read-" + request.CorrelationID,
@@ -175,6 +188,18 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 			status, code, message, retryable = http.StatusConflict, "CONFLICT", "infrastructure operation conflicts with current state", false
 		case errors.Is(err, errInvalidWorkspaceArguments):
 			status, code, message, retryable = http.StatusBadRequest, "INVALID_ARGUMENT", "invalid workspace tool arguments", false
+		case errors.Is(err, errInvalidSecretArguments), attachmentCode(err, attachmentsdomain.CodeInvalidArgument):
+			status, code, message, retryable = http.StatusBadRequest, "INVALID_ARGUMENT", "invalid secret tool arguments", false
+		case attachmentCode(err, attachmentsdomain.CodeForbidden):
+			status, code, message, retryable = http.StatusForbidden, "POLICY_DENIED", "secret scope is denied", false
+		case attachmentCode(err, attachmentsdomain.CodeNotFound):
+			status, code, message, retryable = http.StatusNotFound, "NOT_FOUND", "secret scope was not found", false
+		case attachmentCode(err, attachmentsdomain.CodeConflict), attachmentCode(err, attachmentsdomain.CodeStaleVersion):
+			status, code, message, retryable = http.StatusConflict, "CONFLICT", "secret operation conflicts with current state", false
+		case attachmentCode(err, attachmentsdomain.CodeEntitlementDenied):
+			status, code, message, retryable = http.StatusPaymentRequired, "ENTITLEMENT_DENIED", "secret operation is not permitted by the active plan", false
+		case attachmentCode(err, attachmentsdomain.CodeRetryable), attachmentCode(err, attachmentsdomain.CodeUnavailable):
+			status, code, message, retryable = http.StatusServiceUnavailable, "UNAVAILABLE", "secret provider is temporarily unavailable", true
 		case errors.Is(err, workspace.ErrNotFound):
 			status, code, message, retryable = http.StatusNotFound, "NOT_FOUND", "workspace resource not found", false
 		case errors.Is(err, workspace.ErrConflict), errors.Is(err, workspace.ErrStatefulCommandBusy):
@@ -200,6 +225,93 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 		return
 	}
 	writeResponse(w, http.StatusOK, agentv2.InvocationResponse{APIVersion: agentv2.APIVersion, InvocationID: "read-" + request.CorrelationID, Result: raw})
+}
+
+type secretSetArguments struct {
+	EnvironmentID string                    `json:"environment_id"`
+	Name          string                    `json:"name"`
+	Value         string                    `json:"value"`
+	Scope         attachmentsv1.SecretScope `json:"scope"`
+	Phase         attachmentsv1.SecretPhase `json:"phase"`
+	ExpiresAt     time.Time                 `json:"expires_at,omitempty"`
+}
+
+type secretListArguments struct {
+	EnvironmentID string `json:"environment_id"`
+}
+
+type secretSetResult struct {
+	Secret             attachmentsv1.SecretMetadata        `json:"secret"`
+	Reference          string                              `json:"reference"`
+	AttachmentSnapshot attachmentsv1.AttachmentSnapshotRef `json:"attachment_snapshot"`
+}
+
+type secretListResult struct {
+	Secrets []attachmentsv1.SecretMetadata `json:"secrets"`
+}
+
+func (h Handler) invokeSecrets(ctx context.Context, verified agentv2.VerifiedInvocationContext, request agentv2.InvocationRequest) (any, error) {
+	if h.Secrets == nil {
+		return nil, errors.New("secret service is unavailable")
+	}
+	switch request.Tool {
+	case agentv2.ToolSecretSet:
+		var arguments secretSetArguments
+		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || !agentv1.ValidID(arguments.EnvironmentID) ||
+			!attachmentsdomain.ValidSecretName(arguments.Name) || len(arguments.Value) == 0 || len(arguments.Value) > 64<<10 ||
+			strings.ContainsRune(arguments.Value, '\x00') || !validSecretPlacement(arguments.Scope, arguments.Phase, arguments.ExpiresAt) {
+			return nil, errInvalidSecretArguments
+		}
+		value := []byte(arguments.Value)
+		arguments.Value = ""
+		defer zeroBytes(value)
+		metadata, snapshot, err := h.Secrets.SetSecret(ctx, attachmentsapp.SetSecretRequest{
+			TenantID: verified.TenantID, ApplicationID: verified.ProjectID, EnvironmentID: arguments.EnvironmentID,
+			Name: arguments.Name, Scope: arguments.Scope, Phase: arguments.Phase, Value: value, ExpiresAt: arguments.ExpiresAt,
+			ActorID: verified.AgentID, IdempotencyKey: request.IdempotencyKey,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return secretSetResult{
+			Secret: metadata, Reference: "secret://" + verified.ProjectID + "/" + arguments.EnvironmentID + "/" + arguments.Name,
+			AttachmentSnapshot: snapshot,
+		}, nil
+	case agentv2.ToolSecretListMetadata:
+		var arguments secretListArguments
+		if agentv2.DecodeStrict(request.Arguments, &arguments) != nil || !agentv1.ValidID(arguments.EnvironmentID) {
+			return nil, errInvalidSecretArguments
+		}
+		values, err := h.Secrets.ListProjectSecretMetadata(ctx, verified.TenantID, verified.ProjectID, arguments.EnvironmentID)
+		if err != nil {
+			return nil, err
+		}
+		return secretListResult{Secrets: values}, nil
+	default:
+		return nil, errors.New("secret tool is unavailable")
+	}
+}
+
+func validSecretPlacement(scope attachmentsv1.SecretScope, phase attachmentsv1.SecretPhase, expiresAt time.Time) bool {
+	switch scope {
+	case attachmentsv1.SecretScopeRuntime:
+		return phase == attachmentsv1.SecretPhaseRuntime
+	case attachmentsv1.SecretScopeBuild:
+		return (phase == attachmentsv1.SecretPhaseDetect || phase == attachmentsv1.SecretPhaseBuild) && !expiresAt.IsZero()
+	default:
+		return false
+	}
+}
+
+func zeroBytes(value []byte) {
+	for index := range value {
+		value[index] = 0
+	}
+}
+
+func attachmentCode(err error, code attachmentsdomain.Code) bool {
+	var typed *attachmentsdomain.Error
+	return errors.As(err, &typed) && typed.Code == code
 }
 
 type repositoryWorkspaceArguments struct {

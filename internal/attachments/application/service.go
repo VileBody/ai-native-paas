@@ -286,6 +286,10 @@ func (s *Service) ListSecretMetadata(ctx context.Context, tenant, env string) ([
 	if _, err := s.env(ctx, tenant, env); err != nil {
 		return nil, err
 	}
+	return s.listSecretMetadata(ctx, tenant, env)
+}
+
+func (s *Service) listSecretMetadata(ctx context.Context, tenant, env string) ([]attachmentsv1.SecretMetadata, error) {
 	out := []attachmentsv1.SecretMetadata{}
 	err := s.Store.Transact(ctx, func(tx Tx) error {
 		set, ok := tx.FindSecretSet(tenant, env)
@@ -298,6 +302,20 @@ func (s *Service) ListSecretMetadata(ctx context.Context, tenant, env string) ([
 		return nil
 	})
 	return out, err
+}
+
+// ListProjectSecretMetadata is the Project MCP boundary. Unlike the v1
+// compatibility port, it binds the environment to the project/application
+// identity taken from the verified agent credential.
+func (s *Service) ListProjectSecretMetadata(ctx context.Context, tenant, applicationID, environmentID string) ([]attachmentsv1.SecretMetadata, error) {
+	environment, err := s.env(ctx, tenant, environmentID)
+	if err != nil {
+		return nil, err
+	}
+	if environment.ApplicationID != applicationID {
+		return nil, domain.NewError(domain.CodeForbidden, "application mismatch")
+	}
+	return s.listSecretMetadata(ctx, tenant, environmentID)
 }
 func (s *Service) DeleteSecret(ctx context.Context, r DeleteSecretRequest) (attachmentsv1.AttachmentSnapshotRef, error) {
 	s.defaults()

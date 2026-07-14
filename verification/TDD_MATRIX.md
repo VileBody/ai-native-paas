@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **962**
-- Reused now: **88**
-- New local/contract tests required: **3**
+- Discovered Go tests/fuzz targets: **963**
+- Reused now: **89**
+- New local/contract tests required: **2**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -150,7 +150,7 @@ A release gate may become green only after every referenced test exists and pass
 | `G19` | NEW | acceptance | `test/pivot/agent_workspace_test.go::TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix` |
 | `G20` | REUSED | application | `test/pivot/agent_workspace_test.go::TestAgent_DestroyWorkflowShowsPlanAndRetainsResourcesByPolicy` |
 | `G21` | LIVE_ONLY | security acceptance | `test/pivot/agent_workspace_test.go::TestAgent_NeverReceivesPlatformOrProviderMasterCredential` |
-| `G22` | NEW | cross-domain | `test/pivot/agent_workspace_test.go::TestAgent_SecretSetIsWriteOnlyAcrossMCPAndWorkspace` |
+| `G22` | REUSED | cross-domain | `internal/project/mcp/handler_test.go::TestAgent_SecretSetIsWriteOnlyAcrossMCPAndWorkspace` |
 | `G23` | LIVE_ONLY | application | `test/pivot/agent_workspace_test.go::TestAgent_CostThresholdPausesBeforeApplyAndNotifiesHuman` |
 | `G24` | REUSED | PostgreSQL/concurrency | `test/integration/postgres_infrastructure_test.go::TestAgent_ApprovalIsSingleUseAndBoundToCanonicalPlan` |
 | `G25` | REUSED | application | `internal/agent/application/agent_tdd_test.go::TestAgent_RepairLoopAndBudgetStopAutonomousSpend` |
