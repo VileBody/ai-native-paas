@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-for tool in curl jq sha256sum sha512sum tar unzip qemu-img virt-customize virt-copy-out xz go; do
+for tool in curl jq sha256sum sha512sum tar unzip qemu-img guestfish virt-copy-out xz go; do
   command -v "$tool" >/dev/null || { echo "$tool is required" >&2; exit 1; }
 done
 
@@ -55,34 +55,71 @@ install -m 0755 "$cosign_binary" "$work_directory/root/usr/local/bin/cosign"
 install -m 0755 "$cosign_binary" "$output_directory/cosign"
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$work_directory/root/usr/local/bin/workspace-agent" ./cmd/workspace-agent
 
+upstream_dns="${WORKSPACE_IMAGE_DNS:-}"
+if [[ -z "$upstream_dns" ]]; then
+  upstream_dns="$(awk '$1 == "nameserver" && $2 !~ /^(127\.|::1$)/ { print $2; exit }' \
+    /run/systemd/resolve/resolv.conf /etc/resolv.conf 2>/dev/null || true)"
+fi
+upstream_dns="${upstream_dns:-1.1.1.1}"
+if [[ ! "$upstream_dns" =~ ^[0-9a-fA-F:.]+$ ]]; then
+  echo "WORKSPACE_IMAGE_DNS must be an IPv4 or IPv6 address" >&2
+  exit 1
+fi
+
+provision="$work_directory/provision-workspace-image.sh"
+cat >"$provision" <<'PROVISION'
+#!/usr/bin/env bash
+set -euxo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+apt_opts=(-q -y -o Dpkg::Options::=--force-confnew)
+rm -f /etc/apt/sources.list
+apt-get "${apt_opts[@]}" -o Acquire::Check-Valid-Until=false update
+apt-get "${apt_opts[@]}" install \
+  ca-certificates git jq make python3 ripgrep uidmap slirp4netns \
+  fuse-overlayfs runc
+apt-get "${apt_opts[@]}" purge openssh-server || true
+
+id workspace-agent >/dev/null 2>&1 || \
+  useradd --uid 1000 --create-home --home-dir /home/workspace-agent \
+    --shell /usr/sbin/nologin workspace-agent
+install -d -m 0700 -o workspace-agent -g workspace-agent \
+  /workspace /var/lib/ai-native-paas /var/lib/ai-native-paas/identity \
+  /var/lib/ai-native-paas/journal /home/workspace-agent/.local/share/buildkit
+printf 'workspace-agent:100000:65536\n' > /etc/subuid
+printf 'workspace-agent:100000:65536\n' > /etc/subgid
+printf 'kernel.unprivileged_userns_clone=1\n' > \
+  /etc/sysctl.d/90-workspace-rootless.conf
+passwd -l root
+passwd -l workspace-agent
+systemctl disable ssh.service ssh.socket 2>/dev/null || true
+systemctl enable ai-native-paas-workspace-agent.service \
+  ai-native-paas-buildkit.service
+dpkg-query -W -f='${Package}\t${Version}\n' | sort > \
+  /usr/share/ai-native-paas/debian-packages.tsv
+syft scan dir:/ -o spdx-json=/usr/share/ai-native-paas/sbom.spdx.json
+rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb /tmp/* /var/tmp/*
+cloud-init clean --logs --machine-id
+PROVISION
+
 image="$work_directory/workspace.qcow2"
 cp "$base" "$image"
 qemu-img resize "$image" 40G >/dev/null
 
-virt-customize -a "$image" --network \
-  --upload infra/images/workspace/debian-snapshot.sources:/etc/apt/sources.list.d/debian.sources \
-  --run-command 'rm -f /etc/apt/sources.list' \
-  --run-command 'ip link set dev eth0 up && ip address replace 169.254.2.15/16 dev eth0 && ip route replace default via 169.254.2.2 dev eth0' \
-  --run-command 'printf "nameserver 169.254.2.3\n" > /etc/resolv.conf' \
-  --install 'ca-certificates,git,jq,make,python3,ripgrep,uidmap,slirp4netns,fuse-overlayfs,runc' \
-  --uninstall 'openssh-server' \
-  --copy-in "$work_directory/root/usr/local/bin":/usr/local \
-  --mkdir /usr/share/ai-native-paas \
-  --upload infra/images/workspace/ai-native-paas-workspace-agent.service:/etc/systemd/system/ai-native-paas-workspace-agent.service \
-  --upload infra/images/workspace/ai-native-paas-buildkit.service:/etc/systemd/system/ai-native-paas-buildkit.service \
-  --upload "$lock":/usr/share/ai-native-paas/workspace-image-inputs.json \
-  --run-command 'id workspace-agent >/dev/null 2>&1 || useradd --uid 1000 --create-home --home-dir /home/workspace-agent --shell /usr/sbin/nologin workspace-agent' \
-  --run-command 'install -d -m 0700 -o workspace-agent -g workspace-agent /workspace /var/lib/ai-native-paas /var/lib/ai-native-paas/identity /var/lib/ai-native-paas/journal /home/workspace-agent/.local/share/buildkit' \
-  --run-command 'printf "workspace-agent:100000:65536\n" > /etc/subuid && printf "workspace-agent:100000:65536\n" > /etc/subgid' \
-  --run-command 'printf "kernel.unprivileged_userns_clone=1\n" > /etc/sysctl.d/90-workspace-rootless.conf' \
-  --run-command 'passwd -l root && passwd -l workspace-agent' \
-  --run-command 'systemctl disable ssh.service ssh.socket 2>/dev/null || true' \
-  --run-command 'systemctl enable ai-native-paas-workspace-agent.service ai-native-paas-buildkit.service' \
-  --run-command 'dpkg-query -W -f="\${Package}\t\${Version}\n" | sort > /usr/share/ai-native-paas/debian-packages.tsv' \
-  --run-command 'syft scan dir:/ -o spdx-json=/usr/share/ai-native-paas/sbom.spdx.json' \
-  --run-command 'rm -f /etc/resolv.conf' \
-  --run-command 'rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb /tmp/* /var/tmp/*' \
-  --run-command 'cloud-init clean --logs --machine-id'
+guestfish --network --rw -a "$image" -i <<GUESTFISH
+debug sh "ip link set dev eth0 up; ip address replace 169.254.2.15/16 dev eth0; ip route replace default via 169.254.2.2 dev eth0; printf 'nameserver %s\\n' '$upstream_dns' > /etc/resolv.conf; getent ahostsv4 snapshot.debian.org"
+upload infra/images/workspace/debian-snapshot.sources /etc/apt/sources.list.d/debian.sources
+mkdir-p /usr/local/bin
+copy-in $work_directory/root/usr/local/bin /usr/local
+mkdir-p /usr/share/ai-native-paas
+upload infra/images/workspace/ai-native-paas-workspace-agent.service /etc/systemd/system/ai-native-paas-workspace-agent.service
+upload infra/images/workspace/ai-native-paas-buildkit.service /etc/systemd/system/ai-native-paas-buildkit.service
+upload $lock /usr/share/ai-native-paas/workspace-image-inputs.json
+upload $provision /tmp/provision-workspace-image.sh
+sh "/bin/bash /tmp/provision-workspace-image.sh"
+rm-f /etc/resolv.conf
+sync
+GUESTFISH
 
 raw="$output_directory/ai-native-paas-workspace.raw"
 compressed="$raw.xz"

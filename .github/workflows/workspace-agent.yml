@@ -101,8 +101,10 @@ jobs:
           LIBGUESTFS_BACKEND: direct
           LIBGUESTFS_BACKEND_SETTINGS: force_tcg
         run: |
+          upstream_dns="$(awk '$1 == "nameserver" && $2 !~ /^(127\.|::1$)/ { print $2; exit }' /run/systemd/resolve/resolv.conf /etc/resolv.conf 2>/dev/null || true)"
+          test -n "$upstream_dns" || upstream_dns=1.1.1.1
           guestfish --network -a /dev/null run : debug sh \
-            "ip link set dev eth0 up; ip address replace 169.254.2.15/16 dev eth0; ip route replace default via 169.254.2.2 dev eth0; printf 'nameserver 169.254.2.3\\n' > /etc/resolv.conf; ip -4 address show dev eth0; ip route; getent ahostsv4 snapshot.debian.org"
+            "ip link set dev eth0 up; ip address replace 169.254.2.15/16 dev eth0; ip route replace default via 169.254.2.2 dev eth0; printf 'nameserver %s\\n' '$upstream_dns' > /etc/resolv.conf; ip -4 address show dev eth0; ip route; getent ahostsv4 snapshot.debian.org"
       - run: ./scripts/build-workspace-image.sh
         env:
           LIBGUESTFS_APPEND: ipv6.disable=1
