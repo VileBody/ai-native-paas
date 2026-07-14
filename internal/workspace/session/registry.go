@@ -204,6 +204,28 @@ func (r *Registry) AuthorizeOutcome(ctx context.Context, principal Principal, se
 	return r.authorize(ctx, principal, sessionID, true)
 }
 
+// AuthorizeOutcomeFor permits a freshly rotated certificate/session to report
+// the result of a command that was accepted by a prior rotated session. It does
+// not permit migration to another VM, principal, workspace, or arbitrary
+// closed session.
+func (r *Registry) AuthorizeOutcomeFor(ctx context.Context, principal Principal, authenticatedSessionID, executionSessionID string) (Session, error) {
+	current, err := r.AuthorizeOutcome(ctx, principal, authenticatedSessionID)
+	if err != nil {
+		return Session{}, err
+	}
+	if strings.TrimSpace(executionSessionID) == "" || executionSessionID == current.ID {
+		return current, nil
+	}
+	execution, err := r.Store.GetSession(ctx, executionSessionID)
+	if err != nil {
+		return Session{}, err
+	}
+	if execution.TenantID != current.TenantID || execution.ProjectID != current.ProjectID || execution.WorkspaceID != current.WorkspaceID || execution.TaskID != current.TaskID || execution.AgentID != current.AgentID || execution.VMID != current.VMID || execution.ClosedAt == nil || execution.CloseReason != "certificate_rotated" {
+		return Session{}, ErrConflict
+	}
+	return execution, nil
+}
+
 func (r *Registry) queue(ctx context.Context, payload workspacev1.AgentMessage) (Message, error) {
 	hash, err := agentv2.StableFingerprint(payload)
 	if err != nil {

@@ -13,11 +13,13 @@ import (
 )
 
 const (
-	agentConfigPath = "/run/ai-native-paas/workspace-agent.json"
-	agentCertPath   = "/run/ai-native-paas/workspace-agent.crt"
-	agentKeyPath    = "/run/ai-native-paas/workspace-agent.key"
-	agentCAPath     = "/run/ai-native-paas/workspace-ca.crt"
-	agentUnit       = "ai-native-paas-workspace-agent.service"
+	agentConfigPath    = "/var/lib/ai-native-paas/identity/workspace-agent.json"
+	agentCertPath      = "/var/lib/ai-native-paas/identity/workspace-agent.crt"
+	agentKeyPath       = "/var/lib/ai-native-paas/identity/workspace-agent.key"
+	agentCAPath        = "/var/lib/ai-native-paas/identity/workspace-ca.crt"
+	agentUnit          = "ai-native-paas-workspace-agent.service"
+	agentJournalPath   = "/var/lib/ai-native-paas/journal"
+	agentWorkspaceRoot = "/workspace"
 )
 
 type CloudInitRenderer struct {
@@ -27,12 +29,14 @@ type CloudInitRenderer struct {
 }
 
 type agentConfig struct {
-	ControlPlaneURL string `json:"control_plane_url"`
-	WorkspaceID     string `json:"workspace_id"`
-	CorrelationID   string `json:"correlation_id"`
-	CertificateFile string `json:"certificate_file"`
-	PrivateKeyFile  string `json:"private_key_file"`
-	CAFile          string `json:"ca_file"`
+	ControlPlaneURL  string `json:"control_plane_url"`
+	WorkspaceID      string `json:"workspace_id"`
+	CorrelationID    string `json:"correlation_id"`
+	CertificateFile  string `json:"certificate_file"`
+	PrivateKeyFile   string `json:"private_key_file"`
+	CAFile           string `json:"ca_file"`
+	JournalDirectory string `json:"journal_directory"`
+	WorkspaceRoot    string `json:"workspace_root"`
 }
 
 type cloudInitFile struct {
@@ -71,6 +75,7 @@ func (r CloudInitRenderer) Render(ctx context.Context, request workspace.Provide
 	config, err := json.Marshal(agentConfig{
 		ControlPlaneURL: strings.TrimRight(endpoint.String(), "/"), WorkspaceID: request.WorkspaceID, CorrelationID: request.CorrelationID,
 		CertificateFile: agentCertPath, PrivateKeyFile: agentKeyPath, CAFile: agentCAPath,
+		JournalDirectory: agentJournalPath, WorkspaceRoot: agentWorkspaceRoot,
 	})
 	if err != nil {
 		return "", err
@@ -101,5 +106,5 @@ func (r CloudInitRenderer) Render(ctx context.Context, request workspace.Provide
 }
 
 func encodedFile(path, permissions string, content []byte) cloudInitFile {
-	return cloudInitFile{Path: path, Owner: "root:root", Permissions: permissions, Encoding: "b64", Content: base64.StdEncoding.EncodeToString(content)}
+	return cloudInitFile{Path: path, Owner: "workspace-agent:workspace-agent", Permissions: permissions, Encoding: "b64", Content: base64.StdEncoding.EncodeToString(content)}
 }

@@ -1,0 +1,46 @@
+{
+  "schema": "ai-native-paas.io/workspace-image-inputs/v1",
+  "base": {
+    "name": "debian-12-genericcloud-amd64-20260712-2537.qcow2",
+    "url": "https://cloud.debian.org/images/cloud/bookworm/20260712-2537/debian-12-genericcloud-amd64-20260712-2537.qcow2",
+    "sha512": "6c2607f1846ee86040830c87d0b723f0967da3e884ea4673d9db4aa8eee13a4b7c663524bfa42082c16fc6919f3aa1bf425c004d07ff06c53a319ad0c42647bb"
+  },
+  "debian_snapshot": "20260712T000000Z",
+  "tools": {
+    "opentofu": {
+      "version": "1.12.4",
+      "url": "https://github.com/opentofu/opentofu/releases/download/v1.12.4/tofu_1.12.4_linux_amd64.zip",
+      "sha256": "f5d2ae8a0efcddd3722546b3e0f2f2f0648ce5e5a3e411176041adcb7dccc1e8"
+    },
+    "buildkit": {
+      "version": "0.31.1",
+      "url": "https://github.com/moby/buildkit/releases/download/v0.31.1/buildkit-v0.31.1.linux-amd64.tar.gz",
+      "sha256": "1fc78750d0c96bdc18799a3c0b551d6807bd4939e8cd79e357823e467451e16e"
+    },
+    "rootlesskit": {
+      "version": "3.0.2",
+      "url": "https://github.com/rootless-containers/rootlesskit/releases/download/v3.0.2/rootlesskit-x86_64.tar.gz",
+      "sha256": "f4f2764cdd99db4f3fa715acac9d760c49a5e7c2838f180bdbe3188cec248dfb"
+    },
+    "helm": {
+      "version": "3.21.3",
+      "url": "https://get.helm.sh/helm-v3.21.3-linux-amd64.tar.gz",
+      "sha256": "15e041a93a590dce8100f39385cd98c84a765c9e36aeeb9e2dc6ff9e4769e2e0"
+    },
+    "kustomize": {
+      "version": "5.8.1",
+      "url": "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.8.1/kustomize_v5.8.1_linux_amd64.tar.gz",
+      "sha256": "029a7f0f4e1932c52a0476cf02a0fd855c0bb85694b82c338fc648dcb53a819d"
+    },
+    "cosign": {
+      "version": "3.1.1",
+      "url": "https://github.com/sigstore/cosign/releases/download/v3.1.1/cosign-linux-amd64",
+      "sha256": "ae1ecd212663f3693ad9edf8b1a183900c9a52d3155ba6e354237f9a0f6463fc"
+    },
+    "syft": {
+      "version": "1.46.0",
+      "url": "https://github.com/anchore/syft/releases/download/v1.46.0/syft_1.46.0_linux_amd64.tar.gz",
+      "sha256": "d654f678b709eb53c393d38519d5ed7d2e57205529404018614cfefa0fb2b5ca"
+    }
+  }
+}

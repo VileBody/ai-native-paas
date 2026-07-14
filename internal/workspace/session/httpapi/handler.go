@@ -184,7 +184,7 @@ func (h Handler) outcome(response http.ResponseWriter, request *http.Request) {
 		writeError(response, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid workspace outcome")
 		return
 	}
-	bound, err := h.Registry.AuthorizeOutcome(request.Context(), principal, body.SessionID)
+	bound, err := h.Registry.AuthorizeOutcomeFor(request.Context(), principal, body.SessionID, body.ExecutionSessionID)
 	if err != nil {
 		writeSessionError(response, err)
 		return

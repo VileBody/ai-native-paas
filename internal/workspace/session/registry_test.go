@@ -122,6 +122,33 @@ func TestSession_CertificateScopeCannotCrossWorkspaceOrAcknowledgeForeignMessage
 	}
 }
 
+func TestSession_RotatedCertificateCanReportOnlyItsPredecessorExecution(t *testing.T) {
+	registry, store, clock, principal, original := newRegistryFixture()
+	rotatedPrincipal := principal
+	rotatedPrincipal.CertificateID = "certificate-2"
+	rotatedPrincipal.NotAfter = clock.Now().Add(10 * time.Minute)
+	rotated, err := registry.Connect(context.Background(), rotatedPrincipal, "vm-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	execution, err := registry.AuthorizeOutcomeFor(context.Background(), rotatedPrincipal, rotated.SessionID, original.SessionID)
+	if err != nil || execution.ID != original.SessionID || execution.VMID != "vm-1" {
+		t.Fatalf("execution=%#v err=%v", execution, err)
+	}
+
+	foreign := Session{
+		ID: "foreign-session", TenantID: principal.TenantID, ProjectID: principal.ProjectID, WorkspaceID: "workspace-foreign",
+		TaskID: principal.TaskID, AgentID: principal.AgentID, VMID: "vm-1", CertificateID: "certificate-foreign",
+		ConnectedAt: clock.Now(), LastSeenAt: clock.Now(), ExpiresAt: clock.Now().Add(10 * time.Minute), Version: 1,
+	}
+	if _, err := store.Connect(context.Background(), foreign); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := registry.AuthorizeOutcomeFor(context.Background(), rotatedPrincipal, rotated.SessionID, foreign.ID); !errors.Is(err, ErrConflict) {
+		t.Fatalf("foreign execution session accepted: %v", err)
+	}
+}
+
 func TestSession_UnacknowledgedDeliveryIsRedeliveredAfterLease(t *testing.T) {
 	registry, _, clock, principal, sessionView := newRegistryFixture()
 	registry.DeliveryLease = 2 * time.Second

@@ -54,7 +54,7 @@ func TestCloudInitRenderer_EmbedsOnlyEncodedShortLivedIdentityAndNoShell(t *test
 	files := make(map[string]cloudInitFile, len(document.WriteFiles))
 	for _, file := range document.WriteFiles {
 		files[file.Path] = file
-		if file.Owner != "root:root" || file.Permissions != "0400" || file.Encoding != "b64" {
+		if file.Owner != "workspace-agent:workspace-agent" || file.Permissions != "0400" || file.Encoding != "b64" {
 			t.Fatalf("insecure bootstrap file: %#v", file)
 		}
 	}
@@ -67,7 +67,7 @@ func TestCloudInitRenderer_EmbedsOnlyEncodedShortLivedIdentityAndNoShell(t *test
 		t.Fatal(err)
 	}
 	var config agentConfig
-	if err := json.Unmarshal(configRaw, &config); err != nil || config.CorrelationID != "correlation-1" || config.ControlPlaneURL != "https://workspace-gateway.example.com" || config.PrivateKeyFile != agentKeyPath {
+	if err := json.Unmarshal(configRaw, &config); err != nil || config.CorrelationID != "correlation-1" || config.ControlPlaneURL != "https://workspace-gateway.example.com" || config.PrivateKeyFile != agentKeyPath || config.JournalDirectory != agentJournalPath || config.WorkspaceRoot != agentWorkspaceRoot {
 		t.Fatalf("agent config=%#v err=%v", config, err)
 	}
 }

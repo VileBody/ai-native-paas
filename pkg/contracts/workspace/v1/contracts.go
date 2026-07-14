@@ -166,6 +166,7 @@ type AgentCertificateView struct {
 
 type AgentCommandOutcome struct {
 	SessionID             string       `json:"session_id"`
+	ExecutionSessionID    string       `json:"execution_session_id,omitempty"`
 	CommandID             string       `json:"command_id"`
 	State                 CommandState `json:"state"`
 	ExitCode              *int         `json:"exit_code,omitempty"`

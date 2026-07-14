@@ -127,6 +127,7 @@ build:
 	$(GO) build -trimpath -o bin/commerce-api ./cmd/commerce-api
 	$(GO) build -trimpath -o bin/project-api ./cmd/project-api
 	$(GO) build -trimpath -o bin/workspace-manager ./cmd/workspace-manager
+	$(GO) build -trimpath -o bin/workspace-agent ./cmd/workspace-agent
 
 smoke-runtime-api: build
 	./scripts/runtime-api-smoke.sh

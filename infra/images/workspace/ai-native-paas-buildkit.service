@@ -1,0 +1,35 @@
+[Unit]
+Description=Rootless BuildKit for AI-native PaaS workspace
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=workspace-agent
+Group=workspace-agent
+Environment=HOME=/home/workspace-agent
+Environment=XDG_RUNTIME_DIR=/run/workspace-buildkit
+RuntimeDirectory=workspace-buildkit
+RuntimeDirectoryMode=0700
+ExecStart=/usr/local/bin/rootlesskit --net=slirp4netns --copy-up=/etc --disable-host-loopback /usr/local/bin/buildkitd --addr unix:///run/workspace-buildkit/buildkitd.sock
+Restart=on-failure
+RestartSec=2s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+ReadWritePaths=/home/workspace-agent /run/workspace-buildkit /var/tmp /workspace
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,39 @@
+[Unit]
+Description=AI-native PaaS disposable workspace agent
+After=network-online.target ai-native-paas-buildkit.service cloud-final.service
+Wants=network-online.target ai-native-paas-buildkit.service
+ConditionPathExists=/var/lib/ai-native-paas/identity/workspace-agent.json
+
+[Service]
+Type=simple
+User=workspace-agent
+Group=workspace-agent
+Environment=PLATFORM_PROFILE=production
+Environment=WORKSPACE_AGENT_CONFIG_FILE=/var/lib/ai-native-paas/identity/workspace-agent.json
+ExecStart=/usr/local/bin/workspace-agent
+Restart=always
+RestartSec=2s
+TimeoutStopSec=15s
+KillMode=control-group
+Delegate=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=no
+ProtectClock=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/ai-native-paas /workspace /home/workspace-agent /var/tmp
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
