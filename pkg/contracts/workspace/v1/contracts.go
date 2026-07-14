@@ -153,6 +153,17 @@ type AgentHeartbeat struct {
 	SessionID string `json:"session_id"`
 }
 
+type AgentCertificateRotate struct {
+	SessionID string `json:"session_id"`
+	CSRPEM    string `json:"csr_pem"`
+}
+
+type AgentCertificateView struct {
+	CertificatePEM string    `json:"certificate_pem"`
+	CAChainPEM     string    `json:"ca_chain_pem"`
+	NotAfter       time.Time `json:"not_after"`
+}
+
 type AgentCommandOutcome struct {
 	SessionID             string       `json:"session_id"`
 	CommandID             string       `json:"command_id"`

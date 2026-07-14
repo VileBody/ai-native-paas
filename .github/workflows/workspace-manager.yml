@@ -68,15 +68,9 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      packages: write
       id-token: write
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/login-action@v3
         with:
           registry: ${{ secrets.TWC_REGISTRY_HOST }}
@@ -90,6 +84,4 @@ jobs:
           push: true
           provenance: mode=max
           sbom: true
-          tags: |
-            ghcr.io/vilebody/ai-native-paas-workspace-manager:${{ github.sha }}
-            ${{ secrets.TWC_REGISTRY_HOST }}/ai-native-paas-workspace-manager:${{ github.sha }}
+          tags: ${{ secrets.TWC_REGISTRY_HOST }}/ai-native-paas-workspace-manager:${{ github.sha }}

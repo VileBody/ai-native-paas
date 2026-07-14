@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/keir-research/ai-native-paas/internal/workspace"
+	"github.com/keir-research/ai-native-paas/internal/workspace/bootstrap"
 	"github.com/keir-research/ai-native-paas/internal/workspace/session"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
@@ -20,6 +21,7 @@ type Handler struct {
 	Registry     *session.Registry
 	Workspaces   *workspace.Service
 	Bindings     AgentBindingResolver
+	Certificates CertificateRotator
 	Principals   PrincipalResolver
 	MaxBodyBytes int64
 	LongPoll     time.Duration
@@ -27,6 +29,10 @@ type Handler struct {
 
 type AgentBindingResolver interface {
 	ResolveAgentBinding(context.Context, string, string, string, string, string) (string, error)
+}
+
+type CertificateRotator interface {
+	Sign(context.Context, bootstrap.Identity, []byte) (bootstrap.CertificateBundle, error)
 }
 
 func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
@@ -38,6 +44,8 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		h.connect(response, request)
 	case request.Method == http.MethodPost && request.URL.Path == "/api/v1/workspace-agent/session:heartbeat":
 		h.heartbeat(response, request)
+	case request.Method == http.MethodPost && request.URL.Path == "/api/v1/workspace-agent/certificate:rotate":
+		h.rotateCertificate(response, request)
 	case request.Method == http.MethodGet && request.URL.Path == "/api/v1/workspace-agent/messages:next":
 		h.next(response, request)
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/api/v1/workspace-agent/messages/") && strings.HasSuffix(request.URL.Path, ":ack"):
@@ -47,6 +55,35 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 	default:
 		writeError(response, http.StatusNotFound, "NOT_FOUND", "route not found")
 	}
+}
+
+func (h Handler) rotateCertificate(response http.ResponseWriter, request *http.Request) {
+	principal, ok := h.authenticate(response, request)
+	if !ok {
+		return
+	}
+	var body workspacev1.AgentCertificateRotate
+	if decode(request, h.bodyLimit(), &body) != nil || h.Certificates == nil || strings.TrimSpace(body.SessionID) == "" || len(body.CSRPEM) > 32<<10 {
+		writeError(response, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid workspace certificate rotation")
+		return
+	}
+	bound, err := h.Registry.AuthorizeOutcome(request.Context(), principal, body.SessionID)
+	if err != nil {
+		writeSessionError(response, err)
+		return
+	}
+	bundle, err := h.Certificates.Sign(request.Context(), bootstrap.Identity{
+		TenantID: bound.TenantID, ProjectID: bound.ProjectID, WorkspaceID: bound.WorkspaceID,
+		TaskID: bound.TaskID, AgentID: bound.AgentID,
+	}, []byte(body.CSRPEM))
+	if err != nil {
+		writeError(response, http.StatusServiceUnavailable, "UNAVAILABLE", "workspace certificate rotation failed")
+		return
+	}
+	defer bundle.Clear()
+	writeJSON(response, http.StatusOK, workspacev1.AgentCertificateView{
+		CertificatePEM: string(bundle.Certificate), CAChainPEM: string(bundle.CAChain), NotAfter: bundle.NotAfter,
+	})
 }
 
 func (h Handler) connect(response http.ResponseWriter, request *http.Request) {

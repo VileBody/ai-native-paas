@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/keir-research/ai-native-paas/internal/workspace"
+	"github.com/keir-research/ai-native-paas/internal/workspace/bootstrap"
 	"github.com/keir-research/ai-native-paas/internal/workspace/session"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
@@ -29,6 +30,16 @@ type handlerIDs struct {
 }
 
 type bindingResolver struct{}
+
+type certificateRotator struct{ identity bootstrap.Identity }
+
+func (r *certificateRotator) Sign(_ context.Context, identity bootstrap.Identity, csr []byte) (bootstrap.CertificateBundle, error) {
+	r.identity = identity
+	if string(csr) != "test-csr" {
+		return bootstrap.CertificateBundle{}, fmt.Errorf("unexpected CSR")
+	}
+	return bootstrap.CertificateBundle{Certificate: []byte("rotated-certificate"), CAChain: []byte("rotated-ca"), NotAfter: time.Date(2026, 7, 14, 12, 14, 0, 0, time.UTC)}, nil
+}
 
 func (bindingResolver) ResolveAgentBinding(_ context.Context, tenantID, projectID, workspaceID, taskID, correlationID string) (string, error) {
 	if tenantID != "tenant-1" || projectID != "project-1" || workspaceID != "workspace-1" || taskID != "task-1" || correlationID != "correlation-1" {
@@ -66,7 +77,33 @@ func handlerFixture(t *testing.T) (Handler, *session.Registry, handlerClock, *x5
 	clock := handlerClock{now: time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)}
 	registry := &session.Registry{Store: session.NewMemoryStore(), Clock: clock, IDs: &handlerIDs{}, AckPollInterval: time.Millisecond, DispatchAckTimeout: time.Second}
 	certificate := clientCertificate(t, clock.now, "/tenant/tenant-1/project/project-1/workspace/workspace-1/task/task-1/agent/agent-1")
-	return Handler{Registry: registry, Bindings: bindingResolver{}, Principals: SPIFFEResolver{TrustDomain: "workspace.platform.example.com"}, MaxBodyBytes: 4096, LongPoll: 5 * time.Millisecond}, registry, clock, certificate
+	return Handler{Registry: registry, Bindings: bindingResolver{}, Certificates: &certificateRotator{}, Principals: SPIFFEResolver{TrustDomain: "workspace.platform.example.com"}, MaxBodyBytes: 4096, LongPoll: 5 * time.Millisecond}, registry, clock, certificate
+}
+
+func TestWorkspaceAgentHTTP_RotationUsesOnlyVerifiedSessionIdentity(t *testing.T) {
+	handler, _, _, certificate := handlerFixture(t)
+	connected := connectAgent(t, handler, certificate)
+	rotator := &certificateRotator{}
+	handler.Certificates = rotator
+	body := fmt.Sprintf(`{"session_id":%q,"csr_pem":"test-csr"}`, connected.SessionID)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/certificate:rotate", strings.NewReader(body))
+	response := serve(handler, withCertificate(request, certificate))
+	if response.Code != http.StatusOK {
+		t.Fatalf("rotation status=%d body=%s", response.Code, response.Body.String())
+	}
+	if rotator.identity != (bootstrap.Identity{TenantID: "tenant-1", ProjectID: "project-1", WorkspaceID: "workspace-1", TaskID: "task-1", AgentID: "agent-1"}) {
+		t.Fatalf("rotation identity=%#v", rotator.identity)
+	}
+	var view workspacev1.AgentCertificateView
+	if err := json.Unmarshal(response.Body.Bytes(), &view); err != nil || view.CertificatePEM != "rotated-certificate" || view.CAChainPEM != "rotated-ca" {
+		t.Fatalf("rotation response=%#v err=%v", view, err)
+	}
+
+	foreign := clientCertificate(t, time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC), "/tenant/tenant-1/project/project-2/workspace/workspace-1/task/task-1/agent/agent-1")
+	foreignResponse := serve(handler, withCertificate(httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/certificate:rotate", strings.NewReader(body)), foreign))
+	if foreignResponse.Code != http.StatusForbidden {
+		t.Fatalf("foreign session rotated certificate: %d", foreignResponse.Code)
+	}
 }
 
 func serve(handler Handler, request *http.Request) *httptest.ResponseRecorder {

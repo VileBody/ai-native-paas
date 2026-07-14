@@ -4,6 +4,8 @@ package openbao
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -139,6 +141,70 @@ func (i *Issuer) Issue(ctx context.Context, identity bootstrap.Identity) (bootst
 	return bundle, nil
 }
 
+// Sign rotates a workspace identity without moving the newly generated
+// private key through the control plane. The CSR may carry only a P-256 public
+// key; OpenBao receives the authoritative URI SAN from the verified session.
+func (i *Issuer) Sign(ctx context.Context, identity bootstrap.Identity, csrPEM []byte) (bootstrap.CertificateBundle, error) {
+	if i == nil || i.base == nil || i.client == nil || i.clock == nil {
+		return bootstrap.CertificateBundle{}, errors.New("OpenBao workspace issuer is unavailable")
+	}
+	identityURI, err := identity.SPIFFEURI(i.trustDomain)
+	if err != nil {
+		return bootstrap.CertificateBundle{}, err
+	}
+	csr, err := validateCSR(csrPEM)
+	if err != nil {
+		return bootstrap.CertificateBundle{}, err
+	}
+	token, err := readToken(i.tokenFile)
+	if err != nil {
+		return bootstrap.CertificateBundle{}, err
+	}
+	defer clear(token)
+	payload, err := json.Marshal(map[string]any{
+		"csr": string(csrPEM), "uri_sans": identityURI.String(), "exclude_cn_from_sans": true, "ttl": i.ttl.String(),
+	})
+	if err != nil {
+		return bootstrap.CertificateBundle{}, err
+	}
+	endpoint := *i.base
+	endpoint.Path = path.Join("/v1", i.mount, "sign", i.role)
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
+	if err != nil {
+		return bootstrap.CertificateBundle{}, errors.New("create OpenBao PKI signing request")
+	}
+	request.Header.Set("Authorization", "Bearer "+string(token))
+	request.Header.Set("Content-Type", "application/json")
+	response, err := i.client.Do(request)
+	if err != nil {
+		return bootstrap.CertificateBundle{}, errors.New("OpenBao PKI signing request failed")
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
+		return bootstrap.CertificateBundle{}, fmt.Errorf("OpenBao PKI signing failed with status %d", response.StatusCode)
+	}
+	bundle, err := readSignedBundle(response.Body, identityURI)
+	if err != nil {
+		return bootstrap.CertificateBundle{}, err
+	}
+	leafBlock, _ := pem.Decode(bundle.Certificate)
+	if leafBlock == nil {
+		bundle.Clear()
+		return bootstrap.CertificateBundle{}, errors.New("OpenBao workspace certificate response is invalid")
+	}
+	leaf, err := x509.ParseCertificate(leafBlock.Bytes)
+	if err != nil || !samePublicKey(leaf.PublicKey, csr.PublicKey) {
+		bundle.Clear()
+		return bootstrap.CertificateBundle{}, errors.New("OpenBao workspace certificate key binding is invalid")
+	}
+	if err := validateLeafAndChain(&bundle, leaf, identityURI, i.clock.Now().UTC(), i.ttl); err != nil {
+		bundle.Clear()
+		return bootstrap.CertificateBundle{}, err
+	}
+	return bundle, nil
+}
+
 // Revoke implements workspace.LeaseRevoker using the synchronous OpenBao
 // lease endpoint. The reason is intentionally not sent to the provider; it is
 // recorded by the workspace audit transaction at the control-plane boundary.
@@ -184,7 +250,14 @@ func validateBundle(bundle *bootstrap.CertificateBundle, expected *url.URL, now 
 		return errors.New("OpenBao workspace certificate/key pair is invalid")
 	}
 	leaf, err := x509.ParseCertificate(pair.Certificate[0])
-	if err != nil || len(leaf.URIs) != 1 || leaf.URIs[0].String() != expected.String() || !hasUsage(leaf.ExtKeyUsage, x509.ExtKeyUsageClientAuth) || hasUsage(leaf.ExtKeyUsage, x509.ExtKeyUsageServerAuth) {
+	if err != nil {
+		return errors.New("OpenBao workspace certificate identity is invalid")
+	}
+	return validateLeafAndChain(bundle, leaf, expected, now, ttl)
+}
+
+func validateLeafAndChain(bundle *bootstrap.CertificateBundle, leaf *x509.Certificate, expected *url.URL, now time.Time, ttl time.Duration) error {
+	if bundle == nil || strings.TrimSpace(bundle.Serial) == "" || leaf == nil || len(leaf.URIs) != 1 || leaf.URIs[0].String() != expected.String() || !hasUsage(leaf.ExtKeyUsage, x509.ExtKeyUsageClientAuth) || hasUsage(leaf.ExtKeyUsage, x509.ExtKeyUsageServerAuth) {
 		return errors.New("OpenBao workspace certificate identity is invalid")
 	}
 	if leaf.NotBefore.After(now.Add(time.Minute)) || !leaf.NotAfter.After(now.Add(time.Minute)) || leaf.NotAfter.After(now.Add(ttl+time.Minute)) {
@@ -214,6 +287,56 @@ func validateBundle(bundle *bootstrap.CertificateBundle, expected *url.URL, now 
 	}
 	bundle.NotAfter = leaf.NotAfter.UTC()
 	return nil
+}
+
+func validateCSR(raw []byte) (*x509.CertificateRequest, error) {
+	if len(raw) == 0 || len(raw) > 32<<10 {
+		return nil, errors.New("workspace certificate CSR is invalid")
+	}
+	block, rest := pem.Decode(raw)
+	if block == nil || block.Type != "CERTIFICATE REQUEST" || len(bytes.TrimSpace(rest)) != 0 {
+		return nil, errors.New("workspace certificate CSR is invalid")
+	}
+	csr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil || csr.CheckSignature() != nil || csr.Subject.String() != "" || len(csr.DNSNames) != 0 || len(csr.EmailAddresses) != 0 || len(csr.IPAddresses) != 0 || len(csr.URIs) != 0 {
+		return nil, errors.New("workspace certificate CSR is invalid")
+	}
+	key, ok := csr.PublicKey.(*ecdsa.PublicKey)
+	if !ok || key.Curve != elliptic.P256() {
+		return nil, errors.New("workspace certificate CSR key is invalid")
+	}
+	return csr, nil
+}
+
+func readSignedBundle(reader io.Reader, identityURI *url.URL) (bootstrap.CertificateBundle, error) {
+	raw, err := io.ReadAll(io.LimitReader(reader, (512<<10)+1))
+	if err != nil || len(raw) == 0 || len(raw) > 512<<10 {
+		return bootstrap.CertificateBundle{}, errors.New("OpenBao PKI response is invalid")
+	}
+	var envelope struct {
+		Data struct {
+			Certificate  string   `json:"certificate"`
+			IssuingCA    string   `json:"issuing_ca"`
+			CAChain      []string `json:"ca_chain"`
+			SerialNumber string   `json:"serial_number"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return bootstrap.CertificateBundle{}, errors.New("OpenBao PKI response is invalid")
+	}
+	chain := strings.Join(envelope.Data.CAChain, "\n")
+	if strings.TrimSpace(chain) == "" {
+		chain = envelope.Data.IssuingCA
+	}
+	return bootstrap.CertificateBundle{
+		Certificate: []byte(envelope.Data.Certificate), CAChain: []byte(chain), IdentityURI: identityURI.String(), Serial: envelope.Data.SerialNumber,
+	}, nil
+}
+
+func samePublicKey(left, right any) bool {
+	leftRaw, leftErr := x509.MarshalPKIXPublicKey(left)
+	rightRaw, rightErr := x509.MarshalPKIXPublicKey(right)
+	return leftErr == nil && rightErr == nil && bytes.Equal(leftRaw, rightRaw)
 }
 
 func readToken(filename string) ([]byte, error) {

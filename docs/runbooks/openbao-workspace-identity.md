@@ -35,7 +35,9 @@ bao write workspace-pki/roles/workspace-agent \
   key_type=ec \
   key_bits=256 \
   no_store=true \
-  generate_lease=false
+  generate_lease=false \
+  use_csr_common_name=false \
+  use_csr_sans=false
 
 bao policy write workspace-manager \
   deploy/admin/openbao/policies/workspace-manager.hcl
@@ -59,6 +61,7 @@ Verification:
 ```sh
 bao read workspace-pki/roles/workspace-agent
 bao token capabilities workspace-pki/issue/workspace-agent
+bao token capabilities workspace-pki/sign/workspace-agent
 bao token capabilities sys/leases/revoke
 ```
 

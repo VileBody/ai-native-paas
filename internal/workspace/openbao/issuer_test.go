@@ -76,6 +76,35 @@ func certificateResponse(t *testing.T, now time.Time, identity *url.URL, usages 
 	}}
 }
 
+func signingResponse(t *testing.T, now time.Time, identity *url.URL, publicKey any) map[string]any {
+	t.Helper()
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(11), Subject: pkix.Name{CommonName: "workspace-signing-ca"},
+		NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour), IsCA: true, BasicConstraintsValid: true,
+		KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leafTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(12), URIs: []*url.URL{identity}, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(14 * time.Minute),
+		KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+	leafDER, err := x509.CreateCertificate(rand.Reader, leafTemplate, caTemplate, publicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return map[string]any{"data": map[string]any{
+		"certificate": pemString("CERTIFICATE", leafDER), "ca_chain": []string{pemString("CERTIFICATE", caDER)},
+		"issuing_ca": pemString("CERTIFICATE", caDER), "serial_number": "0c",
+	}}
+}
+
 func pemString(kind string, value []byte) string {
 	return string(pem.EncodeToMemory(&pem.Block{Type: kind, Bytes: value}))
 }
@@ -182,5 +211,57 @@ func TestOpenBaoIssuer_RevokesExactLeaseSynchronouslyWithoutLeakingProviderBody(
 	}
 	if err := issuer.Revoke(context.Background(), "database/creds/project/lease-1", "command_terminal"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestOpenBaoIssuer_RotationSignsAgentGeneratedKeyForSameSPIFFEIdentity(t *testing.T) {
+	now := time.Date(2026, 7, 14, 15, 30, 0, 0, time.UTC)
+	identity := bootstrap.Identity{TenantID: "tenant-1", ProjectID: "project-1", WorkspaceID: "workspace-1", TaskID: "task-1", AgentID: "agent-1"}
+	expectedURI, _ := identity.SPIFFEURI("workspace.platform.example.com")
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{}, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER})
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/v1/workspace-pki/sign/workspace-agent" || request.Header.Get("Authorization") != "Bearer "+openBaoTokenSentinel {
+			http.Error(response, "bad request", http.StatusForbidden)
+			return
+		}
+		var payload struct {
+			CSR               string `json:"csr"`
+			URISANs           string `json:"uri_sans"`
+			ExcludeCNFromSANs bool   `json:"exclude_cn_from_sans"`
+			TTL               string `json:"ttl"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil || payload.CSR != string(csrPEM) || payload.URISANs != expectedURI.String() || !payload.ExcludeCNFromSANs || payload.TTL != "15m0s" {
+			http.Error(response, "bad payload", http.StatusBadRequest)
+			return
+		}
+		_ = json.NewEncoder(response).Encode(signingResponse(t, now, expectedURI, &key.PublicKey))
+	}))
+	defer server.Close()
+	issuer, err := NewIssuer(Config{
+		Address: server.URL, TokenFile: tokenFile(t), PKIMount: "workspace-pki", Role: "workspace-agent",
+		TrustDomain: "workspace.platform.example.com", TTL: 15 * time.Minute, HTTPClient: server.Client(), Clock: issuerClock{now},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := issuer.Sign(context.Background(), identity, csrPEM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bundle.PrivateKey) != 0 || bundle.IdentityURI != expectedURI.String() || bundle.Serial != "0c" || !bundle.NotAfter.Equal(now.Add(14*time.Minute)) {
+		t.Fatalf("invalid signed bundle: %#v", bundle)
+	}
+
+	badCSR, _ := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{DNSNames: []string{"attacker.example.com"}}, key)
+	if _, err := issuer.Sign(context.Background(), identity, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: badCSR})); err == nil {
+		t.Fatal("CSR-controlled SAN accepted")
 	}
 }

@@ -142,7 +142,7 @@ func main() {
 		os.Exit(1)
 	}
 	agentHandler := sessionhttp.Handler{
-		Registry: sessions, Workspaces: service, Bindings: service,
+		Registry: sessions, Workspaces: service, Bindings: service, Certificates: issuer,
 		Principals: sessionhttp.SPIFFEResolver{TrustDomain: settings.TrustDomain}, MaxBodyBytes: 64 << 10,
 	}
 	handler := http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
