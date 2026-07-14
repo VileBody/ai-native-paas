@@ -5,6 +5,7 @@ on:
     paths:
       - 'cmd/project-api/**'
       - 'internal/project/**'
+      - 'internal/infrastructure/**'
       - 'internal/identity/**'
       - 'internal/agent/enrollment/**'
       - 'internal/source/**'
@@ -14,6 +15,7 @@ on:
       - 'pkg/contracts/workspace/v1/**'
       - 'test/integration/postgres_enrollment_test.go'
       - 'test/integration/postgres_identity_test.go'
+      - 'test/integration/postgres_infrastructure_test.go'
       - 'go.mod'
       - 'go.sum'
       - '.dockerignore'
@@ -63,7 +65,7 @@ jobs:
         with:
           go-version: '1.25.x'
           cache: true
-      - run: go test -count=1 -tags=postgres_integration ./test/integration -run 'TestPostgres_(AgentEnrollment|OIDCSubject|Workspace)'
+      - run: go test -count=1 -tags=postgres_integration ./test/integration -run 'TestPostgres_(AgentEnrollment|Infrastructure|OIDCSubject|Workspace)'
 
   image:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'

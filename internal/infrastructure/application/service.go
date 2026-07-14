@@ -2,6 +2,7 @@ package application
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -48,7 +49,7 @@ type tofuPlan struct {
 	} `json:"resource_changes"`
 }
 
-func (s *Service) Plan(command PlanCommand) (PlanResult, error) {
+func (s *Service) Plan(ctx context.Context, command PlanCommand) (PlanResult, error) {
 	if s == nil || s.Store == nil || s.Clock == nil || s.IDs == nil {
 		return PlanResult{}, errors.New("infrastructure service is unavailable")
 	}
@@ -121,7 +122,7 @@ func (s *Service) Plan(command PlanCommand) (PlanResult, error) {
 	if err != nil {
 		return PlanResult{}, err
 	}
-	record, err := s.Store.CreatePlan(PlanRecord{
+	record, err := s.Store.CreatePlan(ctx, PlanRecord{
 		TenantID: command.TenantID, IdempotencyKey: command.IdempotencyKey,
 		IdempotencyFingerprint: fingerprint, Summary: summary,
 		ArtifactDigest: command.ArtifactDigest, Target: command.Target,
@@ -142,7 +143,7 @@ type GrantApprovalCommand struct {
 	ExpiresAt      time.Time
 }
 
-func (s *Service) GrantApproval(command GrantApprovalCommand) (ApprovalGrant, error) {
+func (s *Service) GrantApproval(ctx context.Context, command GrantApprovalCommand) (ApprovalGrant, error) {
 	if s == nil || s.Store == nil || s.Clock == nil || s.IDs == nil {
 		return ApprovalGrant{}, errors.New("infrastructure service is unavailable")
 	}
@@ -150,7 +151,7 @@ func (s *Service) GrantApproval(command GrantApprovalCommand) (ApprovalGrant, er
 	if command.TenantID == "" || command.ProjectID == "" || command.PlanID == "" || command.ActorID == "" || command.ApproverUserID == "" || !command.ExpiresAt.After(now) {
 		return ApprovalGrant{}, errors.New("invalid approval grant command")
 	}
-	plan, err := s.Store.GetPlan(command.TenantID, command.ProjectID, command.PlanID)
+	plan, err := s.Store.GetPlan(ctx, command.TenantID, command.ProjectID, command.PlanID)
 	if err != nil {
 		return ApprovalGrant{}, err
 	}
@@ -158,12 +159,12 @@ func (s *Service) GrantApproval(command GrantApprovalCommand) (ApprovalGrant, er
 	if plan.Reservation.ExpiresAt.Before(expiresAt) {
 		expiresAt = plan.Reservation.ExpiresAt
 	}
-	return s.Store.CreateApproval(ApprovalGrant{
+	return s.Store.CreateApproval(ctx, ApprovalGrant{
 		GrantID: s.IDs.New("approval"), TenantID: command.TenantID, ProjectID: command.ProjectID,
 		PlanID: plan.Summary.PlanID, PlanHash: plan.Summary.PlanHash,
 		EstimateVersion: plan.Estimate.Version, ReservationID: plan.Reservation.ReservationID,
 		Target: plan.Target, ActorID: command.ActorID, ApproverUserID: command.ApproverUserID,
-		ExpiresAt: expiresAt,
+		CreatedAt: now, ExpiresAt: expiresAt,
 	})
 }
 
@@ -173,12 +174,12 @@ type ApplyCommand struct {
 	Authorization infrastructurev1.ApplyAuthorization
 }
 
-func (s *Service) AuthorizeApply(command ApplyCommand) (PlanRecord, error) {
+func (s *Service) AuthorizeApply(ctx context.Context, command ApplyCommand) (PlanRecord, error) {
 	if s == nil || s.Store == nil || s.Clock == nil {
 		return PlanRecord{}, errors.New("infrastructure service is unavailable")
 	}
 	now := s.Clock.Now().UTC()
-	plan, err := s.Store.GetPlan(command.TenantID, command.ProjectID, command.Authorization.PlanID)
+	plan, err := s.Store.GetPlan(ctx, command.TenantID, command.ProjectID, command.Authorization.PlanID)
 	if err != nil {
 		return PlanRecord{}, err
 	}
@@ -188,7 +189,7 @@ func (s *Service) AuthorizeApply(command ApplyCommand) (PlanRecord, error) {
 		}
 		return PlanRecord{}, err
 	}
-	return s.Store.AuthorizeApply(ApplyMatch{
+	return s.Store.AuthorizeApply(ctx, ApplyMatch{
 		TenantID: command.TenantID, ProjectID: command.ProjectID,
 		Authorization: command.Authorization, ApprovalRequired: plan.Summary.RequiresApproval, Now: now,
 	})

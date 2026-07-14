@@ -3,7 +3,7 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **828**
+- Discovered Go tests/fuzz targets: **829**
 - Reused now: **29**
 - New local/contract tests required: **51**
 - Live/provider/system tests required: **77**

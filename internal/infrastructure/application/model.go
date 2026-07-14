@@ -1,6 +1,7 @@
 package application
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -52,6 +53,7 @@ type ApprovalGrant struct {
 	Target          string
 	ActorID         string
 	ApproverUserID  string
+	CreatedAt       time.Time
 	ExpiresAt       time.Time
 	ConsumedAt      time.Time
 }
@@ -65,10 +67,10 @@ type ApplyMatch struct {
 }
 
 type Store interface {
-	CreatePlan(PlanRecord) (PlanRecord, error)
-	GetPlan(tenantID, projectID, planID string) (PlanRecord, error)
-	CreateApproval(ApprovalGrant) (ApprovalGrant, error)
-	AuthorizeApply(ApplyMatch) (PlanRecord, error)
+	CreatePlan(context.Context, PlanRecord) (PlanRecord, error)
+	GetPlan(context.Context, string, string, string) (PlanRecord, error)
+	CreateApproval(context.Context, ApprovalGrant) (ApprovalGrant, error)
+	AuthorizeApply(context.Context, ApplyMatch) (PlanRecord, error)
 }
 
 type Clock interface{ Now() time.Time }

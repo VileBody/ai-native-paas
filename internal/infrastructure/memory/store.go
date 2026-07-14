@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"sync"
 
 	infraapp "github.com/keir-research/ai-native-paas/internal/infrastructure/application"
@@ -17,7 +18,7 @@ func New() *Store {
 	return &Store{plans: map[string]infraapp.PlanRecord{}, idempotency: map[string]string{}, approvals: map[string]infraapp.ApprovalGrant{}}
 }
 
-func (s *Store) CreatePlan(record infraapp.PlanRecord) (infraapp.PlanRecord, error) {
+func (s *Store) CreatePlan(_ context.Context, record infraapp.PlanRecord) (infraapp.PlanRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := record.TenantID + "\x00" + record.Summary.ProjectID + "\x00" + record.IdempotencyKey
@@ -36,7 +37,7 @@ func (s *Store) CreatePlan(record infraapp.PlanRecord) (infraapp.PlanRecord, err
 	return record, nil
 }
 
-func (s *Store) GetPlan(tenantID, projectID, planID string) (infraapp.PlanRecord, error) {
+func (s *Store) GetPlan(_ context.Context, tenantID, projectID, planID string) (infraapp.PlanRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	record, ok := s.plans[planID]
@@ -46,21 +47,21 @@ func (s *Store) GetPlan(tenantID, projectID, planID string) (infraapp.PlanRecord
 	return record, nil
 }
 
-func (s *Store) CreateApproval(grant infraapp.ApprovalGrant) (infraapp.ApprovalGrant, error) {
+func (s *Store) CreateApproval(_ context.Context, grant infraapp.ApprovalGrant) (infraapp.ApprovalGrant, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.approvals[grant.GrantID]; ok {
 		return infraapp.ApprovalGrant{}, infraapp.ErrConflict
 	}
 	plan, ok := s.plans[grant.PlanID]
-	if !ok || plan.TenantID != grant.TenantID || plan.Summary.ProjectID != grant.ProjectID || !plan.Summary.RequiresApproval || !grant.ExpiresAt.After(plan.Summary.CreatedAt) {
+	if !ok || plan.TenantID != grant.TenantID || plan.Summary.ProjectID != grant.ProjectID || !plan.Summary.RequiresApproval || grant.CreatedAt.IsZero() || !grant.ExpiresAt.After(grant.CreatedAt) {
 		return infraapp.ApprovalGrant{}, infraapp.ErrPermissionDenied
 	}
 	s.approvals[grant.GrantID] = grant
 	return grant, nil
 }
 
-func (s *Store) AuthorizeApply(match infraapp.ApplyMatch) (infraapp.PlanRecord, error) {
+func (s *Store) AuthorizeApply(_ context.Context, match infraapp.ApplyMatch) (infraapp.PlanRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	a := match.Authorization

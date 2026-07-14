@@ -1,12 +1,13 @@
 package pivot_test
 
 import (
+	"context"
 	"testing"
 )
 
 func TestCost_TofuPlanProducesDeterministicNormalizedEstimate(t *testing.T) {
 	service, _, _ := infrastructureFixture()
-	first, err := service.Plan(planCommand("estimate-a", "staging", twoResourcePlan))
+	first, err := service.Plan(context.Background(), planCommand("estimate-a", "staging", twoResourcePlan))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -14,7 +15,7 @@ func TestCost_TofuPlanProducesDeterministicNormalizedEstimate(t *testing.T) {
     {"type":"unknown_cache","provider_name":"example/unknown","address":"unknown_cache.app","change":{"actions":["create"]}},
     {"type":"twc_server","provider_name":"registry.opentofu.org/timeweb-cloud/timeweb-cloud","address":"twc_server.app","change":{"after":{"different":"ignored"},"actions":["create"]}}
   ],"terraform_version":"1.12.4","format_version":"1.2"}`
-	second, err := service.Plan(planCommand("estimate-b", "staging", reordered))
+	second, err := service.Plan(context.Background(), planCommand("estimate-b", "staging", reordered))
 	if err != nil {
 		t.Fatal(err)
 	}
