@@ -44,6 +44,10 @@ Implemented:
 - GitLab discovery calls have bounded `429` retry using documented reset
   headers. Non-idempotent project creation is never blindly retried; recovery
   uses the exact correlation marker.
+- Project archive closes the local source gate before the GitLab call, revokes
+  stored workspace credentials and is reversible without changing provider
+  identity. Purge is a separate fail-closed command bound to an exact approval
+  grant and records GitLab.com's delayed deletion as `PURGE_PENDING`.
 
 Evidence:
 
@@ -59,8 +63,8 @@ Evidence:
   `TestPostgres_WorkspaceCommitReceiptMigrationAndRoundTrip` passed. The pod
   was deleted immediately after the test.
 - Pivot matrix discovers executable evidence for S2, S3, S4, S5, S6, S7,
-  S9, S10, S12, S13, S14, S15 and S17; the complete matrix remains mapped at
-  157 requirements and now discovers 896 Go test/fuzz targets.
+  S9, S10, S12, S13, S14, S15, S16 and S17; the complete matrix remains mapped
+  at 157 requirements and now discovers 899 Go test/fuzz targets.
 - Managed PostgreSQL migration `004_branch_environment_cleanup.sql`, the full
   tagged Source suite and the real Store round-trip passed in temporary
   in-cluster test pods; see
@@ -70,10 +74,13 @@ Evidence:
   `docs/evidence/phase-4/gitlab-plan-summary-notes-2026-07-14.md`.
 - Bounded rate-limit discovery recovery passes the S15 contract; see
   `docs/evidence/phase-4/gitlab-rate-limit-recovery-2026-07-14.md`.
+- Reversible archive and separately approved purge pass the S16 contract; see
+  `docs/evidence/phase-4/gitlab-project-archive-2026-07-14.md`.
 
 Remaining source gates:
 
-- GitLab.com live token isolation, rename/transfer and archive tests;
+- GitLab.com live token isolation, rename/transfer and lifecycle mutation
+  tests;
 - runtime consumption of preview cleanup intents;
 - live signed-image proof for the implemented task-UID and command-scoped
   identity-FD boundary; see

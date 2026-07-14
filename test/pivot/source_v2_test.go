@@ -33,6 +33,21 @@ type sourceV2Fixture struct {
 	repository domain.Repository
 }
 
+type sourcePurgeAuthorizer struct {
+	allowed bool
+	calls   int
+	seen    sourceapp.ProjectPurgeAuthorization
+}
+
+func (a *sourcePurgeAuthorizer) VerifyAndConsumeProjectPurge(_ context.Context, authorization sourceapp.ProjectPurgeAuthorization) error {
+	a.calls++
+	a.seen = authorization
+	if !a.allowed {
+		return fmt.Errorf("approval denied")
+	}
+	return nil
+}
+
 func newSourceV2Fixture(t *testing.T) sourceV2Fixture {
 	t.Helper()
 	store := memory.New()
@@ -356,5 +371,72 @@ func TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency(t *testing.T) {
 	}
 	if !strings.Contains(correlationDescription, "paas-correlation") || strings.Contains(correlationDescription, provider.AdminToken) {
 		t.Fatalf("unsafe correlation description %q", correlationDescription)
+	}
+}
+
+func TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge(t *testing.T) {
+	fixture := newSourceV2Fixture(t)
+	workspace, err := domain.NewWorkspace("workspace-archive", "tenant-1", fixture.repository.ID, "agent/archive", strings.Repeat("a", 40), fixture.clock.Now(), fixture.clock.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = workspace.MarkCloned("/workspace/archive", "credential-archive", fixture.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err = fixture.store.Transact(context.Background(), func(tx sourceapp.Tx) error { return tx.InsertWorkspace(workspace) }); err != nil {
+		t.Fatal(err)
+	}
+	archiveCommand := sourceapp.ArchiveRepositoryCommand{TenantID: "tenant-1", ActorID: "user-1", RepositoryID: fixture.repository.ID, IdempotencyKey: "archive-1"}
+	fixture.provider.ArchiveLostResponseOnce = true
+	if _, err = fixture.service.ArchiveRepository(context.Background(), archiveCommand); !domain.HasCode(err, domain.CodeExternal) {
+		t.Fatalf("lost archive response err=%v", err)
+	}
+	var gated domain.Repository
+	if err = fixture.store.Transact(context.Background(), func(tx sourceapp.Tx) error {
+		gated, _ = tx.GetRepository(fixture.repository.ID)
+		return nil
+	}); err != nil || gated.State != domain.RepositorySuspended {
+		t.Fatalf("local source gate was not closed: repository=%+v err=%v", gated, err)
+	}
+	archived, err := fixture.service.ArchiveRepository(context.Background(), archiveCommand)
+	if err != nil || archived.State != domain.RepositorySuspended || !fixture.provider.ArchivedProjects[fixture.repository.ProviderProjectID] || fixture.provider.RevokeCalls != 1 {
+		t.Fatalf("archived=%+v revoke=%d err=%v", archived, fixture.provider.RevokeCalls, err)
+	}
+	replay, err := fixture.service.ArchiveRepository(context.Background(), archiveCommand)
+	if err != nil || replay.State != domain.RepositorySuspended || fixture.provider.ArchiveCalls != 2 {
+		t.Fatalf("archive replay=%+v calls=%d err=%v", replay, fixture.provider.ArchiveCalls, err)
+	}
+	workspaceService := &sourceapp.WorkspaceService{Store: fixture.store, Provider: fixture.provider, Git: &testkit.Git{}, Clock: fixture.clock, IDs: fixture.ids}
+	if _, err = workspaceService.Execute(context.Background(), sourceapp.ExecuteWorkspaceCommand{TenantID: "tenant-1", ActorID: "agent-1", WorkspaceID: workspace.ID}); !domain.HasCode(err, domain.CodeNotFound) {
+		t.Fatalf("archived workspace execution err=%v", err)
+	}
+	if _, err = workspaceService.Create(context.Background(), sourceapp.CreateWorkspaceCommand{TenantID: "tenant-1", ActorID: "agent-1", RepositoryID: fixture.repository.ID, Branch: "agent/new", BaseSHA: strings.Repeat("a", 40)}); !domain.HasCode(err, domain.CodeNotFound) {
+		t.Fatalf("archived workspace create err=%v", err)
+	}
+	restored, err := fixture.service.RestoreRepository(context.Background(), sourceapp.RestoreRepositoryCommand{TenantID: "tenant-1", ActorID: "user-1", RepositoryID: fixture.repository.ID, IdempotencyKey: "restore-1"})
+	if err != nil || restored.State != domain.RepositoryReady || restored.ProviderProjectID != archived.ProviderProjectID || restored.ProviderPath != archived.ProviderPath || fixture.provider.UnarchiveCalls != 1 {
+		t.Fatalf("restored=%+v err=%v", restored, err)
+	}
+	if _, err = workspaceService.Create(context.Background(), sourceapp.CreateWorkspaceCommand{TenantID: "tenant-1", ActorID: "agent-1", RepositoryID: fixture.repository.ID, Branch: "agent/restored", BaseSHA: strings.Repeat("a", 40)}); err != nil {
+		t.Fatalf("restored repository did not accept workspace: %v", err)
+	}
+	archived, err = fixture.service.ArchiveRepository(context.Background(), sourceapp.ArchiveRepositoryCommand{TenantID: "tenant-1", ActorID: "user-1", RepositoryID: fixture.repository.ID, IdempotencyKey: "archive-2"})
+	if err != nil || archived.State != domain.RepositorySuspended {
+		t.Fatalf("second archive=%+v err=%v", archived, err)
+	}
+	if _, err = fixture.service.PurgeRepository(context.Background(), sourceapp.PurgeRepositoryCommand{TenantID: "tenant-1", ActorID: "user-1", RepositoryID: fixture.repository.ID, ApprovalGrantID: "grant-purge-1", IdempotencyKey: "purge-1"}); !domain.HasCode(err, domain.CodeForbidden) || fixture.provider.DeleteCalls != 0 {
+		t.Fatalf("purge without verifier err=%v deletes=%d", err, fixture.provider.DeleteCalls)
+	}
+	authorizer := &sourcePurgeAuthorizer{allowed: true}
+	fixture.service.PurgeAuthorizer = authorizer
+	purged, err := fixture.service.PurgeRepository(context.Background(), sourceapp.PurgeRepositoryCommand{TenantID: "tenant-1", ActorID: "user-1", RepositoryID: fixture.repository.ID, ApprovalGrantID: "grant-purge-1", IdempotencyKey: "purge-1"})
+	if err != nil || purged.State != domain.RepositoryPurgePending || fixture.provider.DeleteCalls != 1 || authorizer.calls != 1 {
+		t.Fatalf("purged=%+v deletes=%d auth=%d err=%v", purged, fixture.provider.DeleteCalls, authorizer.calls, err)
+	}
+	if authorizer.seen.RepositoryID != fixture.repository.ID || authorizer.seen.ProviderProjectID != fixture.repository.ProviderProjectID || authorizer.seen.ApprovalGrantID != "grant-purge-1" {
+		t.Fatalf("authorization not exactly bound: %+v", authorizer.seen)
+	}
+	if _, err = fixture.service.RestoreRepository(context.Background(), sourceapp.RestoreRepositoryCommand{TenantID: "tenant-1", ActorID: "user-1", RepositoryID: fixture.repository.ID, IdempotencyKey: "restore-after-purge"}); !domain.HasCode(err, domain.CodeConflict) || fixture.provider.UnarchiveCalls != 1 {
+		t.Fatalf("purge-pending restore err=%v unarchive=%d", err, fixture.provider.UnarchiveCalls)
 	}
 }

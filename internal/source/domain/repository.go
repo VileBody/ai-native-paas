@@ -13,6 +13,7 @@ const (
 	RepositoryReady        RepositoryState = "READY"
 	RepositoryFailed       RepositoryState = "FAILED"
 	RepositorySuspended    RepositoryState = "SUSPENDED"
+	RepositoryPurgePending RepositoryState = "PURGE_PENDING"
 )
 
 type Repository struct {
@@ -90,6 +91,45 @@ func (r *Repository) SyncProviderMetadata(projectID int64, path, webURL, default
 		r.Version++
 		r.UpdatedAt = now.UTC()
 	}
+	return nil
+}
+func (r *Repository) Suspend(now time.Time) error {
+	if r.State == RepositorySuspended {
+		return nil
+	}
+	if r.State != RepositoryReady {
+		return NewError(CodeConflict, "repository cannot be archived")
+	}
+	r.State = RepositorySuspended
+	r.LastError = ""
+	r.Version++
+	r.UpdatedAt = now.UTC()
+	return nil
+}
+func (r *Repository) Resume(now time.Time) error {
+	if r.State == RepositoryReady {
+		return nil
+	}
+	if r.State != RepositorySuspended {
+		return NewError(CodeConflict, "repository cannot be restored")
+	}
+	r.State = RepositoryReady
+	r.LastError = ""
+	r.Version++
+	r.UpdatedAt = now.UTC()
+	return nil
+}
+func (r *Repository) MarkPurgePending(now time.Time) error {
+	if r.State == RepositoryPurgePending {
+		return nil
+	}
+	if r.State != RepositorySuspended {
+		return NewError(CodeConflict, "only an archived repository may be purged")
+	}
+	r.State = RepositoryPurgePending
+	r.LastError = ""
+	r.Version++
+	r.UpdatedAt = now.UTC()
 	return nil
 }
 func (r *Repository) FailProvisioning(message string, now time.Time) {

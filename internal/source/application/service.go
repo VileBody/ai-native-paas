@@ -13,10 +13,11 @@ import (
 )
 
 type Service struct {
-	Store    Store
-	Provider GitProvider
-	Clock    Clock
-	IDs      IDGenerator
+	Store           Store
+	Provider        GitProvider
+	Clock           Clock
+	IDs             IDGenerator
+	PurgeAuthorizer ProjectPurgeAuthorizer
 }
 
 type CreateProjectCommand struct {

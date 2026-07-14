@@ -39,20 +39,24 @@ type Provider struct {
 	Heads                                                   map[string]string
 	MergeRequests                                           map[string]application.ProviderMergeRequest
 	MergeRequestNotes                                       map[string]application.ProviderMergeRequestNote
+	ArchivedProjects                                        map[int64]bool
+	DeletedProjects                                         map[int64]bool
 	CreateCalls, ProtectCalls, CredentialCalls, RevokeCalls int
 	MergeRequestCalls                                       int
 	MergeRequestNoteCalls                                   int
+	ArchiveCalls, UnarchiveCalls, DeleteCalls               int
 	LastMergeRequest                                        application.CreateMergeRequestRequest
 	LostResponseOnce                                        bool
 	MergeRequestLostResponseOnce                            bool
 	MergeRequestNoteLostResponseOnce                        bool
+	ArchiveLostResponseOnce                                 bool
 	ProtectError                                            error
 	RevokeError                                             error
 	Token                                                   string
 }
 
 func NewProvider() *Provider {
-	return &Provider{NextID: 100, Repositories: map[int64]application.ProviderRepository{}, Correlations: map[string]int64{}, Heads: map[string]string{}, MergeRequests: map[string]application.ProviderMergeRequest{}, MergeRequestNotes: map[string]application.ProviderMergeRequestNote{}, Token: "super-secret-token"}
+	return &Provider{NextID: 100, Repositories: map[int64]application.ProviderRepository{}, Correlations: map[string]int64{}, Heads: map[string]string{}, MergeRequests: map[string]application.ProviderMergeRequest{}, MergeRequestNotes: map[string]application.ProviderMergeRequestNote{}, ArchivedProjects: map[int64]bool{}, DeletedProjects: map[int64]bool{}, Token: "super-secret-token"}
 }
 func key(id int64, branch string) string { return fmt.Sprintf("%d:%s", id, branch) }
 func mergeRequestKey(id int64, source, target string) string {
@@ -168,6 +172,43 @@ func (p *Provider) FindMergeRequestNoteByMarker(_ context.Context, projectID, me
 	defer p.mu.Unlock()
 	note, ok := p.MergeRequestNotes[noteKey(projectID, mergeRequestIID, marker)]
 	return note, ok, nil
+}
+func (p *Provider) ArchiveRepository(_ context.Context, projectID int64) (application.ProviderRepository, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.ArchiveCalls++
+	repository, ok := p.Repositories[projectID]
+	if !ok {
+		return application.ProviderRepository{}, errors.New("project not found")
+	}
+	repository.Archived = true
+	p.Repositories[projectID] = repository
+	p.ArchivedProjects[projectID] = true
+	if p.ArchiveLostResponseOnce {
+		p.ArchiveLostResponseOnce = false
+		return application.ProviderRepository{}, errors.New("lost response after archive")
+	}
+	return repository, nil
+}
+func (p *Provider) UnarchiveRepository(_ context.Context, projectID int64) (application.ProviderRepository, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.UnarchiveCalls++
+	repository, ok := p.Repositories[projectID]
+	if !ok {
+		return application.ProviderRepository{}, errors.New("project not found")
+	}
+	repository.Archived = false
+	p.Repositories[projectID] = repository
+	p.ArchivedProjects[projectID] = false
+	return repository, nil
+}
+func (p *Provider) DeleteRepository(_ context.Context, projectID int64) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.DeleteCalls++
+	p.DeletedProjects[projectID] = true
+	return nil
 }
 func noteMarker(body string) string {
 	if end := strings.IndexByte(body, '\n'); end >= 0 {

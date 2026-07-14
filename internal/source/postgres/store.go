@@ -281,6 +281,25 @@ func (a *txAdapter) GetWorkspace(id string) (domain.Workspace, bool) {
 	a.capture(err)
 	return w, err == nil
 }
+func (a *txAdapter) ListWorkspaces(repositoryID string) []domain.Workspace {
+	rows, err := a.tx.Query("SELECT id,tenant_id,repository_id,branch,base_sha,commit_sha,directory,credential_id,state,last_error,expires_at,version,created_at,updated_at FROM source.workspaces WHERE repository_id=$1 ORDER BY id", repositoryID)
+	if err != nil {
+		a.capture(err)
+		return nil
+	}
+	defer rows.Close()
+	var result []domain.Workspace
+	for rows.Next() {
+		var workspace domain.Workspace
+		if err := rows.Scan(&workspace.ID, &workspace.TenantID, &workspace.RepositoryID, &workspace.Branch, &workspace.BaseSHA, &workspace.CommitSHA, &workspace.Directory, &workspace.CredentialID, &workspace.State, &workspace.LastError, &workspace.ExpiresAt, &workspace.Version, &workspace.CreatedAt, &workspace.UpdatedAt); err != nil {
+			a.capture(err)
+			return nil
+		}
+		result = append(result, workspace)
+	}
+	a.capture(rows.Err())
+	return result
+}
 func (a *txAdapter) InsertWorkspace(w domain.Workspace) error {
 	_, err := a.tx.Exec("INSERT INTO source.workspaces(id,tenant_id,repository_id,branch,base_sha,commit_sha,directory,credential_id,state,last_error,expires_at,version,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)", w.ID, w.TenantID, w.RepositoryID, w.Branch, w.BaseSHA, w.CommitSHA, w.Directory, w.CredentialID, w.State, w.LastError, w.ExpiresAt, w.Version, w.CreatedAt, w.UpdatedAt)
 	return mapDB(err)

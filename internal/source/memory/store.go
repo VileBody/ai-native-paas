@@ -203,6 +203,15 @@ func (t *tx) GetWorkspace(id string) (domain.Workspace, bool) {
 	v, ok := t.workspaces[id]
 	return v, ok
 }
+func (t *tx) ListWorkspaces(repositoryID string) []domain.Workspace {
+	var result []domain.Workspace
+	for _, workspace := range t.workspaces {
+		if workspace.RepositoryID == repositoryID {
+			result = append(result, workspace)
+		}
+	}
+	return result
+}
 func (t *tx) InsertWorkspace(v domain.Workspace) error {
 	if _, ok := t.workspaces[v.ID]; ok {
 		return domain.NewError(domain.CodeConflict, "workspace exists")

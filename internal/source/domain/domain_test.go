@@ -54,6 +54,24 @@ func TestRepository_MetadataRenameKeepsProviderID(t *testing.T) {
 		t.Fatalf("%+v %v", r, err)
 	}
 }
+func TestRepository_ArchiveRestoreAndPurgeStateMachine(t *testing.T) {
+	r, _ := domain.NewRepository("r", "t", "p", "gitlab", "corr", 7, now)
+	_ = r.BeginProvisioning(now)
+	_ = r.AttachProvider(42, "g/p", "", "main", now)
+	if err := r.Suspend(now.Add(time.Minute)); err != nil || r.State != domain.RepositorySuspended {
+		t.Fatalf("repository=%+v err=%v", r, err)
+	}
+	if err := r.Resume(now.Add(2 * time.Minute)); err != nil || r.State != domain.RepositoryReady || r.ProviderProjectID != 42 {
+		t.Fatalf("repository=%+v err=%v", r, err)
+	}
+	_ = r.Suspend(now.Add(3 * time.Minute))
+	if err := r.MarkPurgePending(now.Add(4 * time.Minute)); err != nil || r.State != domain.RepositoryPurgePending {
+		t.Fatalf("repository=%+v err=%v", r, err)
+	}
+	if err := r.Resume(now.Add(5 * time.Minute)); !domain.HasCode(err, domain.CodeConflict) {
+		t.Fatalf("purge-pending repository restored: %v", err)
+	}
+}
 func TestBranchPush_DuplicateIsNoop(t *testing.T) {
 	b, _ := domain.NewBranchHead("r", "main")
 	changed, err := b.ApplyPush("", sha("a"), "e1", now, now)

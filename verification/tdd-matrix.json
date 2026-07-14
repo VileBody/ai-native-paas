@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 896,
-  "discovered_unique_test_name_count": 894,
+  "discovered_go_test_count": 899,
+  "discovered_unique_test_name_count": 897,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -298,7 +298,7 @@
       "id": "S16",
       "level": "application + provider",
       "name": "TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge",
-      "status": "LIVE_ONLY",
+      "status": "REUSED",
       "test_file": "test/pivot/source_v2_test.go",
       "test_name": "TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge",
       "test_ref": "test/pivot/source_v2_test.go::TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge"
@@ -1589,9 +1589,9 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 70,
+      "LIVE_ONLY": 69,
       "NEW": 44,
-      "REUSED": 43
+      "REUSED": 44
     },
     "unmapped": 0
   }

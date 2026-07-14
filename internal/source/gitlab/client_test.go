@@ -223,6 +223,48 @@ func TestGitLab_CreateAndFindMergeRequestNoteUsesNotesAPI(t *testing.T) {
 	}
 }
 
+func TestGitLab_ArchiveRestoreAndDeleteUseProjectLifecycleAPI(t *testing.T) {
+	var actions []string
+	deleteCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		actions = append(actions, r.Method+" "+r.URL.Path)
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v4/projects/42/archive":
+			_, _ = io.WriteString(w, `{"id":42,"namespace":{"id":7},"path":"booking","path_with_namespace":"acme/booking","web_url":"https://git/acme/booking","default_branch":"main","archived":true}`)
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v4/projects/42/unarchive":
+			_, _ = io.WriteString(w, `{"id":42,"namespace":{"id":7},"path":"booking","path_with_namespace":"acme/booking","web_url":"https://git/acme/booking","default_branch":"main","archived":false}`)
+		case r.Method == http.MethodDelete && r.URL.Path == "/api/v4/projects/42":
+			deleteCalls++
+			if deleteCalls > 1 {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			w.WriteHeader(http.StatusAccepted)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	client := gitlab.Client{BaseURL: server.URL}
+	archived, err := client.ArchiveRepository(context.Background(), 42)
+	if err != nil || !archived.Archived || archived.ID != 42 {
+		t.Fatalf("archived=%+v err=%v", archived, err)
+	}
+	restored, err := client.UnarchiveRepository(context.Background(), 42)
+	if err != nil || restored.Archived || restored.ID != 42 {
+		t.Fatalf("restored=%+v err=%v", restored, err)
+	}
+	if err := client.DeleteRepository(context.Background(), 42); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.DeleteRepository(context.Background(), 42); err != nil {
+		t.Fatalf("idempotent delete after provider 404: %v", err)
+	}
+	if len(actions) != 4 {
+		t.Fatalf("actions=%v", actions)
+	}
+}
+
 func TestGitLab_BootstrapRepositoryUsesExactBaseAndBatchCommit(t *testing.T) {
 	var body struct {
 		Branch        string `json:"branch"`

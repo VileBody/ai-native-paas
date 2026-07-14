@@ -182,10 +182,11 @@ type projectJSON struct {
 	WebURL            string `json:"web_url"`
 	DefaultBranch     string `json:"default_branch"`
 	Description       string `json:"description"`
+	Archived          bool   `json:"archived"`
 }
 
 func toProvider(p projectJSON) application.ProviderRepository {
-	return application.ProviderRepository{ID: p.ID, NamespaceID: p.Namespace.ID, Path: p.Path, PathWithNamespace: p.PathWithNamespace, WebURL: p.WebURL, DefaultBranch: p.DefaultBranch, Description: p.Description}
+	return application.ProviderRepository{ID: p.ID, NamespaceID: p.Namespace.ID, Path: p.Path, PathWithNamespace: p.PathWithNamespace, WebURL: p.WebURL, DefaultBranch: p.DefaultBranch, Description: p.Description, Archived: p.Archived}
 }
 func (c *Client) CreateRepository(ctx context.Context, r application.CreateRepositoryRequest) (application.ProviderRepository, error) {
 	description := "[paas-correlation:" + r.CorrelationID + "]"
@@ -347,6 +348,45 @@ func (c *Client) FindMergeRequestNoteByMarker(ctx context.Context, projectID, me
 		}
 	}
 	return application.ProviderMergeRequestNote{}, false, nil
+}
+
+func (c *Client) ArchiveRepository(ctx context.Context, projectID int64) (application.ProviderRepository, error) {
+	return c.setRepositoryArchived(ctx, projectID, true)
+}
+
+func (c *Client) UnarchiveRepository(ctx context.Context, projectID int64) (application.ProviderRepository, error) {
+	return c.setRepositoryArchived(ctx, projectID, false)
+}
+
+func (c *Client) setRepositoryArchived(ctx context.Context, projectID int64, archived bool) (application.ProviderRepository, error) {
+	if projectID <= 0 {
+		return application.ProviderRepository{}, errors.New("gitlab project id is invalid")
+	}
+	action := "archive"
+	if !archived {
+		action = "unarchive"
+	}
+	var project projectJSON
+	path := "/projects/" + strconv.FormatInt(projectID, 10) + "/" + action
+	if err := c.do(ctx, http.MethodPost, path, nil, &project); err != nil {
+		return application.ProviderRepository{}, err
+	}
+	if project.ID != projectID || project.Archived != archived {
+		return application.ProviderRepository{}, errors.New("gitlab archive response does not match requested state")
+	}
+	return toProvider(project), nil
+}
+
+func (c *Client) DeleteRepository(ctx context.Context, projectID int64) error {
+	if projectID <= 0 {
+		return errors.New("gitlab project id is invalid")
+	}
+	err := c.do(ctx, http.MethodDelete, "/projects/"+strconv.FormatInt(projectID, 10), nil, nil)
+	var apiErr *APIError
+	if errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound {
+		return nil
+	}
+	return err
 }
 
 func (c *Client) BootstrapRepository(ctx context.Context, request application.BootstrapRepositoryRequest) (string, error) {

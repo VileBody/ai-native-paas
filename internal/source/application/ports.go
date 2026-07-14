@@ -64,6 +64,7 @@ type Tx interface {
 	UpsertMergeRequest(domain.MergeRequest, int64) error
 
 	GetWorkspace(id string) (domain.Workspace, bool)
+	ListWorkspaces(repositoryID string) []domain.Workspace
 	InsertWorkspace(domain.Workspace) error
 	UpdateWorkspace(domain.Workspace, int64) error
 
@@ -86,6 +87,7 @@ type ProviderRepository struct {
 	WebURL            string
 	DefaultBranch     string
 	Description       string
+	Archived          bool
 }
 type ProviderCredential struct {
 	ID        string
@@ -144,6 +146,26 @@ type GitProvider interface {
 	FindOpenMergeRequest(context.Context, int64, string, string) (ProviderMergeRequest, bool, error)
 	CreateMergeRequestNote(context.Context, int64, int64, string) (ProviderMergeRequestNote, error)
 	FindMergeRequestNoteByMarker(context.Context, int64, int64, string) (ProviderMergeRequestNote, bool, error)
+	ArchiveRepository(context.Context, int64) (ProviderRepository, error)
+	UnarchiveRepository(context.Context, int64) (ProviderRepository, error)
+	DeleteRepository(context.Context, int64) error
+}
+
+type ProjectPurgeAuthorization struct {
+	TenantID          string
+	ProjectID         string
+	RepositoryID      string
+	ProviderProjectID int64
+	ActorID           string
+	ApprovalGrantID   string
+	IdempotencyKey    string
+	Now               time.Time
+}
+
+// ProjectPurgeAuthorizer must consume a grant once while treating a retry with
+// the same idempotency key as the same authorized command.
+type ProjectPurgeAuthorizer interface {
+	VerifyAndConsumeProjectPurge(context.Context, ProjectPurgeAuthorization) error
 }
 
 type PushEvent struct {

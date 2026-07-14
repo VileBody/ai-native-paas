@@ -52,6 +52,9 @@ func (s *WorkspaceService) Execute(ctx context.Context, cmd ExecuteWorkspaceComm
 	if err != nil {
 		return domain.Workspace{}, err
 	}
+	if repo.State != domain.RepositoryReady {
+		return domain.Workspace{}, domain.NewError(domain.CodeNotFound, "ready repository not found")
+	}
 	if w.State == domain.WorkspaceCompleted {
 		return w, nil
 	}

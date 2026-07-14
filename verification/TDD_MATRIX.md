@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **896**
-- Reused now: **43**
+- Discovered Go tests/fuzz targets: **899**
+- Reused now: **44**
 - New local/contract tests required: **44**
-- Live/provider/system tests required: **70**
+- Live/provider/system tests required: **69**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -43,7 +43,7 @@ A release gate may become green only after every referenced test exists and pass
 | `S13` | REUSED | application | `test/pivot/source_v2_test.go::TestSource_DeletedBranchProducesEnvironmentCleanupIntent` |
 | `S14` | REUSED | integration | `internal/workspaceagent/source_v2_test.go::TestSource_SubmoduleAndLFSFollowExplicitPolicy` |
 | `S15` | REUSED | provider contract | `test/pivot/source_v2_test.go::TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency` |
-| `S16` | LIVE_ONLY | application + provider | `test/pivot/source_v2_test.go::TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge` |
+| `S16` | REUSED | application + provider | `test/pivot/source_v2_test.go::TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge` |
 | `S17` | REUSED | real Git integration | `internal/workspaceagent/source_v2_test.go::TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig` |
 | `S18` | LIVE_ONLY | reconciliation | `test/pivot/source_v2_test.go::TestSource_UnknownProviderProjectIsQuarantinedNotAdopted` |
 | `B1` | LIVE_ONLY | domain | `test/pivot/build_v2_test.go::TestBuild_IdentityIncludesCommitAndCanonicalBuildSpec` |
