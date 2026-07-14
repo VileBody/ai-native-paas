@@ -23,6 +23,12 @@ const (
 	MeterEgressBytes                Meter = "egress.bytes"
 	MeterLogsIngestedBytes          Meter = "logs.ingested_bytes"
 	MeterLogsRetainedGiBHours       Meter = "logs.retained_gib_hours"
+	MeterOpenRouterInputTokens      Meter = "capability.openrouter.input_tokens"
+	MeterOpenRouterOutputTokens     Meter = "capability.openrouter.output_tokens"
+	MeterApifyActorRuns             Meter = "capability.apify.actor_runs"
+	MeterApifyStorageBytes          Meter = "capability.apify.storage_bytes"
+	MeterBrightDataRequests         Meter = "capability.bright_data.requests"
+	MeterBrightDataTransferBytes    Meter = "capability.bright_data.transfer_bytes"
 )
 
 var meterCatalog = []Meter{
@@ -31,6 +37,9 @@ var meterCatalog = []Meter{
 	MeterArtifactStorageGiBHours, MeterPersistentStorageGiBHours,
 	MeterDatabasePlanSeconds, MeterObjectStorageGiBHours,
 	MeterEgressBytes, MeterLogsIngestedBytes, MeterLogsRetainedGiBHours,
+	MeterOpenRouterInputTokens, MeterOpenRouterOutputTokens,
+	MeterApifyActorRuns, MeterApifyStorageBytes,
+	MeterBrightDataRequests, MeterBrightDataTransferBytes,
 }
 
 func MeterCatalog() []Meter { return append([]Meter(nil), meterCatalog...) }

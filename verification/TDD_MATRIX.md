@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **947**
-- Reused now: **82**
-- New local/contract tests required: **9**
+- Discovered Go tests/fuzz targets: **948**
+- Reused now: **83**
+- New local/contract tests required: **8**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -121,7 +121,7 @@ A release gate may become green only after every referenced test exists and pass
 | `C8` | LIVE_ONLY | application/provider | `test/pivot/commerce_v2_test.go::TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder` |
 | `C9` | LIVE_ONLY | integration | `test/pivot/commerce_v2_test.go::TestUsage_ProviderReportReplayDoesNotDoubleCharge` |
 | `C10` | LIVE_ONLY | capability gateway integration | `test/pivot/commerce_v2_test.go::TestUsage_OpenRouterTokensAreAttributedToProjectTaskAndModel` |
-| `C11` | NEW | rating | `test/pivot/commerce_v2_test.go::TestUsage_ApifyAndBrightDataMetersRemainProviderSpecificButInvoiceStable` |
+| `C11` | REUSED | rating | `internal/commerce/application/commercial_tdd_test.go::TestUsage_ApifyAndBrightDataMetersRemainProviderSpecificButInvoiceStable` |
 | `C12` | NEW | workspace/commerce integration | `test/pivot/commerce_v2_test.go::TestBudget_WorkspaceCommandStoppedBeforeExceedingHardLimit` |
 | `C13` | NEW | Agent/Commerce | `test/pivot/commerce_v2_test.go::TestBudget_RepairLoopConsumesConfiguredNotUnlimitedBudget` |
 | `C14` | LIVE_ONLY | cross-domain | `test/pivot/commerce_v2_test.go::TestCommercial_SuspendedProjectIsReadOnlyAndRetainsData` |

@@ -43,6 +43,8 @@ func planSpec() commercev1.PlanSpec {
 			commercev1.MeterBuildCPUSeconds:       {MinorUnits: 2, PerQuantity: 60},
 			commercev1.MeterBuildMemoryGiBSeconds: {MinorUnits: 1, PerQuantity: 60},
 			commercev1.MeterBuildDockerVMSeconds:  {MinorUnits: 5, PerQuantity: 60},
+			commercev1.MeterApifyActorRuns:        {MinorUnits: 25, PerQuantity: 1},
+			commercev1.MeterBrightDataRequests:    {MinorUnits: 2, PerQuantity: 100},
 		},
 		Included:                map[commercev1.Meter]int64{},
 		ChargeUserBuildFailures: true,
@@ -543,6 +545,67 @@ func TestInvoicePreview_IsDeterministic(t *testing.T) {
 	rb, _ := json.Marshal(b)
 	if string(ra) != string(rb) {
 		t.Fatalf("a=%s b=%s", ra, rb)
+	}
+}
+
+func TestUsage_ApifyAndBrightDataMetersRemainProviderSpecificButInvoiceStable(t *testing.T) {
+	t.Parallel()
+
+	appendProviderUsage := func(t *testing.T, f *fixture, meter commercev1.Meter, resourceType, resourceID, key string, quantity int64) {
+		t.Helper()
+		f.ownership.Allowed["tenant-1/"+resourceType+"/"+resourceID] = true
+		if err := f.svc.Append(f.ctx, commercev1.UsageEvent{
+			TenantID:       "tenant-1",
+			PeriodID:       f.period.ID,
+			ResourceType:   resourceType,
+			ResourceID:     resourceID,
+			Meter:          meter,
+			Kind:           commercev1.UsageStandard,
+			Quantity:       quantity,
+			IdempotencyKey: key,
+			OccurredAt:     baseTime.Add(time.Hour),
+			WindowStart:    baseTime,
+			WindowEnd:      baseTime.Add(time.Hour),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	previewForOrder := func(t *testing.T, reverse bool) commercev1.InvoicePreview {
+		t.Helper()
+		f := newFixture(t)
+		appendApify := func() {
+			appendProviderUsage(t, f, commercev1.MeterApifyActorRuns, "capability.apify", "binding-apify", "apify-runs", 3)
+		}
+		appendBright := func() {
+			appendProviderUsage(t, f, commercev1.MeterBrightDataRequests, "capability.bright-data", "binding-bright", "bright-requests", 250)
+		}
+		if reverse {
+			appendBright()
+			appendApify()
+		} else {
+			appendApify()
+			appendBright()
+		}
+		preview, err := f.svc.PreviewInvoice(f.ctx, "tenant-1", f.period.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return preview
+	}
+
+	forward := previewForOrder(t, false)
+	reverse := previewForOrder(t, true)
+	forwardJSON, _ := json.Marshal(forward)
+	reverseJSON, _ := json.Marshal(reverse)
+	if string(forwardJSON) != string(reverseJSON) {
+		t.Fatalf("provider ingestion order changed invoice:\n%s\n%s", forwardJSON, reverseJSON)
+	}
+	if len(forward.Lines) != 2 || forward.TotalMinorUnits != 80 {
+		t.Fatalf("invoice=%+v", forward)
+	}
+	if forward.Lines[0].Meter != commercev1.MeterApifyActorRuns || forward.Lines[0].AmountMinorUnits != 75 ||
+		forward.Lines[1].Meter != commercev1.MeterBrightDataRequests || forward.Lines[1].AmountMinorUnits != 5 {
+		t.Fatalf("provider meters were collapsed or misrated: %+v", forward.Lines)
 	}
 }
 func TestInvoicePreview_GroupsByMeterAndResource(t *testing.T) {
