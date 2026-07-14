@@ -62,6 +62,7 @@ qemu-img resize "$image" 40G >/dev/null
 virt-customize -a "$image" --network \
   --upload infra/images/workspace/debian-snapshot.sources:/etc/apt/sources.list.d/debian.sources \
   --run-command 'rm -f /etc/apt/sources.list' \
+  --run-command 'ip link set dev eth0 up && ip address replace 169.254.2.15/16 dev eth0 && ip route replace default via 169.254.2.2 dev eth0' \
   --run-command 'printf "nameserver 169.254.2.3\n" > /etc/resolv.conf' \
   --install 'ca-certificates,git,jq,make,python3,ripgrep,uidmap,slirp4netns,fuse-overlayfs,runc' \
   --uninstall 'openssh-server' \
