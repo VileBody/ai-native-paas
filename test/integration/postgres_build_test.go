@@ -21,6 +21,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/build/support"
 	"github.com/keir-research/ai-native-paas/internal/build/testkit"
 	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
+	buildv2 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v2"
 	sourcev1 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v1"
 )
 
@@ -328,5 +329,39 @@ func TestPostgres_DockerfileExecutionSelectionAndIdentityRemainImmutable(t *test
 	}
 	if _, err := db.ExecContext(ctx, `UPDATE build.builds SET id='renamed-build',version=version+1 WHERE id=$1`, build.ID); err == nil {
 		t.Fatal("build primary identity mutation unexpectedly succeeded")
+	}
+}
+
+func TestPostgres_V2BuildSpecRoundTripsAndRemainsImmutable(t *testing.T) {
+	db, store := migratedBuildStore(t)
+	ctx := context.Background()
+	build := pgBuild(t, "build-v2-spec")
+	spec := buildv2.BuildSpec{
+		SourceSHA: build.Source.CommitSHA, Driver: buildv2.DriverDockerfile,
+		DefinitionPath: "docker/Dockerfile", Platforms: []string{"linux/amd64"},
+		NetworkProfile: "governed", CacheScope: "project-pg", ResourceClass: "standard", TimeoutSeconds: 900,
+	}
+	if err := build.ConfigureV2Request(&spec, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Transact(ctx, func(tx application.Tx) error { return tx.InsertBuild(build) }); err != nil {
+		t.Fatal(err)
+	}
+	var loaded domain.Build
+	if err := store.Transact(ctx, func(tx application.Tx) error {
+		var ok bool
+		loaded, ok = tx.GetBuild(build.ID)
+		if !ok {
+			return errors.New("v2 build missing")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if loaded.RequestContract != buildv2.APIVersion || loaded.BuildSpec == nil || loaded.BuildSpec.DefinitionPath != "docker/Dockerfile" || loaded.BuildSpecDigest == "" || loaded.AutoDetectionAllowed {
+		t.Fatalf("loaded=%+v", loaded)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE build.builds SET config=jsonb_set(config,'{_build_spec,definition_path}','"SharedDockerSocket"'::jsonb),version=version+1 WHERE id=$1`, build.ID); err == nil {
+		t.Fatal("persisted v2 build spec mutation unexpectedly succeeded")
 	}
 }

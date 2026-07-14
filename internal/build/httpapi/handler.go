@@ -10,6 +10,7 @@ import (
 
 	"github.com/keir-research/ai-native-paas/internal/build/application"
 	"github.com/keir-research/ai-native-paas/internal/build/domain"
+	buildv2 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v2"
 	sourcev1 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v1"
 )
 
@@ -25,7 +26,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	parts := splitPath(r.URL.Path)
-	if len(parts) < 4 || parts[0] != "v1" || parts[1] != "organizations" || parts[3] != "builds" {
+	if len(parts) < 4 || (parts[0] != "v1" && parts[0] != "v2") || parts[1] != "organizations" || parts[3] != "builds" {
 		writeError(w, domain.NewError(domain.CodeNotFound, "route not found"))
 		return
 	}
@@ -40,8 +41,10 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
-	case len(parts) == 4 && r.Method == http.MethodPost:
+	case len(parts) == 4 && r.Method == http.MethodPost && parts[0] == "v1":
 		h.requestBuild(w, r, tenantID, actorID)
+	case len(parts) == 4 && r.Method == http.MethodPost && parts[0] == "v2":
+		h.requestBuildV2(w, r, tenantID, actorID)
 	case len(parts) == 5 && r.Method == http.MethodGet:
 		h.getBuild(w, r, tenantID, parts[4])
 	case len(parts) == 6 && parts[5] == "run" && r.Method == http.MethodPost:
@@ -55,6 +58,33 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, domain.NewError(domain.CodeNotFound, "route not found"))
 	}
+}
+
+type requestBuildV2Body struct {
+	Source               sourcev1.SourceRevision `json:"source"`
+	Spec                 *buildv2.BuildSpec      `json:"spec,omitempty"`
+	AllowAutoDetection   bool                    `json:"allow_auto_detection,omitempty"`
+	BuilderDigest        string                  `json:"builder_digest"`
+	RunImageDigest       string                  `json:"run_image_digest"`
+	PlatformBuildVersion string                  `json:"platform_version"`
+}
+
+func (h Handler) requestBuildV2(w http.ResponseWriter, r *http.Request, tenantID, actorID string) {
+	var body requestBuildV2Body
+	if err := decode(r, h.limit(), &body); err != nil {
+		writeError(w, domain.Wrap(domain.CodeInvalidArgument, "invalid json", err))
+		return
+	}
+	result, err := h.Build.RequestBuildV2(r.Context(), application.RequestBuildV2Command{
+		TenantID: tenantID, ActorID: actorID, CorrelationID: correlationID(r), IdempotencyKey: strings.TrimSpace(r.Header.Get("Idempotency-Key")),
+		Source: body.Source, Spec: body.Spec, AllowAutoDetection: body.AllowAutoDetection,
+		BuilderDigest: body.BuilderDigest, RunImageDigest: body.RunImageDigest, PlatformVersion: body.PlatformBuildVersion,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, result)
 }
 
 type requestBuildBody struct {

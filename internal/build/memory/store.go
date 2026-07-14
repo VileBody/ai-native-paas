@@ -58,6 +58,18 @@ func cloneBuild(value domain.Build) domain.Build {
 		}
 		value.Config.BuildEnv = env
 	}
+	if value.BuildSpec != nil {
+		spec := *value.BuildSpec
+		spec.Platforms = append([]string(nil), value.BuildSpec.Platforms...)
+		spec.SecretRefs = append([]string(nil), value.BuildSpec.SecretRefs...)
+		if value.BuildSpec.BuildArguments != nil {
+			spec.BuildArguments = make(map[string]string, len(value.BuildSpec.BuildArguments))
+			for key, item := range value.BuildSpec.BuildArguments {
+				spec.BuildArguments[key] = item
+			}
+		}
+		value.BuildSpec = &spec
+	}
 	return value
 }
 func cloneArtifact(value domain.Artifact) domain.Artifact {
@@ -140,7 +152,9 @@ func (t *tx) UpdateBuild(v domain.Build, expected int64) error {
 		!reflect.DeepEqual(old.Source, v.Source) || !reflect.DeepEqual(old.Config, v.Config) ||
 		old.BuilderDigest != v.BuilderDigest || old.RunImageDigest != v.RunImageDigest ||
 		old.PlatformBuildVersion != v.PlatformBuildVersion || old.CreatedAt != v.CreatedAt ||
-		old.CorrelationID != v.CorrelationID || old.OriginalCorrelationID != v.OriginalCorrelationID {
+		old.CorrelationID != v.CorrelationID || old.OriginalCorrelationID != v.OriginalCorrelationID ||
+		old.RequestContract != v.RequestContract || !reflect.DeepEqual(old.BuildSpec, v.BuildSpec) ||
+		old.BuildSpecDigest != v.BuildSpecDigest || old.AutoDetectionAllowed != v.AutoDetectionAllowed {
 		return domain.NewError(domain.CodeConflict, "build identity is immutable")
 	}
 	if old.Backend != "" && (old.Backend != v.Backend || old.Runtime != v.Runtime || old.BuildpackID != v.BuildpackID) {

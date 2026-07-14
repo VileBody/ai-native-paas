@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **908**
-- Reused now: **47**
-- New local/contract tests required: **44**
+- Discovered Go tests/fuzz targets: **914**
+- Reused now: **50**
+- New local/contract tests required: **41**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -47,9 +47,9 @@ A release gate may become green only after every referenced test exists and pass
 | `S17` | REUSED | real Git integration | `internal/workspaceagent/source_v2_test.go::TestSource_CheckoutCredentialRemovedFromDiskAndGitConfig` |
 | `S18` | REUSED | reconciliation | `test/pivot/source_v2_test.go::TestSource_UnknownProviderProjectIsQuarantinedNotAdopted` |
 | `B1` | REUSED | domain | `test/pivot/build_v2_test.go::TestBuild_IdentityIncludesCommitAndCanonicalBuildSpec` |
-| `B2` | NEW | application | `test/pivot/build_v2_test.go::TestBuild_ExplicitBuildSpecOverridesRuntimeDetection` |
-| `B3` | NEW | application | `test/pivot/build_v2_test.go::TestBuild_BuildpacksRemainOptionalFallback` |
-| `B4` | NEW | application | `test/pivot/build_v2_test.go::TestBuild_DockerfileRunsOnlyInDisposableIsolationBackend` |
+| `B2` | REUSED | application | `internal/build/application/service_test.go::TestBuild_ExplicitBuildSpecOverridesRuntimeDetection` |
+| `B3` | REUSED | application | `internal/build/application/service_test.go::TestBuild_BuildpacksRemainOptionalFallback` |
+| `B4` | REUSED | application | `internal/build/application/service_test.go::TestBuild_DockerfileRunsOnlyInDisposableIsolationBackend` |
 | `B5` | LIVE_ONLY | provider/system security | `test/pivot/build_v2_test.go::TestBuild_NetworkProfileBlocksMetadataPrivateAndControlPlane` |
 | `B6` | LIVE_ONLY | system | `test/pivot/build_v2_test.go::TestBuild_ResourceLimitsTerminateForkBombAndOversizedContext` |
 | `B7` | NEW | integration | `test/pivot/build_v2_test.go::TestBuild_SecretsNeverEnterLayerLogOrProvenance` |

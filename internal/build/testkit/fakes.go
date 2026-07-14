@@ -104,9 +104,26 @@ func (b *Builder) LastRequest() (application.BuildExecutionRequest, bool) {
 	}
 	return cloneRequest(b.Requests[len(b.Requests)-1]), true
 }
+
+type IsolatedBuilder struct {
+	*Builder
+	Isolation application.IsolationBoundary
+}
+
+func (b *IsolatedBuilder) IsolationBoundary() application.IsolationBoundary {
+	return b.Isolation
+}
+
 func cloneRequest(r application.BuildExecutionRequest) application.BuildExecutionRequest {
 	r.Environment = cloneMap(r.Environment)
 	r.Secrets = append([]application.BuildSecret(nil), r.Secrets...)
+	if r.BuildSpec != nil {
+		spec := *r.BuildSpec
+		spec.Platforms = append([]string(nil), r.BuildSpec.Platforms...)
+		spec.SecretRefs = append([]string(nil), r.BuildSpec.SecretRefs...)
+		spec.BuildArguments = cloneMap(r.BuildSpec.BuildArguments)
+		r.BuildSpec = &spec
+	}
 	return r
 }
 

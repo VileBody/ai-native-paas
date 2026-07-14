@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/keir-research/ai-native-paas/internal/build/domain"
 	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
+	buildv2 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v2"
 	sourcev1 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v1"
 )
 
@@ -37,6 +39,17 @@ type RequestBuildCommand struct {
 	TenantID, ActorID, CorrelationID, IdempotencyKey string
 	Source                                           sourcev1.SourceRevision
 	Config                                           domain.BuildConfig
+	BuilderDigest, RunImageDigest, PlatformVersion   string
+}
+
+// RequestBuildV2Command has two intentionally distinct modes: an explicit
+// BuildSpec, or a project-policy-approved buildpacks fallback. A caller cannot
+// submit both, and the fallback is never implicit.
+type RequestBuildV2Command struct {
+	TenantID, ActorID, CorrelationID, IdempotencyKey string
+	Source                                           sourcev1.SourceRevision
+	Spec                                             *buildv2.BuildSpec
+	AllowAutoDetection                               bool
 	BuilderDigest, RunImageDigest, PlatformVersion   string
 }
 type RequestBuildResult struct {
@@ -98,6 +111,111 @@ func (s *Service) RequestBuild(ctx context.Context, cmd RequestBuildCommand) (Re
 		return tx.AppendAudit(AuditRecord{ID: s.IDs.NewID("aud"), TenantID: cmd.TenantID, ActorID: cmd.ActorID, Action: "build.request", ResourceType: "build", ResourceID: build.ID, Data: []byte(`{"source":"exact-revision"}`), CreatedAt: now})
 	})
 	return result, err
+}
+
+func (s *Service) RequestBuildV2(ctx context.Context, cmd RequestBuildV2Command) (RequestBuildResult, error) {
+	if s.Store == nil || s.Clock == nil || s.IDs == nil {
+		return RequestBuildResult{}, domain.NewError(domain.CodeUnavailable, "build service is not configured")
+	}
+	if strings.TrimSpace(cmd.TenantID) == "" || strings.TrimSpace(cmd.ActorID) == "" || strings.TrimSpace(cmd.CorrelationID) == "" || strings.TrimSpace(cmd.IdempotencyKey) == "" {
+		return RequestBuildResult{}, domain.NewError(domain.CodeInvalidArgument, "missing request-build fields")
+	}
+
+	source := cmd.Source
+	config := domain.BuildConfig{Type: domain.BuildTypeAuto}
+	var canonicalSpec *buildv2.BuildSpec
+	var identitySeed string
+	if cmd.Spec != nil {
+		canonical, err := cmd.Spec.Canonical()
+		if err != nil {
+			return RequestBuildResult{}, domain.NewError(domain.CodeInvalidArgument, "invalid canonical build specification")
+		}
+		if !strings.EqualFold(source.CommitSHA, canonical.SourceSHA) {
+			return RequestBuildResult{}, domain.NewError(domain.CodeInvalidArgument, "build spec source SHA does not match source revision")
+		}
+		if canonical.Driver != buildv2.DriverDockerfile {
+			return RequestBuildResult{}, domain.NewError(domain.CodeInvalidArgument, "explicit build driver is not executable in this release slice")
+		}
+		if source.SourceRoot != "" && source.SourceRoot != canonical.ContextRoot {
+			return RequestBuildResult{}, domain.NewError(domain.CodeInvalidArgument, "build spec context root does not match source revision")
+		}
+		source.SourceRoot = canonical.ContextRoot
+		config = domain.BuildConfig{Type: domain.BuildTypeDockerfile, DockerfilePath: canonical.DefinitionPath, BuildSecretRef: append([]string(nil), canonical.SecretRefs...)}
+		value, err := domain.ComputeBuildV2Identity(source.ProjectID, source.RepositoryID, canonical)
+		if err != nil {
+			return RequestBuildResult{}, err
+		}
+		identitySeed = value
+		canonicalSpec = &canonical
+	} else {
+		if !cmd.AllowAutoDetection {
+			return RequestBuildResult{}, domain.NewError(domain.CodeInvalidArgument, "explicit build spec or auto-detection permission is required")
+		}
+		identitySeed = "auto-buildpacks"
+	}
+	materialIdentity, err := domain.ComputeBuildIdentity(source, config, cmd.BuilderDigest, cmd.RunImageDigest, cmd.PlatformVersion)
+	if err != nil {
+		return RequestBuildResult{}, err
+	}
+	identity := "bldidv2_" + hashJSON(struct {
+		Contract string `json:"contract"`
+		Spec     string `json:"spec"`
+		Material string `json:"material"`
+	}{Contract: buildv2.APIVersion, Spec: identitySeed, Material: materialIdentity})
+	requestHash := hashJSON(struct {
+		Identity string `json:"identity"`
+	}{Identity: identity})
+
+	var result RequestBuildResult
+	err = s.Store.Transact(ctx, func(tx Tx) error {
+		if record, ok := tx.GetIdempotency(cmd.TenantID, cmd.IdempotencyKey); ok {
+			if record.Command != "build.request.v2" || record.RequestHash != requestHash {
+				return domain.NewError(domain.CodeConflict, "idempotency key was used for another request")
+			}
+			if !record.Completed {
+				return domain.NewError(domain.CodeConflict, "build request is in progress")
+			}
+			return json.Unmarshal(record.Result, &result)
+		}
+		if existing, ok := tx.FindBuildByIdentity(cmd.TenantID, identity); ok {
+			result.Build = existing
+			if artifact, found := tx.FindArtifactByBuild(existing.ID); found {
+				copyArtifact := artifact
+				result.Artifact = &copyArtifact
+			}
+			result.Reused = existing.State == buildv1.BuildSucceeded && result.Artifact != nil && result.Artifact.State == domain.ArtifactReleasable
+			return completeV2Idempotency(tx, cmd, requestHash, result, s.Clock.Now())
+		}
+		now := s.Clock.Now()
+		build, err := domain.NewBuild(s.IDs.NewID("bld"), cmd.TenantID, identity, cmd.CorrelationID, source, config, cmd.BuilderDigest, cmd.RunImageDigest, cmd.PlatformVersion, now)
+		if err != nil {
+			return err
+		}
+		if err := build.ConfigureV2Request(canonicalSpec, cmd.AllowAutoDetection); err != nil {
+			return err
+		}
+		if err := tx.InsertBuild(build); err != nil {
+			return err
+		}
+		result.Build = build
+		if err := completeV2Idempotency(tx, cmd, requestHash, result, now); err != nil {
+			return err
+		}
+		payload, _ := json.Marshal(map[string]any{"build_id": build.ID, "tenant_id": build.TenantID, "identity": build.Identity, "commit_sha": build.Source.CommitSHA, "spec_digest": build.BuildSpecDigest, "auto_detection_allowed": build.AutoDetectionAllowed})
+		if err := tx.AppendOutbox(OutboxRecord{ID: s.IDs.NewID("evt"), Topic: "build.requested.v2", AggregateID: build.ID, Payload: payload, CreatedAt: now}); err != nil {
+			return err
+		}
+		return tx.AppendAudit(AuditRecord{ID: s.IDs.NewID("aud"), TenantID: cmd.TenantID, ActorID: cmd.ActorID, Action: "build.request.v2", ResourceType: "build", ResourceID: build.ID, Data: payload, CreatedAt: now})
+	})
+	return result, err
+}
+
+func completeV2Idempotency(tx Tx, cmd RequestBuildV2Command, requestHash string, result RequestBuildResult, now time.Time) error {
+	raw, err := json.Marshal(result)
+	if err != nil {
+		return domain.Wrap(domain.CodePlatformFailure, "encode build result", err)
+	}
+	return tx.PutIdempotency(IdempotencyRecord{TenantID: cmd.TenantID, Key: cmd.IdempotencyKey, Command: "build.request.v2", RequestHash: requestHash, Result: raw, Completed: true, CreatedAt: now, CompletedAt: now})
 }
 
 type RetryBuildCommand struct {
@@ -218,8 +336,11 @@ func (s *Service) RunBuild(ctx context.Context, tenantID, actorID, buildID strin
 	if build.State != buildv1.BuildQueued {
 		return build, artifact, domain.NewError(domain.CodeConflict, "automatic resume of partial build is not implemented")
 	}
-	if s.Fetcher == nil || s.Detector == nil || s.Registry == nil || s.SBOM == nil || s.Scanner == nil || s.Signer == nil || s.Verifier == nil || s.Logs == nil {
+	if s.Fetcher == nil || s.Registry == nil || s.SBOM == nil || s.Scanner == nil || s.Signer == nil || s.Verifier == nil || s.Logs == nil {
 		return build, artifact, domain.NewError(domain.CodeUnavailable, "build pipeline is not configured")
+	}
+	if build.BuildSpec == nil && s.Detector == nil {
+		return build, artifact, domain.NewError(domain.CodeUnavailable, "runtime detector is unavailable")
 	}
 	if err := s.startBuild(ctx, actorID, &build); err != nil {
 		return build, artifact, err
@@ -234,11 +355,11 @@ func (s *Service) RunBuild(ctx context.Context, tenantID, actorID, buildID strin
 	if err := s.advance(ctx, &build, buildv1.BuildDetecting); err != nil {
 		return build, artifact, err
 	}
-	detection, err := s.Detector.Detect(ctx, snapshot.Path, build.Config)
+	detection, selectionSource, err := s.resolveExecution(ctx, snapshot.Path, build)
 	if err != nil {
 		return s.fail(ctx, actorID, build, artifact, err)
 	}
-	if err := s.selectExecution(ctx, &build, detection); err != nil {
+	if err := s.selectExecution(ctx, actorID, &build, detection, selectionSource); err != nil {
 		return build, artifact, err
 	}
 	secrets, err := s.resolveSecrets(ctx, build)
@@ -250,15 +371,12 @@ func (s *Service) RunBuild(ctx context.Context, tenantID, actorID, buildID strin
 		secretValues = append(secretValues, secret.Value)
 	}
 	writer := s.Logs.Writer(build.ID, secretValues)
-	builder := s.Buildpacks
-	if detection.Backend == BackendDockerfile {
-		builder = s.Dockerfile
-	}
-	if builder == nil {
-		return s.fail(ctx, actorID, build, artifact, domain.NewError(domain.CodeUnavailable, "selected build backend is unavailable"))
+	builder, err := s.executionBuilder(build.Backend)
+	if err != nil {
+		return s.fail(ctx, actorID, build, artifact, err)
 	}
 	repository := s.repository(build)
-	output, err := builder.Build(ctx, BuildExecutionRequest{BuildID: build.ID, TenantID: build.TenantID, BuilderDigest: build.BuilderDigest, RunImageDigest: build.RunImageDigest, Source: snapshot, Detection: detection, Config: build.Config, Environment: cloneMap(build.Config.BuildEnv), Secrets: secretsForPhase(secrets, PhaseBuild), LogWriter: writer, Repository: repository})
+	output, err := builder.Build(ctx, BuildExecutionRequest{BuildID: build.ID, TenantID: build.TenantID, BuilderDigest: build.BuilderDigest, RunImageDigest: build.RunImageDigest, Source: snapshot, Detection: detection, Config: build.Config, BuildSpec: build.BuildSpec, Environment: cloneMap(build.Config.BuildEnv), Secrets: secretsForPhase(secrets, PhaseBuild), LogWriter: writer, Repository: repository})
 	if err != nil {
 		return s.fail(ctx, actorID, build, artifact, err)
 	}
@@ -420,10 +538,51 @@ func (s *Service) startBuild(ctx context.Context, actorID string, build *domain.
 	})
 }
 
-func (s *Service) selectExecution(ctx context.Context, build *domain.Build, detection Detection) error {
-	return s.updateBuild(ctx, build, func(value *domain.Build) error {
-		return value.SelectExecution(detection.Runtime, domain.ExecutionBackend(detection.Backend), detection.BuildpackID, s.Clock.Now())
+func (s *Service) resolveExecution(ctx context.Context, sourcePath string, build domain.Build) (Detection, string, error) {
+	if build.BuildSpec != nil {
+		switch build.BuildSpec.Driver {
+		case buildv2.DriverDockerfile:
+			return Detection{Runtime: "dockerfile", Backend: BackendDockerfile, Evidence: []string{"explicit-build-spec:" + build.BuildSpecDigest, "definition:" + build.BuildSpec.DefinitionPath}}, "explicit-build-spec", nil
+		default:
+			return Detection{}, "", domain.NewError(domain.CodeInvalidArgument, "explicit build driver is not executable in this release slice")
+		}
+	}
+	if !build.AutoDetectionAllowed {
+		return Detection{}, "", domain.NewError(domain.CodePolicyRejected, "runtime detection was not approved by project policy")
+	}
+	if s.Detector == nil {
+		return Detection{}, "", domain.NewError(domain.CodeUnavailable, "runtime detector is unavailable")
+	}
+	detection, err := s.Detector.Detect(ctx, sourcePath, build.Config)
+	if err != nil {
+		return Detection{}, "", err
+	}
+	if build.RequestContract == buildv2.APIVersion && detection.Backend != BackendBuildpacks {
+		return Detection{}, "", domain.NewError(domain.CodePolicyRejected, "v2 auto mode only permits the buildpacks fallback; Dockerfile requires an explicit BuildSpec")
+	}
+	return detection, "runtime-detector", nil
+}
+
+func (s *Service) selectExecution(ctx context.Context, actorID string, build *domain.Build, detection Detection, selectionSource string) error {
+	next := *build
+	if err := next.SelectExecution(detection.Runtime, domain.ExecutionBackend(detection.Backend), detection.BuildpackID, s.Clock.Now()); err != nil {
+		return err
+	}
+	payload, _ := json.Marshal(map[string]any{"build_id": next.ID, "runtime": detection.Runtime, "backend": detection.Backend, "buildpack_id": detection.BuildpackID, "entrypoint": detection.Entrypoint, "evidence": detection.Evidence, "selection_source": selectionSource, "spec_digest": next.BuildSpecDigest})
+	err := s.Store.Transact(ctx, func(tx Tx) error {
+		now := s.Clock.Now()
+		if err := tx.UpdateBuild(next, build.Version); err != nil {
+			return err
+		}
+		if err := tx.AppendOutbox(OutboxRecord{ID: s.IDs.NewID("evt"), Topic: "build.execution_selected.v2", AggregateID: next.ID, Payload: payload, CreatedAt: now}); err != nil {
+			return err
+		}
+		return tx.AppendAudit(AuditRecord{ID: s.IDs.NewID("aud"), TenantID: next.TenantID, ActorID: actorID, Action: "build.execution.select", ResourceType: "build", ResourceID: next.ID, Data: payload, CreatedAt: now})
 	})
+	if err == nil {
+		*build = next
+	}
+	return err
 }
 
 func (s *Service) builderForBackend(backend domain.ExecutionBackend) Builder {
@@ -435,6 +594,20 @@ func (s *Service) builderForBackend(backend domain.ExecutionBackend) Builder {
 	default:
 		return nil
 	}
+}
+
+func (s *Service) executionBuilder(backend domain.ExecutionBackend) (Builder, error) {
+	builder := s.builderForBackend(backend)
+	if builder == nil {
+		return nil, domain.NewError(domain.CodeUnavailable, "selected build backend is unavailable")
+	}
+	if backend == domain.ExecutionDockerfile {
+		isolated, ok := builder.(IsolatedBuilder)
+		if !ok || isolated.IsolationBoundary() != IsolationDisposableWorkspaceVM {
+			return nil, domain.NewError(domain.CodePolicyRejected, "Dockerfile execution requires the disposable workspace VM boundary")
+		}
+	}
+	return builder, nil
 }
 
 func (s *Service) advance(ctx context.Context, build *domain.Build, state buildv1.BuildState) error {

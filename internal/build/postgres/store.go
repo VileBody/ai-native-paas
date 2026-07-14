@@ -17,6 +17,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/build/application"
 	"github.com/keir-research/ai-native-paas/internal/build/domain"
 	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
+	buildv2 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v2"
 )
 
 //go:embed migrations/*.sql
@@ -168,8 +169,20 @@ func scanBuild(row interface{ Scan(...any) error }) (domain.Build, error) {
 	if err := json.Unmarshal(sourceRaw, &value.Source); err != nil {
 		return value, fmt.Errorf("decode source revision: %w", err)
 	}
-	if err := json.Unmarshal(configRaw, &value.Config); err != nil {
+	var stored persistedBuildConfig
+	if err := json.Unmarshal(configRaw, &stored); err != nil {
 		return value, fmt.Errorf("decode build config: %w", err)
+	}
+	value.Config = stored.BuildConfig
+	value.RequestContract = stored.RequestContract
+	value.BuildSpec = stored.BuildSpec
+	value.BuildSpecDigest = stored.BuildSpecDigest
+	if stored.AutoDetectionAllowed != nil {
+		value.AutoDetectionAllowed = *stored.AutoDetectionAllowed
+	}
+	if value.RequestContract == "" {
+		value.RequestContract = domain.LegacyBuildContract
+		value.AutoDetectionAllowed = true
 	}
 	value.State = buildv1.BuildState(state)
 	value.Backend = domain.ExecutionBackend(backend)
@@ -183,6 +196,17 @@ func scanBuild(row interface{ Scan(...any) error }) (domain.Build, error) {
 		value.CompletedAt = completedAt.Time
 	}
 	return value, nil
+}
+
+// persistedBuildConfig keeps additive request metadata in the existing
+// immutable config JSONB. Anonymous embedding preserves the original flat v1
+// representation, so databases created before v2 remain readable.
+type persistedBuildConfig struct {
+	domain.BuildConfig
+	RequestContract      string             `json:"_request_contract,omitempty"`
+	BuildSpec            *buildv2.BuildSpec `json:"_build_spec,omitempty"`
+	BuildSpecDigest      string             `json:"_build_spec_digest,omitempty"`
+	AutoDetectionAllowed *bool              `json:"_auto_detection_allowed,omitempty"`
 }
 
 func (a *txAdapter) GetBuild(id string) (domain.Build, bool) {
@@ -208,7 +232,19 @@ func encodeBuild(value domain.Build) ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	configRaw, err := json.Marshal(value.Config)
+	// Preserve the byte-level JSONB shape of pre-v2 rows. The database treats
+	// config as immutable, so enriching a legacy row during a state transition
+	// would correctly be rejected as an identity mutation.
+	if value.RequestContract == domain.LegacyBuildContract && value.BuildSpec == nil && value.BuildSpecDigest == "" && value.AutoDetectionAllowed {
+		configRaw, err := json.Marshal(value.Config)
+		return sourceRaw, configRaw, err
+	}
+	autoDetectionAllowed := value.AutoDetectionAllowed
+	configRaw, err := json.Marshal(persistedBuildConfig{
+		BuildConfig: value.Config, RequestContract: value.RequestContract,
+		BuildSpec: value.BuildSpec, BuildSpecDigest: value.BuildSpecDigest,
+		AutoDetectionAllowed: &autoDetectionAllowed,
+	})
 	return sourceRaw, configRaw, err
 }
 

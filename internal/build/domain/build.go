@@ -5,8 +5,11 @@ import (
 	"time"
 
 	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
+	buildv2 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v2"
 	sourcev1 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v1"
 )
+
+const LegacyBuildContract = "build.platform.example.com/v1"
 
 type ExecutionBackend string
 
@@ -24,6 +27,10 @@ type Build struct {
 	BuilderDigest         string
 	RunImageDigest        string
 	PlatformBuildVersion  string
+	RequestContract       string
+	BuildSpec             *buildv2.BuildSpec
+	BuildSpecDigest       string
+	AutoDetectionAllowed  bool
 	Runtime               string
 	Backend               ExecutionBackend
 	BuildpackID           string
@@ -54,9 +61,44 @@ func NewBuild(id, tenantID, identity, correlationID string, source sourcev1.Sour
 	return Build{
 		ID: id, TenantID: tenantID, Identity: identity, Source: source, Config: config,
 		BuilderDigest: builderDigest, RunImageDigest: runImageDigest, PlatformBuildVersion: platformVersion,
+		RequestContract: LegacyBuildContract, AutoDetectionAllowed: true,
 		State: buildv1.BuildQueued, CorrelationID: correlationID, OriginalCorrelationID: correlationID,
 		Attempt: 1, Version: 1, CreatedAt: now.UTC(), UpdatedAt: now.UTC(),
 	}, nil
+}
+
+// ConfigureV2Request attaches the immutable v2 execution contract before the
+// build is inserted. An explicit spec and runtime detection are deliberately
+// mutually exclusive; a missing spec is accepted only as an opted-in fallback.
+func (b *Build) ConfigureV2Request(spec *buildv2.BuildSpec, allowAutoDetection bool) error {
+	if b.State != buildv1.BuildQueued || b.Version != 1 {
+		return NewError(CodeConflict, "v2 build contract can only be attached before persistence")
+	}
+	b.RequestContract = buildv2.APIVersion
+	if spec == nil {
+		if !allowAutoDetection {
+			return NewError(CodeInvalidArgument, "explicit build spec or auto-detection permission is required")
+		}
+		b.BuildSpec = nil
+		b.BuildSpecDigest = ""
+		b.AutoDetectionAllowed = true
+		return nil
+	}
+	if allowAutoDetection {
+		return NewError(CodeInvalidArgument, "explicit build spec cannot enable auto-detection")
+	}
+	canonical, err := spec.Canonical()
+	if err != nil {
+		return NewError(CodeInvalidArgument, "invalid canonical build specification")
+	}
+	digest, err := canonical.Fingerprint()
+	if err != nil {
+		return Wrap(CodePlatformFailure, "fingerprint build specification", err)
+	}
+	b.BuildSpec = &canonical
+	b.BuildSpecDigest = digest
+	b.AutoDetectionAllowed = false
+	return nil
 }
 
 func (b Build) Terminal() bool {
@@ -195,7 +237,27 @@ func (b Build) Retry(newID, correlationID string, now time.Time) (Build, error) 
 	}
 	retry.OriginalCorrelationID = b.OriginalCorrelationID
 	retry.Attempt = b.Attempt + 1
+	retry.RequestContract = b.RequestContract
+	retry.BuildSpec = cloneBuildSpec(b.BuildSpec)
+	retry.BuildSpecDigest = b.BuildSpecDigest
+	retry.AutoDetectionAllowed = b.AutoDetectionAllowed
 	return retry, nil
+}
+
+func cloneBuildSpec(spec *buildv2.BuildSpec) *buildv2.BuildSpec {
+	if spec == nil {
+		return nil
+	}
+	copySpec := *spec
+	copySpec.Platforms = append([]string(nil), spec.Platforms...)
+	copySpec.SecretRefs = append([]string(nil), spec.SecretRefs...)
+	if spec.BuildArguments != nil {
+		copySpec.BuildArguments = make(map[string]string, len(spec.BuildArguments))
+		for key, value := range spec.BuildArguments {
+			copySpec.BuildArguments[key] = value
+		}
+	}
+	return &copySpec
 }
 
 func truncate(v string, limit int) string {

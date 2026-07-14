@@ -28,6 +28,9 @@ func buildAuth(request *http.Request, tenantID string) {
 func requestBody() string {
 	return `{"source":{"project_id":"project-1","repository_id":"repo-1","branch":"main","commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"config":{},"builder_digest":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","run_image_digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","platform_version":"v1"}`
 }
+func requestV2Body() string {
+	return `{"source":{"project_id":"project-1","repository_id":"repo-1","branch":"main","commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"spec":{"source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","driver":"dockerfile","definition_path":"Dockerfile","platforms":["linux/amd64"],"network_profile":"governed","cache_scope":"project-1","resource_class":"standard","timeout_seconds":900},"builder_digest":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","run_image_digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","platform_version":"v2"}`
+}
 func TestHTTP_BuildHealth(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	buildAPI().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/healthz", nil))
@@ -55,6 +58,24 @@ func TestHTTP_RequestAndGetBuild(t *testing.T) {
 	handler.ServeHTTP(out, get)
 	if out.Code != http.StatusOK {
 		t.Fatalf("get status=%d body=%s", out.Code, out.Body.String())
+	}
+}
+func TestHTTP_RequestV2PersistsExplicitBuildSpec(t *testing.T) {
+	handler := buildAPI()
+	request := httptest.NewRequest(http.MethodPost, "/v2/organizations/tenant-1/builds", strings.NewReader(requestV2Body()))
+	buildAuth(request, "tenant-1")
+	request.Header.Set("Idempotency-Key", "request-v2")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var result application.RequestBuildResult
+	if err := json.Unmarshal(recorder.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Build.BuildSpec == nil || result.Build.BuildSpecDigest == "" || result.Build.AutoDetectionAllowed {
+		t.Fatalf("build=%+v", result.Build)
 	}
 }
 func TestHTTP_BuildTenantIsDerivedFromPath(t *testing.T) {

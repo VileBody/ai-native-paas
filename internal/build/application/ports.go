@@ -7,6 +7,7 @@ import (
 
 	"github.com/keir-research/ai-native-paas/internal/build/domain"
 	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
+	buildv2 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v2"
 	sourcev1 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v1"
 )
 
@@ -120,6 +121,7 @@ type BuildExecutionRequest struct {
 	Source         SourceSnapshot
 	Detection      Detection
 	Config         domain.BuildConfig
+	BuildSpec      *buildv2.BuildSpec
 	Environment    map[string]string
 	Secrets        []BuildSecret
 	LogWriter      io.Writer
@@ -128,6 +130,18 @@ type BuildExecutionRequest struct {
 type Builder interface {
 	Build(context.Context, BuildExecutionRequest) (BuildOutput, error)
 	Cancel(context.Context, string) error
+}
+
+type IsolationBoundary string
+
+const IsolationDisposableWorkspaceVM IsolationBoundary = "disposable-workspace-vm"
+
+// IsolatedBuilder is a fail-closed capability declaration. Merely registering
+// a Dockerfile builder is insufficient: the adapter must prove that untrusted
+// instructions execute across the disposable workspace boundary.
+type IsolatedBuilder interface {
+	Builder
+	IsolationBoundary() IsolationBoundary
 }
 
 type PublishedArtifact struct {

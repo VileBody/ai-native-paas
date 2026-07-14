@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/build/memory"
 	"github.com/keir-research/ai-native-paas/internal/build/testkit"
 	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
+	buildv2 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v2"
 	sourcev1 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v1"
 )
 
@@ -38,6 +40,126 @@ func setup(t *testing.T) (*application.Service, *testkit.Builder, *testkit.Regis
 }
 func command(key string) application.RequestBuildCommand {
 	return application.RequestBuildCommand{TenantID: "t1", ActorID: "u1", CorrelationID: "cor-1", IdempotencyKey: key, Source: sourcev1.SourceRevision{ProjectID: "p1", RepositoryID: "r1", Branch: "main", CommitSHA: strings.Repeat("d", 40)}, Config: domain.BuildConfig{}, BuilderDigest: dg("e"), RunImageDigest: dg("f"), PlatformVersion: "v1"}
+}
+
+func explicitDockerfileCommand(key string) application.RequestBuildV2Command {
+	sha := strings.Repeat("d", 40)
+	spec := &buildv2.BuildSpec{
+		SourceSHA: sha, Driver: buildv2.DriverDockerfile, DefinitionPath: "Dockerfile",
+		Platforms: []string{"linux/amd64"}, NetworkProfile: "governed",
+		CacheScope: "project-p1", ResourceClass: "standard", TimeoutSeconds: 900,
+	}
+	return application.RequestBuildV2Command{
+		TenantID: "t1", ActorID: "u1", CorrelationID: "cor-v2", IdempotencyKey: key,
+		Source: sourcev1.SourceRevision{ProjectID: "p1", RepositoryID: "r1", Branch: "main", CommitSHA: sha}, Spec: spec,
+		BuilderDigest: dg("e"), RunImageDigest: dg("f"), PlatformVersion: "v2",
+	}
+}
+
+func TestBuild_ExplicitBuildSpecOverridesRuntimeDetection(t *testing.T) {
+	s, _, _, _, _ := setup(t)
+	detector := s.Detector.(*testkit.Detector)
+	detector.Detection = application.Detection{Runtime: "go", Backend: application.BackendBuildpacks, BuildpackID: "paketo/go", Evidence: []string{"go.mod", "package.json"}}
+	dockerfile := &testkit.Builder{Output: application.BuildOutput{ManifestDigest: dg("a"), MediaType: "application/vnd.oci.image.manifest.v1+json"}}
+	s.Dockerfile = &testkit.IsolatedBuilder{Builder: dockerfile, Isolation: application.IsolationDisposableWorkspaceVM}
+
+	requested, err := s.RequestBuildV2(context.Background(), explicitDockerfileCommand("explicit-dockerfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	build, _, err := s.RunBuild(context.Background(), "t1", "u1", requested.Build.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detector.Calls != 0 || build.Backend != domain.ExecutionDockerfile || build.BuildSpec == nil || build.BuildSpecDigest == "" {
+		t.Fatalf("detector calls=%d build=%+v", detector.Calls, build)
+	}
+	request, ok := dockerfile.LastRequest()
+	if !ok || request.BuildSpec == nil || request.BuildSpec.Driver != buildv2.DriverDockerfile || request.Detection.Backend != application.BackendDockerfile {
+		t.Fatalf("request=%+v ok=%v", request, ok)
+	}
+}
+
+func TestBuild_BuildpacksRemainOptionalFallback(t *testing.T) {
+	s, buildpacks, _, _, _ := setup(t)
+	detector := s.Detector.(*testkit.Detector)
+	detector.Detection.Evidence = []string{"go.mod"}
+	cmd := explicitDockerfileCommand("auto-buildpacks")
+	cmd.Spec = nil
+	cmd.AllowAutoDetection = true
+
+	requested, err := s.RequestBuildV2(context.Background(), cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	build, _, err := s.RunBuild(context.Background(), "t1", "u1", requested.Build.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detector.Calls != 1 || build.Backend != domain.ExecutionBuildpacks || build.BuildpackID != "paketo/go" || len(buildpacks.Requests) != 1 {
+		t.Fatalf("detector calls=%d build=%+v requests=%d", detector.Calls, build, len(buildpacks.Requests))
+	}
+	persisted, _, err := s.GetBuild(context.Background(), "t1", build.ID)
+	if err != nil || persisted.Backend != domain.ExecutionBuildpacks || persisted.BuildpackID != "paketo/go" || !persisted.AutoDetectionAllowed {
+		t.Fatalf("persisted=%+v err=%v", persisted, err)
+	}
+	_, _, _, audit := s.Store.(*memory.Store).Snapshot()
+	var selection map[string]any
+	for _, record := range audit {
+		if record.Action == "build.execution.select" && record.ResourceID == build.ID {
+			if err := json.Unmarshal(record.Data, &selection); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if selection["selection_source"] != "runtime-detector" || selection["backend"] != string(application.BackendBuildpacks) {
+		t.Fatalf("selection audit=%v", selection)
+	}
+}
+
+func TestBuild_DockerfileRunsOnlyInDisposableIsolationBackend(t *testing.T) {
+	s, _, _, _, _ := setup(t)
+	unisolated := &testkit.Builder{Output: application.BuildOutput{ManifestDigest: dg("a"), MediaType: "application/vnd.oci.image.manifest.v1+json"}}
+	s.Dockerfile = unisolated
+	requested, err := s.RequestBuildV2(context.Background(), explicitDockerfileCommand("reject-shared-builder"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	build, _, err := s.RunBuild(context.Background(), "t1", "u1", requested.Build.ID)
+	if !domain.HasCode(err, domain.CodePolicyRejected) || build.Backend != domain.ExecutionDockerfile || build.State != buildv1.BuildFailedUserCode {
+		t.Fatalf("build=%+v err=%v", build, err)
+	}
+	if len(unisolated.Requests) != 0 {
+		t.Fatalf("unisolated Dockerfile builder was invoked: %+v", unisolated.Requests)
+	}
+}
+
+func TestBuildV2_RequiresExclusiveExplicitOrBuildpacksFallback(t *testing.T) {
+	s, _, _, _, _ := setup(t)
+	missing := explicitDockerfileCommand("missing-mode")
+	missing.Spec = nil
+	if _, err := s.RequestBuildV2(context.Background(), missing); !domain.HasCode(err, domain.CodeInvalidArgument) {
+		t.Fatalf("missing mode err=%v", err)
+	}
+	both := explicitDockerfileCommand("both-modes")
+	both.AllowAutoDetection = true
+	if _, err := s.RequestBuildV2(context.Background(), both); !domain.HasCode(err, domain.CodeInvalidArgument) {
+		t.Fatalf("both modes err=%v", err)
+	}
+
+	detector := s.Detector.(*testkit.Detector)
+	detector.Detection = application.Detection{Runtime: "dockerfile", Backend: application.BackendDockerfile, Evidence: []string{"Dockerfile"}}
+	implicitDockerfile := explicitDockerfileCommand("implicit-dockerfile")
+	implicitDockerfile.Spec = nil
+	implicitDockerfile.AllowAutoDetection = true
+	requested, err := s.RequestBuildV2(context.Background(), implicitDockerfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	build, _, err := s.RunBuild(context.Background(), "t1", "u1", requested.Build.ID)
+	if !domain.HasCode(err, domain.CodePolicyRejected) || build.State != buildv1.BuildFailedUserCode || build.Backend != "" {
+		t.Fatalf("build=%+v err=%v", build, err)
+	}
 }
 func TestBuildRequest_ConcurrentDuplicateCreatesOneBuild(t *testing.T) {
 	s, _, _, _, _ := setup(t)
