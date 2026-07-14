@@ -11,6 +11,8 @@ import (
 	"io/fs"
 	"sort"
 	"strings"
+
+	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 )
 
 //go:embed migrations/*.sql
@@ -23,6 +25,27 @@ func NewPostgresResolver(db *sql.DB) (*PostgresResolver, error) {
 		return nil, errors.New("identity postgres db is nil")
 	}
 	return &PostgresResolver{DB: db}, nil
+}
+
+// NewPostgresVerifier is the shared production bootstrap for human identity.
+// It serializes the membership schema migration before OIDC discovery so every
+// API replica observes the same durable controlled-beta membership source.
+func NewPostgresVerifier(ctx context.Context, db *sql.DB, issuer, clientID string) (*Verifier, error) {
+	if strings.TrimSpace(issuer) == "" || strings.TrimSpace(clientID) == "" {
+		return nil, errors.New("OIDC issuer and client id are required")
+	}
+	resolver, err := NewPostgresResolver(db)
+	if err != nil {
+		return nil, err
+	}
+	if err := postgresbootstrap.WithMigrationLock(ctx, db, "platform-identity", resolver.Migrate); err != nil {
+		return nil, fmt.Errorf("bootstrap OIDC memberships: %w", err)
+	}
+	verifier, err := New(ctx, issuer, clientID, resolver)
+	if err != nil {
+		return nil, err
+	}
+	return verifier, nil
 }
 
 func (r *PostgresResolver) Migrate(ctx context.Context) error {

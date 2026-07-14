@@ -62,39 +62,33 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
-	db, err := postgresbootstrap.Open(ctx, os.Getenv("DATABASE_URL"))
+	bootstrapCtx, cancelBootstrap := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancelBootstrap()
+	db, err := postgresbootstrap.Open(bootstrapCtx, os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
 	sourceStore := &sourcepostgres.Store{DB: db, MaxSerializableRetries: 32}
-	if err := postgresbootstrap.WithMigrationLock(ctx, db, "source", sourceStore.Migrate); err != nil {
+	if err := postgresbootstrap.WithMigrationLock(bootstrapCtx, db, "source", sourceStore.Migrate); err != nil {
 		log.Fatal(err)
 	}
 	workspaceStore := &workspacepostgres.Store{DB: db}
-	if err := postgresbootstrap.WithMigrationLock(ctx, db, "workspace", workspaceStore.Migrate); err != nil {
+	if err := postgresbootstrap.WithMigrationLock(bootstrapCtx, db, "workspace", workspaceStore.Migrate); err != nil {
 		log.Fatal(err)
 	}
 	infrastructureStore := &infrapostgres.Store{DB: db}
-	if err := postgresbootstrap.WithMigrationLock(ctx, db, "infrastructure", infrastructureStore.Migrate); err != nil {
+	if err := postgresbootstrap.WithMigrationLock(bootstrapCtx, db, "infrastructure", infrastructureStore.Migrate); err != nil {
 		log.Fatal(err)
 	}
 	enrollmentStore, err := enrollmentpostgres.New(db)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := postgresbootstrap.WithMigrationLock(ctx, db, "agent-enrollment", enrollmentStore.Migrate); err != nil {
+	if err := postgresbootstrap.WithMigrationLock(bootstrapCtx, db, "agent-enrollment", enrollmentStore.Migrate); err != nil {
 		log.Fatal(err)
 	}
-	memberships, err := oidcverify.NewPostgresResolver(db)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := postgresbootstrap.WithMigrationLock(ctx, db, "platform-identity", memberships.Migrate); err != nil {
-		log.Fatal(err)
-	}
-
 	gitLabToken, err := readSecretFile("GITLAB_ADMIN_TOKEN_FILE", 16<<10)
 	if err != nil {
 		log.Fatal(err)
@@ -136,10 +130,11 @@ func main() {
 		Source: source, Bootstrapper: gitLab, Enrollment: enrollmentService,
 		GitLabNamespaceID: namespaceID, MCPBaseURL: os.Getenv("MCP_BASE_URL"), WorkspaceImageDigest: os.Getenv("WORKSPACE_IMAGE_DIGEST"),
 	}
-	oidcVerifier, err := oidcverify.New(ctx, os.Getenv("OIDC_ISSUER"), os.Getenv("OIDC_CLIENT_ID"), memberships)
+	oidcVerifier, err := oidcverify.NewPostgresVerifier(bootstrapCtx, db, os.Getenv("OIDC_ISSUER"), os.Getenv("OIDC_CLIENT_ID"))
 	if err != nil {
 		log.Fatal(err)
 	}
+	cancelBootstrap()
 
 	projectHandler := projecthttp.Handler{Projects: projects, Infrastructure: infrastructureService, SourceChanges: workspaceService, MaxBodyBytes: 64 << 10}
 	enrollmentHandler := enrollmenthttp.Handler{Enrollment: enrollmentService, MaxBodyBytes: 64 << 10}

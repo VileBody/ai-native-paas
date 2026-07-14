@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
+	"github.com/keir-research/ai-native-paas/internal/identity/oidcverify"
 	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 	"github.com/keir-research/ai-native-paas/internal/source/application"
@@ -26,23 +27,38 @@ func main() {
 	}
 	ctx := context.Background()
 	var (
-		store       application.Store
-		storageName string
-		adapters    []platformprofile.Adapter
+		store        application.Store
+		storageName  string
+		adapters     []platformprofile.Adapter
+		oidcVerifier httpauth.OIDCVerifier
 	)
 	if profile == platformprofile.Production {
-		db, openErr := postgresbootstrap.Open(ctx, os.Getenv("DATABASE_URL"))
+		bootstrapCtx, cancelBootstrap := context.WithTimeout(ctx, 2*time.Minute)
+		defer cancelBootstrap()
+		db, openErr := postgresbootstrap.Open(bootstrapCtx, os.Getenv("DATABASE_URL"))
 		if openErr != nil {
 			log.Fatal(openErr)
 		}
 		defer db.Close()
 		postgresStore := &sourcepostgres.Store{DB: db, MaxSerializableRetries: 8}
-		if migrateErr := postgresbootstrap.WithMigrationLock(ctx, db, "source", postgresStore.Migrate); migrateErr != nil {
+		if migrateErr := postgresbootstrap.WithMigrationLock(bootstrapCtx, db, "source", postgresStore.Migrate); migrateErr != nil {
 			log.Fatal(migrateErr)
 		}
 		store = postgresStore
+		verifier, verifierErr := oidcverify.NewPostgresVerifier(bootstrapCtx, db, os.Getenv("OIDC_ISSUER"), os.Getenv("OIDC_CLIENT_ID"))
+		if verifierErr != nil {
+			log.Fatal(verifierErr)
+		}
+		oidcVerifier = verifier
+		cancelBootstrap()
 		storageName = "postgres"
-		adapters = []platformprofile.Adapter{platformprofile.Prod("source-postgres-store"), platformprofile.Prod("gitlab-api"), platformprofile.Prod("verified-identity-middleware")}
+		adapters = []platformprofile.Adapter{
+			platformprofile.Prod("source-postgres-store"),
+			platformprofile.Prod("gitlab-api"),
+			platformprofile.Prod("oidc-jwks-verifier"),
+			platformprofile.Prod("postgres-membership-resolver"),
+			platformprofile.Prod("verified-identity-middleware"),
+		}
 	} else {
 		store = memory.New()
 		storageName = "memory-development-only"
@@ -60,6 +76,7 @@ func main() {
 	var handler http.Handler = httpapi.Handler{Source: source, Webhooks: hooks}
 	handler = (httpauth.Middleware{
 		Profile:        profile,
+		OIDC:           oidcVerifier,
 		PublicPaths:    map[string]struct{}{`/healthz`: {}},
 		PublicPrefixes: []string{"/hooks/gitlab/"},
 	}).Wrap(handler)

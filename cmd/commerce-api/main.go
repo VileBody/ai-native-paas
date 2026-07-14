@@ -18,6 +18,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/commerce/memory"
 	commercepostgres "github.com/keir-research/ai-native-paas/internal/commerce/postgres"
 	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
+	"github.com/keir-research/ai-native-paas/internal/identity/oidcverify"
 	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 )
@@ -54,12 +55,15 @@ func main() {
 	defer stop()
 
 	var (
-		store       application.Store
-		storageName string
-		adapters    []platformprofile.Adapter
+		store        application.Store
+		storageName  string
+		adapters     []platformprofile.Adapter
+		oidcVerifier httpauth.OIDCVerifier
 	)
 	if profile == platformprofile.Production {
-		db, openErr := postgresbootstrap.Open(ctx, os.Getenv("DATABASE_URL"))
+		bootstrapCtx, cancelBootstrap := context.WithTimeout(ctx, 2*time.Minute)
+		defer cancelBootstrap()
+		db, openErr := postgresbootstrap.Open(bootstrapCtx, os.Getenv("DATABASE_URL"))
 		if openErr != nil {
 			log.Fatal(openErr)
 		}
@@ -68,12 +72,24 @@ func main() {
 		if storeErr != nil {
 			log.Fatal(storeErr)
 		}
-		if migrateErr := postgresbootstrap.WithMigrationLock(ctx, db, "commerce", postgresStore.Migrate); migrateErr != nil {
+		if migrateErr := postgresbootstrap.WithMigrationLock(bootstrapCtx, db, "commerce", postgresStore.Migrate); migrateErr != nil {
 			log.Fatal(migrateErr)
 		}
 		store = postgresStore
+		verifier, verifierErr := oidcverify.NewPostgresVerifier(bootstrapCtx, db, os.Getenv("OIDC_ISSUER"), os.Getenv("OIDC_CLIENT_ID"))
+		if verifierErr != nil {
+			log.Fatal(verifierErr)
+		}
+		oidcVerifier = verifier
+		cancelBootstrap()
 		storageName = "postgres"
-		adapters = []platformprofile.Adapter{platformprofile.Prod("commerce-postgres-store"), platformprofile.Prod("verified-identity-middleware"), platformprofile.Prod("deny-by-default-ownership")}
+		adapters = []platformprofile.Adapter{
+			platformprofile.Prod("commerce-postgres-store"),
+			platformprofile.Prod("oidc-jwks-verifier"),
+			platformprofile.Prod("postgres-membership-resolver"),
+			platformprofile.Prod("verified-identity-middleware"),
+			platformprofile.Prod("deny-by-default-ownership"),
+		}
 	} else {
 		store = memory.New()
 		storageName = "memory-development-only"
@@ -96,7 +112,7 @@ func main() {
 		Ownership: ownership, DriftAlertThreshold: 60,
 	}
 	var handler http.Handler = httpapi.Handler{Commerce: service, MaxBodyBytes: 2 << 20}
-	handler = (httpauth.Middleware{Profile: profile, PublicPaths: map[string]struct{}{`/healthz`: {}}}).Wrap(handler)
+	handler = (httpauth.Middleware{Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}}}).Wrap(handler)
 	server := &http.Server{
 		Addr:              env("COMMERCE_API_ADDR", ":8084"),
 		Handler:           handler,

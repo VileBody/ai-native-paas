@@ -32,3 +32,29 @@ func TestEveryEntrypointDeclaresProductionAdapterInventory(t *testing.T) {
 		}
 	}
 }
+
+func TestProductionHumanAPIEntrypointsBootstrapPostgresOIDC(t *testing.T) {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve repository root")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", ".."))
+	for _, api := range []string{"commerce-api", "kernel-api", "project-api", "source-api"} {
+		raw, err := os.ReadFile(filepath.Join(root, "cmd", api, "main.go"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		source := string(raw)
+		for _, required := range []string{
+			"oidcverify.NewPostgresVerifier(",
+			"OIDC:",
+			"oidcVerifier",
+			"oidc-jwks-verifier",
+			"postgres-membership-resolver",
+		} {
+			if !strings.Contains(source, required) {
+				t.Errorf("%s does not wire production identity component %q", api, required)
+			}
+		}
+	}
+}

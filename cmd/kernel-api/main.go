@@ -12,6 +12,7 @@ import (
 
 	kernelpostgres "github.com/keir-research/ai-native-paas/adapters/postgres/kernel"
 	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
+	"github.com/keir-research/ai-native-paas/internal/identity/oidcverify"
 	"github.com/keir-research/ai-native-paas/internal/kernel"
 	"github.com/keir-research/ai-native-paas/internal/kernel/httpapi"
 	"github.com/keir-research/ai-native-paas/internal/kernel/memory"
@@ -30,9 +31,10 @@ func main() {
 	defer stop()
 
 	var (
-		store       kernel.Store
-		storageName string
-		adapters    []platformprofile.Adapter
+		store        kernel.Store
+		storageName  string
+		adapters     []platformprofile.Adapter
+		oidcVerifier httpauth.OIDCVerifier
 	)
 	if profile == platformprofile.Production {
 		bootstrapCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
@@ -50,8 +52,23 @@ func main() {
 			os.Exit(1)
 		}
 		store, err = kernelpostgres.NewStore(db)
+		if err != nil {
+			logger.Error("initialize kernel store", "error", err)
+			os.Exit(1)
+		}
+		verifier, verifierErr := oidcverify.NewPostgresVerifier(bootstrapCtx, db, os.Getenv("OIDC_ISSUER"), os.Getenv("OIDC_CLIENT_ID"))
+		if verifierErr != nil {
+			logger.Error("initialize OIDC identity", "error", verifierErr)
+			os.Exit(1)
+		}
+		oidcVerifier = verifier
 		storageName = "postgres"
-		adapters = []platformprofile.Adapter{platformprofile.Prod("kernel-postgres-store"), platformprofile.Prod("verified-identity-middleware")}
+		adapters = []platformprofile.Adapter{
+			platformprofile.Prod("kernel-postgres-store"),
+			platformprofile.Prod("oidc-jwks-verifier"),
+			platformprofile.Prod("postgres-membership-resolver"),
+			platformprofile.Prod("verified-identity-middleware"),
+		}
 	} else {
 		store = memory.NewStore()
 		storageName = "memory-development-only"
@@ -83,6 +100,7 @@ func main() {
 	}
 	handler = (httpauth.Middleware{
 		Profile: profile,
+		OIDC:    oidcVerifier,
 		PublicPaths: map[string]struct{}{
 			"/healthz": {},
 		},
