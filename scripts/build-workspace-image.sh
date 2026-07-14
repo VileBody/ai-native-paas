@@ -62,6 +62,7 @@ mkdir -p "$package_downloads" "$package_status"
 virt-copy-out -a "$base" /var/lib/dpkg/status "$package_status"
 docker run --rm --platform linux/amd64 \
   --mount "type=bind,source=$PWD/infra/images/workspace/debian-snapshot.sources,target=/etc/apt/sources.list.d/debian.sources,readonly" \
+  --mount "type=bind,source=/etc/ssl/certs,target=/etc/ssl/certs,readonly" \
   --mount "type=bind,source=$package_status/status,target=/var/lib/dpkg/status,readonly" \
   --mount "type=bind,source=$package_downloads,target=/out" \
   "$package_resolver_image" /bin/bash -euxo pipefail -c '
