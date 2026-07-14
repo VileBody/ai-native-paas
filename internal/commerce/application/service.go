@@ -73,6 +73,23 @@ type ApplySettlementResult struct {
 	Reservation commercev1.QuotaReservation
 }
 
+type ProviderUsageReport struct {
+	TenantID        string
+	ProjectID       string
+	OperationID     string
+	Provider        string
+	ProviderEventID string
+	PeriodID        string
+	ResourceType    string
+	ResourceID      string
+	Meter           commercev1.Meter
+	Quantity        int64
+	OccurredAt      time.Time
+	WindowStart     time.Time
+	WindowEnd       time.Time
+	Metadata        map[string]string
+}
+
 func (s *Service) CreatePlanDefinition(ctx context.Context, cmd CreatePlanDefinitionCommand) (domain.PlanDefinition, error) {
 	if err := s.require(); err != nil {
 		return domain.PlanDefinition{}, err
@@ -388,7 +405,7 @@ func (s *Service) SettleApplyReservation(ctx context.Context, cmd SettleApplyRes
 			return ApplySettlementResult{}, domain.NewError(domain.CodeInvalidArgument, "observed resource allocation is duplicated")
 		}
 		seen[identity] = struct{}{}
-		owned, err := s.ownership().Owns(ctx, cmd.TenantID, item.ResourceType, item.ExternalIdentity)
+		owned, err := s.ownsProject(ctx, cmd.TenantID, cmd.ProjectID, item.ResourceType, item.ExternalIdentity)
 		if err != nil {
 			return ApplySettlementResult{}, domain.Wrap(domain.CodeUnavailable, "resource ownership unavailable", err)
 		}
@@ -494,6 +511,78 @@ func applySettlementResult(settlementID string, cmd SettleApplyReservationComman
 		},
 		Reservation: reservation.Contract(),
 	}
+}
+
+func (s *Service) IngestProviderUsage(ctx context.Context, report ProviderUsageReport) (commercev2.UsageFact, error) {
+	if err := s.require(); err != nil {
+		return commercev2.UsageFact{}, err
+	}
+	report.TenantID = strings.TrimSpace(report.TenantID)
+	report.ProjectID = strings.TrimSpace(report.ProjectID)
+	report.OperationID = strings.TrimSpace(report.OperationID)
+	report.Provider = strings.TrimSpace(report.Provider)
+	report.ProviderEventID = strings.TrimSpace(report.ProviderEventID)
+	report.PeriodID = strings.TrimSpace(report.PeriodID)
+	report.ResourceType = strings.TrimSpace(report.ResourceType)
+	report.ResourceID = strings.TrimSpace(report.ResourceID)
+	report.OccurredAt = report.OccurredAt.UTC()
+	report.WindowStart = report.WindowStart.UTC()
+	report.WindowEnd = report.WindowEnd.UTC()
+	report.Metadata = cloneStringMap(report.Metadata)
+	if report.TenantID == "" || report.ProjectID == "" || report.OperationID == "" || report.Provider == "" || report.ProviderEventID == "" || report.ResourceType == "" || report.ResourceID == "" || !commercev1.ValidMeter(report.Meter) || report.Quantity <= 0 || report.OccurredAt.IsZero() || !report.WindowStart.Before(report.WindowEnd) {
+		return commercev2.UsageFact{}, domain.NewError(domain.CodeInvalidArgument, "provider usage report is invalid")
+	}
+	owned, err := s.ownsProject(ctx, report.TenantID, report.ProjectID, report.ResourceType, report.ResourceID)
+	if err != nil {
+		return commercev2.UsageFact{}, domain.Wrap(domain.CodeUnavailable, "project resource ownership unavailable", err)
+	}
+	if !owned {
+		return commercev2.UsageFact{}, domain.NewError(domain.CodePermissionDenied, "provider usage resource is not owned by project")
+	}
+	deduplicationKey := "provider-report:" + fingerprint(struct {
+		Provider string
+		EventID  string
+	}{report.Provider, report.ProviderEventID})
+	metadata := report.Metadata
+	if metadata == nil {
+		metadata = map[string]string{}
+	}
+	metadata["project_id"] = report.ProjectID
+	metadata["operation_id"] = report.OperationID
+	metadata["provider"] = report.Provider
+	metadata["provider_event_id"] = report.ProviderEventID
+	event, err := s.normalizeUsage(ctx, commercev1.UsageEvent{
+		TenantID: report.TenantID, PeriodID: report.PeriodID, ResourceType: report.ResourceType, ResourceID: report.ResourceID,
+		Meter: report.Meter, Kind: commercev1.UsageStandard, Quantity: report.Quantity, IdempotencyKey: deduplicationKey,
+		OccurredAt: report.OccurredAt, WindowStart: report.WindowStart, WindowEnd: report.WindowEnd, Metadata: metadata,
+	})
+	if err != nil {
+		return commercev2.UsageFact{}, err
+	}
+	var stored commercev1.UsageEvent
+	err = s.Store.Transact(ctx, func(tx Tx) error {
+		if err := s.appendUsageTx(tx, event); err != nil {
+			return err
+		}
+		var ok bool
+		stored, ok = tx.FindUsageByKey(report.TenantID, deduplicationKey)
+		if !ok {
+			return domain.NewError(domain.CodeInternal, "provider usage fact was not persisted")
+		}
+		return nil
+	})
+	if err != nil {
+		return commercev2.UsageFact{}, err
+	}
+	fact := commercev2.UsageFact{
+		UsageID: stored.ID, ProjectID: report.ProjectID, OperationID: report.OperationID,
+		Provider: report.Provider, ProviderEventID: report.ProviderEventID, Meter: string(stored.Meter),
+		Quantity: stored.Quantity, DeduplicationKey: stored.IdempotencyKey, OccurredAt: stored.OccurredAt,
+	}
+	if err := fact.Validate(); err != nil {
+		return commercev2.UsageFact{}, domain.Wrap(domain.CodeInternal, "invalid provider usage fact", err)
+	}
+	return fact, nil
 }
 func (s *Service) Commit(ctx context.Context, id string) error {
 	return s.transitionQuota(ctx, id, true)

@@ -118,10 +118,19 @@ type UsageFact struct {
 	UsageID          string    `json:"usage_id"`
 	ProjectID        string    `json:"project_id"`
 	OperationID      string    `json:"operation_id"`
+	Provider         string    `json:"provider"`
+	ProviderEventID  string    `json:"provider_event_id"`
 	Meter            string    `json:"meter"`
 	Quantity         int64     `json:"quantity"`
 	DeduplicationKey string    `json:"deduplication_key"`
 	OccurredAt       time.Time `json:"occurred_at"`
+}
+
+func (f UsageFact) Validate() error {
+	if strings.TrimSpace(f.UsageID) == "" || strings.TrimSpace(f.ProjectID) == "" || strings.TrimSpace(f.OperationID) == "" || strings.TrimSpace(f.Provider) == "" || strings.TrimSpace(f.ProviderEventID) == "" || strings.TrimSpace(f.Meter) == "" || f.Quantity < 0 || strings.TrimSpace(f.DeduplicationKey) == "" || f.OccurredAt.IsZero() {
+		return errors.New("invalid provider usage fact")
+	}
+	return nil
 }
 
 type SettlementState string

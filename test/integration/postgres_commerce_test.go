@@ -287,6 +287,40 @@ func TestPostgres_CommercePartialApplySettlementIsAtomicAndIdempotent(t *testing
 	}
 }
 
+func TestUsage_ProviderReportReplayDoesNotDoubleCharge(t *testing.T) {
+	f := newPostgresCommerceFixture(t)
+	report := application.ProviderUsageReport{
+		TenantID: "tenant-1", ProjectID: "project-1", OperationID: "operation-provider-usage",
+		Provider: "cozystack", ProviderEventID: "provider-event-42", PeriodID: f.period.ID,
+		ResourceType: "managed-database", ResourceID: "cozystack:postgresql/project-1/main",
+		Meter: commercev1.MeterDatabasePlanSeconds, Quantity: 3600, OccurredAt: f.clock.Now(),
+		WindowStart: f.clock.Now().Add(-time.Hour), WindowEnd: f.clock.Now(),
+	}
+	first, err := f.svc.IngestProviderUsage(context.Background(), report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := f.svc.IngestProviderUsage(context.Background(), report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.UsageID != second.UsageID || first.ProviderEventID != report.ProviderEventID || first.ProjectID != report.ProjectID || first.OperationID != report.OperationID {
+		t.Fatalf("provider replay changed usage identity: first=%#v second=%#v", first, second)
+	}
+	var count int
+	if err := f.db.QueryRow(`SELECT count(*) FROM commerce.usage_events WHERE tenant_id=$1 AND idempotency_key=$2`, report.TenantID, first.DeduplicationKey).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("provider usage report replay created %d charges", count)
+	}
+	changed := report
+	changed.Quantity++
+	if _, err := f.svc.IngestProviderUsage(context.Background(), changed); !domain.HasCode(err, domain.CodeConflict) {
+		t.Fatalf("same provider event with changed usage was accepted: %v", err)
+	}
+}
+
 func TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget(t *testing.T) {
 	f := newPostgresCommerceFixture(t)
 	const (

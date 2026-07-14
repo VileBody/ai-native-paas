@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **994**
-- Reused now: **105**
+- Discovered Go tests/fuzz targets: **995**
+- Reused now: **106**
 - New local/contract tests required: **0**
-- Live/provider/system tests required: **52**
+- Live/provider/system tests required: **51**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -119,7 +119,7 @@ A release gate may become green only after every referenced test exists and pass
 | `C6` | REUSED | PostgreSQL + race | `test/integration/postgres_commerce_test.go::TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget` |
 | `C7` | REUSED | domain/fake clock | `test/pivot/commerce_v2_test.go::TestQuota_ExpiredReservationCannotAuthorizeLateApply` |
 | `C8` | REUSED | application/provider | `test/pivot/commerce_v2_test.go::TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder` |
-| `C9` | LIVE_ONLY | integration | `test/pivot/commerce_v2_test.go::TestUsage_ProviderReportReplayDoesNotDoubleCharge` |
+| `C9` | REUSED | integration | `test/integration/postgres_commerce_test.go::TestUsage_ProviderReportReplayDoesNotDoubleCharge` |
 | `C10` | LIVE_ONLY | capability gateway integration | `test/pivot/commerce_v2_test.go::TestUsage_OpenRouterTokensAreAttributedToProjectTaskAndModel` |
 | `C11` | REUSED | rating | `internal/commerce/application/commercial_tdd_test.go::TestUsage_ApifyAndBrightDataMetersRemainProviderSpecificButInvoiceStable` |
 | `C12` | REUSED | workspace/commerce integration | `test/pivot/commerce_v2_test.go::TestBudget_WorkspaceCommandStoppedBeforeExceedingHardLimit` |

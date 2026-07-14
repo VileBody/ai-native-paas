@@ -13,15 +13,24 @@ type IDGenerator interface{ NewID(prefix string) string }
 type ResourceOwnership interface {
 	Owns(ctx context.Context, tenantID, resourceType, resourceID string) (bool, error)
 }
+type ProjectResourceOwnership interface {
+	OwnsProject(ctx context.Context, tenantID, projectID, resourceType, resourceID string) (bool, error)
+}
 type AllowAllOwnership struct{}
 
 func (AllowAllOwnership) Owns(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+func (AllowAllOwnership) OwnsProject(context.Context, string, string, string, string) (bool, error) {
 	return true, nil
 }
 
 type DenyAllOwnership struct{}
 
 func (DenyAllOwnership) Owns(context.Context, string, string, string) (bool, error) {
+	return false, nil
+}
+func (DenyAllOwnership) OwnsProject(context.Context, string, string, string, string) (bool, error) {
 	return false, nil
 }
 
@@ -108,6 +117,13 @@ func (s *Service) ownership() ResourceOwnership {
 		return DenyAllOwnership{}
 	}
 	return s.Ownership
+}
+func (s *Service) ownsProject(ctx context.Context, tenantID, projectID, resourceType, resourceID string) (bool, error) {
+	ownership, ok := s.ownership().(ProjectResourceOwnership)
+	if !ok {
+		return false, nil
+	}
+	return ownership.OwnsProject(ctx, tenantID, projectID, resourceType, resourceID)
 }
 func (s *Service) require() error {
 	if s == nil || s.Store == nil {

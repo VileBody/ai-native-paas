@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 994,
-  "discovered_unique_test_name_count": 992,
+  "discovered_go_test_count": 995,
+  "discovered_unique_test_name_count": 993,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1058,10 +1058,10 @@
       "id": "C9",
       "level": "integration",
       "name": "TestUsage_ProviderReportReplayDoesNotDoubleCharge",
-      "status": "LIVE_ONLY",
-      "test_file": "test/pivot/commerce_v2_test.go",
+      "status": "REUSED",
+      "test_file": "test/integration/postgres_commerce_test.go",
       "test_name": "TestUsage_ProviderReportReplayDoesNotDoubleCharge",
-      "test_ref": "test/pivot/commerce_v2_test.go::TestUsage_ProviderReportReplayDoesNotDoubleCharge"
+      "test_ref": "test/integration/postgres_commerce_test.go::TestUsage_ProviderReportReplayDoesNotDoubleCharge"
     },
     {
       "family": "C",
@@ -1589,8 +1589,8 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 52,
-      "REUSED": 105
+      "LIVE_ONLY": 51,
+      "REUSED": 106
     },
     "unmapped": 0
   }
