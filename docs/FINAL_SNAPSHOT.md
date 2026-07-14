@@ -25,7 +25,10 @@ Local and database baselines are green. Phase 1 added encrypted HTTP-backed
 OpenTofu state, three admin system workers and a live NVMe CSI gate. The admin
 cluster now has a TLS-only, three-server OpenBao Raft release with immutable
 images and retained data/audit PVCs; it remains deliberately uninitialized and
-sealed until the 5/3 holder ceremony, so `PROVIDER_GREEN` is still pending.
+sealed until the 5/3 holder ceremony, so `PROVIDER_GREEN` is still pending. The
+same three system workers also run a TLS-authenticated three-replica NATS
+JetStream quorum with retained NVMe PVCs; a replicated live publish succeeded,
+while application outbox/inbox and failover drills remain pending.
 
 Generic runtime, disposable workspace, initialized OpenBao, Cozystack,
 GitLab.com, capability-provider, security and disaster-recovery gates remain

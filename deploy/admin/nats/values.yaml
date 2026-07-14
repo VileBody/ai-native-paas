@@ -1,0 +1,209 @@
+tlsCA:
+  enabled: true
+  secretName: nats-server-tls
+  key: ca.crt
+
+config:
+  cluster:
+    enabled: true
+    replicas: 3
+    noAdvertise: true
+    routeURLs:
+      useFQDN: true
+    tls:
+      enabled: true
+      secretName: nats-server-tls
+      cert: tls.crt
+      key: tls.key
+      merge:
+        ca_file: /etc/nats-certs/cluster/ca.crt
+        verify: true
+        timeout: 3
+  jetstream:
+    enabled: true
+    fileStore:
+      enabled: true
+      pvc:
+        enabled: true
+        size: 20Gi
+        storageClassName: nvme.network-drives.csi.timeweb.cloud
+      maxSize: 16Gi
+    memoryStore:
+      enabled: false
+    merge:
+      max_memory_store: 268435456
+      max_file_store: 17179869184
+  nats:
+    tls:
+      enabled: true
+      secretName: nats-server-tls
+      cert: tls.crt
+      key: tls.key
+      merge:
+        ca_file: /etc/nats-certs/nats/ca.crt
+        timeout: 3
+  monitor:
+    enabled: true
+    tls:
+      enabled: true
+  merge:
+    authorization:
+      token: << $NATS_AUTH_TOKEN >>
+    max_payload: 8388608
+    max_pending: 67108864
+
+container:
+  image:
+    repository: nats
+    tag: 2.14.2-alpine
+    digest: sha256:952d157e28d5394a211229bd57a7b37ff9f184e58e2c8486a08fa909fd254e32
+    pullPolicy: IfNotPresent
+  env:
+    GOMEMLIMIT: 900MiB
+    NATS_AUTH_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: nats-auth
+          key: token
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi
+  merge:
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+
+reloader:
+  image:
+    repository: natsio/nats-server-config-reloader
+    tag: 0.23.0
+    digest: sha256:64cb6c858e794906d3167378e02b7e0feb83c4e14c07b371eb8d921ef8c4a60b
+    pullPolicy: IfNotPresent
+  merge:
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+
+service:
+  enabled: true
+  ports:
+    nats:
+      enabled: true
+    cluster:
+      enabled: false
+    monitor:
+      enabled: false
+
+statefulSet:
+  merge:
+    spec:
+      podManagementPolicy: Parallel
+      persistentVolumeClaimRetentionPolicy:
+        whenDeleted: Retain
+        whenScaled: Retain
+      updateStrategy:
+        type: RollingUpdate
+
+podTemplate:
+  configChecksumAnnotation: true
+  topologySpreadConstraints:
+    kubernetes.io/hostname:
+      maxSkew: 1
+      whenUnsatisfiable: DoNotSchedule
+  merge:
+    spec:
+      nodeSelector:
+        ai-native-paas.io/pool: system
+      tolerations:
+        - key: ai-native-paas.io/system
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+
+podDisruptionBudget:
+  enabled: true
+  merge:
+    spec:
+      maxUnavailable: 1
+
+natsBox:
+  enabled: true
+  contexts:
+    default:
+      tls:
+        secretName: nats-server-tls
+        cert: tls.crt
+        key: tls.key
+      merge:
+        url: tls://nats.nats.svc:4222
+        ca: /etc/nats-certs/default/ca.crt
+  container:
+    image:
+      repository: natsio/nats-box
+      tag: 0.19.7
+      digest: sha256:ffce8bd103383f179f8c7f11cf645726acf5d17280706c530c3b342dbe16334c
+      pullPolicy: IfNotPresent
+    env:
+      NATS_TOKEN:
+        valueFrom:
+          secretKeyRef:
+            name: nats-auth
+            key: token
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    merge:
+      workingDir: /nsc
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+  podTemplate:
+    merge:
+      spec:
+        nodeSelector:
+          ai-native-paas.io/pool: system
+        tolerations:
+          - key: ai-native-paas.io/system
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          fsGroup: 1000
+          seccompProfile:
+            type: RuntimeDefault
