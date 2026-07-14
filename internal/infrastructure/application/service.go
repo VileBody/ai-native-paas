@@ -31,6 +31,7 @@ type PlanCommand struct {
 	ArtifactDigest    string
 	StateGeneration   int64
 	PlanJSON          []byte
+	RenderedManifests []byte
 	RetainedResources []infrastructurev1.RetainedResource
 }
 
@@ -105,20 +106,25 @@ func (s *Service) Plan(ctx context.Context, command PlanCommand) (PlanResult, er
 	if err != nil {
 		return PlanResult{}, err
 	}
-	planHash, err := hashJSON(struct {
-		ProjectID       string                              `json:"project_id"`
-		WorkspaceID     string                              `json:"workspace_id"`
-		Target          string                              `json:"target"`
-		SourceSHA       string                              `json:"source_sha"`
-		ArtifactDigest  string                              `json:"artifact_digest"`
-		StateGeneration int64                               `json:"state_generation"`
-		Changes         []infrastructurev1.ResourceChange   `json:"changes"`
-		Retained        []infrastructurev1.RetainedResource `json:"retained_resources"`
-	}{command.ProjectID, command.WorkspaceID, command.Target, command.SourceSHA, command.ArtifactDigest, command.StateGeneration, changes, retained})
+	allocation, err := normalizeRequestedRuntimeAllocation(command.RenderedManifests)
 	if err != nil {
 		return PlanResult{}, err
 	}
-	estimate, err := s.estimate(planHash, changes, now)
+	planHash, err := hashJSON(struct {
+		ProjectID       string                                `json:"project_id"`
+		WorkspaceID     string                                `json:"workspace_id"`
+		Target          string                                `json:"target"`
+		SourceSHA       string                                `json:"source_sha"`
+		ArtifactDigest  string                                `json:"artifact_digest"`
+		StateGeneration int64                                 `json:"state_generation"`
+		Changes         []infrastructurev1.ResourceChange     `json:"changes"`
+		Retained        []infrastructurev1.RetainedResource   `json:"retained_resources"`
+		Allocation      commercev2.RequestedRuntimeAllocation `json:"requested_runtime_allocation"`
+	}{command.ProjectID, command.WorkspaceID, command.Target, command.SourceSHA, command.ArtifactDigest, command.StateGeneration, changes, retained, allocation})
+	if err != nil {
+		return PlanResult{}, err
+	}
+	estimate, err := s.estimate(planHash, changes, allocation, now)
 	if err != nil {
 		return PlanResult{}, err
 	}
@@ -422,7 +428,7 @@ func (s *Service) AuthorizeApply(ctx context.Context, command ApplyCommand) (Pla
 }
 
 func validatePlanCommand(command PlanCommand) error {
-	if strings.TrimSpace(command.TenantID) == "" || strings.TrimSpace(command.ProjectID) == "" || strings.TrimSpace(command.ActorID) == "" || strings.TrimSpace(command.WorkspaceID) == "" || strings.TrimSpace(command.Target) == "" || strings.TrimSpace(command.IdempotencyKey) == "" || len(command.IdempotencyKey) > 128 || !sourceRevision.MatchString(command.SourceSHA) || !regexp.MustCompile(`^sha256:[0-9a-f]{64}$`).MatchString(command.ArtifactDigest) || command.StateGeneration < 0 || len(command.PlanJSON) == 0 || len(command.PlanJSON) > 8<<20 {
+	if strings.TrimSpace(command.TenantID) == "" || strings.TrimSpace(command.ProjectID) == "" || strings.TrimSpace(command.ActorID) == "" || strings.TrimSpace(command.WorkspaceID) == "" || strings.TrimSpace(command.Target) == "" || strings.TrimSpace(command.IdempotencyKey) == "" || len(command.IdempotencyKey) > 128 || !sourceRevision.MatchString(command.SourceSHA) || !regexp.MustCompile(`^sha256:[0-9a-f]{64}$`).MatchString(command.ArtifactDigest) || command.StateGeneration < 0 || len(command.PlanJSON) == 0 || len(command.PlanJSON) > 8<<20 || len(command.RenderedManifests) > 8<<20 {
 		return errors.New("invalid infrastructure plan command")
 	}
 	return nil
@@ -525,8 +531,8 @@ func normalizeAction(actions []string) (infrastructurev1.ChangeAction, bool, err
 	}
 }
 
-func (s *Service) estimate(planHash string, changes []infrastructurev1.ResourceChange, now time.Time) (commercev2.CostEstimate, error) {
-	lines := make([]commercev2.EstimateLine, 0, len(changes))
+func (s *Service) estimate(planHash string, changes []infrastructurev1.ResourceChange, allocation commercev2.RequestedRuntimeAllocation, now time.Time) (commercev2.CostEstimate, error) {
+	lines := make([]commercev2.EstimateLine, 0, len(changes)+4)
 	var minimum, maximum int64
 	unknown := false
 	for _, change := range changes {
@@ -538,31 +544,36 @@ func (s *Service) estimate(planHash string, changes []infrastructurev1.ResourceC
 		if !exists {
 			price = UnitPrice{Meter: change.ResourceType, Unit: "resource-month", UnknownMaximumMinor: 1_000_000, Known: false}
 		}
-		provider := price.ProviderMinorPerQuantity
-		upper := provider
-		if !price.Known {
-			unknown = true
-			upper = price.UnknownMaximumMinor
-			if upper <= 0 {
-				upper = 1_000_000
-			}
+		line, nextMinimum, nextMaximum, nextUnknown, err := s.appendEstimateLine(price, change.ResourceType, "resource-month", 1, minimum, maximum, unknown)
+		if err != nil {
+			return commercev2.CostEstimate{}, err
 		}
-		customer, err := markup(upper, s.Prices.RateCard.MarkupBasisPoints)
-		if err != nil || maximum > int64(^uint64(0)>>1)-customer {
-			return commercev2.CostEstimate{}, errors.New("cost estimate overflow")
+		minimum, maximum, unknown = nextMinimum, nextMaximum, nextUnknown
+		lines = append(lines, line)
+	}
+	for _, item := range []struct {
+		priceKey string
+		quantity int64
+		unit     string
+	}{
+		{RuntimeCPUPriceKey, allocation.CPUMillicores, "millicore-month"},
+		{RuntimeMemoryPriceKey, allocation.MemoryMiB, "mib-month"},
+		{RuntimeStoragePriceKey, allocation.StorageMiB, "mib-month"},
+		{RuntimeLoadBalancerPriceKey, allocation.LoadBalancers, "load-balancer-month"},
+	} {
+		if item.quantity == 0 {
+			continue
 		}
-		knownCustomer := int64(0)
-		if price.Known {
-			knownCustomer = customer
-			minimum += customer
+		price, exists := s.Prices.Prices[item.priceKey]
+		if !exists {
+			price = UnitPrice{Meter: item.priceKey, Unit: item.unit, UnknownMaximumMinor: 1_000_000, Known: false}
 		}
-		maximum += customer
-		lines = append(lines, commercev2.EstimateLine{
-			Meter: nonempty(price.Meter, change.ResourceType), Quantity: 1, Unit: nonempty(price.Unit, "resource-month"),
-			ProviderCost: commercev2.Money{Currency: s.Prices.RateCard.Currency, MinorUnit: provider},
-			CustomerCost: commercev2.Money{Currency: s.Prices.RateCard.Currency, MinorUnit: max64(knownCustomer, customer)},
-			PriceKnown:   price.Known,
-		})
+		line, nextMinimum, nextMaximum, nextUnknown, err := s.appendEstimateLine(price, item.priceKey, item.unit, item.quantity, minimum, maximum, unknown)
+		if err != nil {
+			return commercev2.CostEstimate{}, err
+		}
+		minimum, maximum, unknown = nextMinimum, nextMaximum, nextUnknown
+		lines = append(lines, line)
 	}
 	ttl := durationOr(s.EstimateTTL, 30*time.Minute)
 	versionHash, err := hashJSON(struct {
@@ -585,6 +596,64 @@ func (s *Service) estimate(planHash string, changes []infrastructurev1.ResourceC
 		Maximum:          commercev2.Money{Currency: s.Prices.RateCard.Currency, MinorUnit: maximum},
 		ApprovalRequired: unknown, ExpiresAt: now.Add(ttl),
 	}, nil
+}
+
+func (s *Service) appendEstimateLine(price UnitPrice, fallbackMeter, fallbackUnit string, quantity, minimum, maximum int64, unknown bool) (commercev2.EstimateLine, int64, int64, bool, error) {
+	provider, err := multiplyNonNegative(price.ProviderMinorPerQuantity, quantity)
+	if err != nil {
+		return commercev2.EstimateLine{}, 0, 0, false, errors.New("cost estimate overflow")
+	}
+	upper := provider
+	if !price.Known {
+		unknown = true
+		unitUpper := price.UnknownMaximumMinor
+		if unitUpper <= 0 {
+			unitUpper = 1_000_000
+		}
+		upper, err = multiplyNonNegative(unitUpper, quantity)
+		if err != nil {
+			return commercev2.EstimateLine{}, 0, 0, false, errors.New("cost estimate overflow")
+		}
+	}
+	customer, err := markup(upper, s.Prices.RateCard.MarkupBasisPoints)
+	if err != nil {
+		return commercev2.EstimateLine{}, 0, 0, false, errors.New("cost estimate overflow")
+	}
+	nextMaximum, err := addNonNegative(maximum, customer)
+	if err != nil {
+		return commercev2.EstimateLine{}, 0, 0, false, errors.New("cost estimate overflow")
+	}
+	nextMinimum := minimum
+	if price.Known {
+		nextMinimum, err = addNonNegative(minimum, customer)
+		if err != nil {
+			return commercev2.EstimateLine{}, 0, 0, false, errors.New("cost estimate overflow")
+		}
+	}
+	return commercev2.EstimateLine{
+		Meter: nonempty(price.Meter, fallbackMeter), Quantity: quantity, Unit: nonempty(price.Unit, fallbackUnit),
+		ProviderCost: commercev2.Money{Currency: s.Prices.RateCard.Currency, MinorUnit: provider},
+		CustomerCost: commercev2.Money{Currency: s.Prices.RateCard.Currency, MinorUnit: customer},
+		PriceKnown:   price.Known,
+	}, nextMinimum, nextMaximum, unknown, nil
+}
+
+func multiplyNonNegative(left, right int64) (int64, error) {
+	if left < 0 || right < 0 {
+		return 0, errors.New("negative cost input")
+	}
+	value := new(big.Int).Mul(big.NewInt(left), big.NewInt(right))
+	if !value.IsInt64() {
+		return 0, errors.New("cost multiplication overflow")
+	}
+	return value.Int64(), nil
+}
+
+func addNonNegative(left, right int64) (int64, error) {
+	if left < 0 || right < 0 || left > int64(^uint64(0)>>1)-right {
+		return 0, errors.New("cost addition overflow")
+	}
+	return left + right, nil
 }
 
 func markup(providerMinor, basisPoints int64) (int64, error) {

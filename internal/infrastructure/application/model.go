@@ -18,6 +18,13 @@ var (
 	ErrDependencyPending = errors.New("infrastructure dependency is pending")
 )
 
+const (
+	RuntimeCPUPriceKey          = "kubernetes.request.cpu_millicore"
+	RuntimeMemoryPriceKey       = "kubernetes.request.memory_mib"
+	RuntimeStoragePriceKey      = "kubernetes.request.storage_mib"
+	RuntimeLoadBalancerPriceKey = "kubernetes.service.load_balancer"
+)
+
 type UnitPrice struct {
 	Meter                    string
 	Unit                     string

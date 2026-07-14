@@ -17,6 +17,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/workspace"
 	"github.com/keir-research/ai-native-paas/internal/workspace/commercebudget"
 	commercev1 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1"
+	commercev2 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v2"
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
 )
@@ -103,6 +104,131 @@ func TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement(t *testing
 		TenantID: "tenant-1", ProjectID: "project-1", IdempotencyKey: "unknown-price-apply", Authorization: authorization,
 	}); !errors.Is(err, infraapp.ErrApprovalRequired) {
 		t.Fatalf("unknown-price apply proceeded without exact-plan approval: %v", err)
+	}
+}
+
+func TestCost_HelmResourcesContributeRequestedRuntimeAllocation(t *testing.T) {
+	service, _, _ := infrastructureFixture()
+	service.Prices.Prices[infraapp.RuntimeCPUPriceKey] = infraapp.UnitPrice{
+		Meter: "runtime.cpu.request", Unit: "millicore-month", ProviderMinorPerQuantity: 2, Known: true,
+	}
+	service.Prices.Prices[infraapp.RuntimeMemoryPriceKey] = infraapp.UnitPrice{
+		Meter: "runtime.memory.request", Unit: "mib-month", ProviderMinorPerQuantity: 1, Known: true,
+	}
+	service.Prices.Prices[infraapp.RuntimeStoragePriceKey] = infraapp.UnitPrice{
+		Meter: "runtime.storage.request", Unit: "mib-month", ProviderMinorPerQuantity: 3, Known: true,
+	}
+	service.Prices.Prices[infraapp.RuntimeLoadBalancerPriceKey] = infraapp.UnitPrice{
+		Meter: "runtime.load-balancer", Unit: "load-balancer-month", ProviderMinorPerQuantity: 100, Known: true,
+	}
+	command := planCommand("helm-runtime-allocation", "staging", knownResourcePlan)
+	command.RenderedManifests = []byte(`apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: project-1-staging
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+        - name: api
+          resources:
+            requests:
+              cpu: 250m
+              memory: 128Mi
+            limits:
+              cpu: "8"
+              memory: 16Gi
+        - name: limits-only-sidecar
+          resources:
+            limits:
+              cpu: "32"
+              memory: 64Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data
+  namespace: project-1-staging
+spec:
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: project-1-staging
+spec:
+  type: LoadBalancer
+`)
+	result, err := service.Plan(context.Background(), command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := make(map[string]commercev2.EstimateLine, len(result.Estimate.Lines))
+	for _, line := range result.Estimate.Lines {
+		lines[line.Meter] = line
+	}
+	assertLine := func(meter string, quantity, providerCost int64) {
+		t.Helper()
+		line, exists := lines[meter]
+		if !exists || line.Quantity != quantity || line.ProviderCost.MinorUnit != providerCost || !line.PriceKnown {
+			t.Fatalf("unexpected %s estimate line: %#v", meter, line)
+		}
+	}
+	assertLine("runtime.cpu.request", 750, 1500)
+	assertLine("runtime.memory.request", 384, 384)
+	assertLine("runtime.storage.request", 10*1024, 30*1024)
+	assertLine("runtime.load-balancer", 1, 100)
+	if result.Estimate.Minimum.MinorUnit != 41_005 || result.Estimate.Maximum.MinorUnit != 41_005 || result.Estimate.ApprovalRequired {
+		t.Fatalf("unexpected requested-allocation estimate totals: %#v", result.Estimate)
+	}
+
+	withoutRuntime := planCommand("helm-runtime-allocation-control", "staging", knownResourcePlan)
+	control, err := service.Plan(context.Background(), withoutRuntime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Summary.PlanHash == control.Summary.PlanHash || result.Estimate.Version == control.Estimate.Version {
+		t.Fatal("requested runtime allocation was not bound to plan and estimate identity")
+	}
+
+	for name, manifests := range map[string]string{
+		"unknown daemonset cardinality": `apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent
+spec:
+  template:
+    spec:
+      containers:
+        - resources:
+            requests:
+              cpu: 100m
+`,
+		"invalid request quantity": `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: invalid
+spec:
+  template:
+    spec:
+      containers:
+        - resources:
+            requests:
+              memory: definitely-not-a-quantity
+`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			invalid := planCommand("helm-runtime-allocation-"+strings.ReplaceAll(name, " ", "-"), "staging", knownResourcePlan)
+			invalid.RenderedManifests = []byte(manifests)
+			if _, err := service.Plan(context.Background(), invalid); err == nil {
+				t.Fatal("ambiguous or invalid requested runtime allocation was accepted")
+			}
+		})
 	}
 }
 

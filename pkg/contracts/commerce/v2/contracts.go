@@ -56,6 +56,24 @@ type EstimateLine struct {
 	PriceKnown   bool   `json:"price_known"`
 }
 
+// RequestedRuntimeAllocation is the value-free, normalized capacity requested
+// by rendered Kubernetes resources. Pricing is deliberately kept in the
+// immutable rate card so the same allocation can be re-estimated without
+// re-rendering a release.
+type RequestedRuntimeAllocation struct {
+	CPUMillicores int64 `json:"cpu_millicores"`
+	MemoryMiB     int64 `json:"memory_mib"`
+	StorageMiB    int64 `json:"storage_mib"`
+	LoadBalancers int64 `json:"load_balancers"`
+}
+
+func (a RequestedRuntimeAllocation) Validate() error {
+	if a.CPUMillicores < 0 || a.MemoryMiB < 0 || a.StorageMiB < 0 || a.LoadBalancers < 0 {
+		return errors.New("invalid requested runtime allocation")
+	}
+	return nil
+}
+
 type CostEstimate struct {
 	EstimateID        string         `json:"estimate_id"`
 	Version           string         `json:"version"`

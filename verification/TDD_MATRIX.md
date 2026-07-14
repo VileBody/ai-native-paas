@@ -3,10 +3,10 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **990**
-- Reused now: **102**
+- Discovered Go tests/fuzz targets: **991**
+- Reused now: **103**
 - New local/contract tests required: **0**
-- Live/provider/system tests required: **55**
+- Live/provider/system tests required: **54**
 - Unmapped: **0**
 
 `NEW` and `LIVE_ONLY` are explicit implementation work, not passing evidence.
@@ -113,7 +113,7 @@ A release gate may become green only after every referenced test exists and pass
 | `A5.32` | REUSED | domain + fake clock | `test/pivot/attachments_v2_test.go::TestDomain_ReleaseEntersQuarantineBeforeAnotherTenantCanClaim` |
 | `C1` | REUSED | application/golden | `test/pivot/commerce_v2_test.go::TestCost_TofuPlanProducesDeterministicNormalizedEstimate` |
 | `C2` | REUSED | domain | `test/pivot/commerce_v2_test.go::TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement` |
-| `C3` | LIVE_ONLY | application | `test/pivot/commerce_v2_test.go::TestCost_HelmResourcesContributeRequestedRuntimeAllocation` |
+| `C3` | REUSED | application | `test/pivot/commerce_v2_test.go::TestCost_HelmResourcesContributeRequestedRuntimeAllocation` |
 | `C4` | REUSED | domain | `test/pivot/commerce_v2_test.go::TestCost_ApprovalInvalidatedWhenPlanHashChanges` |
 | `C5` | LIVE_ONLY | cross-domain application | `test/pivot/commerce_v2_test.go::TestQuota_ReservationCommittedBeforeExternalApply` |
 | `C6` | REUSED | PostgreSQL + race | `test/integration/postgres_commerce_test.go::TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget` |
