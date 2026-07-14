@@ -1,10 +1,11 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: iteration-5-control-plane-postgres-tests-78ce2f8
+  name: iteration-5-control-plane-postgres-tests-9fb0b2d
   namespace: ai-native-paas-system
   labels:
     ai-native-paas.io/owner: verification
+    ai-native-paas.io/revision: 9fb0b2d
 spec:
   backoffLimit: 0
   ttlSecondsAfterFinished: 3600
@@ -18,7 +19,7 @@ spec:
         - name: craas-ai-native-paas-registry
       containers:
         - name: tests
-          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-tests:78ce2f87b1f785e57518ca746d28a3d8316d57bc
+          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-tests@sha256:8bc27372b398a0d421045f4006b48bbd7afd19177b24a2511ef63f1f09ebdc36
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "-ec"]
           args:
