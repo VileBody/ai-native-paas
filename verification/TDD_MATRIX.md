@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **948**
-- Reused now: **83**
-- New local/contract tests required: **8**
+- Discovered Go tests/fuzz targets: **950**
+- Reused now: **84**
+- New local/contract tests required: **7**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -145,7 +145,7 @@ A release gate may become green only after every referenced test exists and pass
 | `G14` | REUSED | application | `internal/project/mcp/handler_test.go::TestAgent_DeployWorkflowStartsFromExactRepositoryRevision` |
 | `G15` | REUSED | application/OpenTofu integration | `test/pivot/agent_workspace_test.go::TestInfraPlan_IsPureIdempotentAndStoresCanonicalPlanHash` |
 | `G16` | REUSED | cross-domain | `test/pivot/agent_workspace_test.go::TestInfraApply_RequiresMatchingPlanReservationAndApproval` |
-| `G17` | NEW | live state backend/concurrency | `test/pivot/agent_workspace_test.go::TestInfraState_RemoteLockPreventsConcurrentMutation` |
+| `G17` | REUSED | live state backend/concurrency | `test/integration/postgres_remotestate_test.go::TestInfraState_RemoteLockPreventsConcurrentMutation` |
 | `G18` | LIVE_ONLY | orchestration | `test/pivot/agent_workspace_test.go::TestAgent_GitOpsCommitOccursOnlyAfterInfraDependenciesReady` |
 | `G19` | NEW | acceptance | `test/pivot/agent_workspace_test.go::TestAgent_HealthFailureCreatesNewPatchCommitNotDirectClusterFix` |
 | `G20` | NEW | application | `test/pivot/agent_workspace_test.go::TestAgent_DestroyWorkflowShowsPlanAndRetainsResourcesByPolicy` |

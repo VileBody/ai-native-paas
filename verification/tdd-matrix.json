@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 948,
-  "discovered_unique_test_name_count": 946,
+  "discovered_go_test_count": 950,
+  "discovered_unique_test_name_count": 948,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1318,10 +1318,10 @@
       "id": "G17",
       "level": "live state backend/concurrency",
       "name": "TestInfraState_RemoteLockPreventsConcurrentMutation",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "test/integration/postgres_remotestate_test.go",
       "test_name": "TestInfraState_RemoteLockPreventsConcurrentMutation",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestInfraState_RemoteLockPreventsConcurrentMutation"
+      "test_ref": "test/integration/postgres_remotestate_test.go::TestInfraState_RemoteLockPreventsConcurrentMutation"
     },
     {
       "family": "G",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 8,
-      "REUSED": 83
+      "NEW": 7,
+      "REUSED": 84
     },
     "unmapped": 0
   }

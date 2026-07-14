@@ -15,9 +15,11 @@ import (
 )
 
 var (
-	ErrNotFound     = errors.New("state not found")
-	ErrLocked       = errors.New("state is locked")
-	ErrLockMismatch = errors.New("state lock does not match")
+	ErrNotFound          = errors.New("state not found")
+	ErrLocked            = errors.New("state is locked")
+	ErrStaleLock         = errors.New("stale state lock requires recovery")
+	ErrLockMismatch      = errors.New("state lock does not match")
+	ErrRecoveryForbidden = errors.New("state lock recovery is forbidden")
 )
 
 var namespacePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$`)
@@ -48,7 +50,14 @@ type Repository interface {
 	Acquire(context.Context, string, Lock, string) (*Lock, error)
 	Verify(context.Context, string, string) error
 	Release(context.Context, string, string) error
+	Recover(context.Context, string, string, string, string) error
 	RecordState(context.Context, string, Blob, string) error
+}
+
+type RecoveryAuthorization struct {
+	Allowed bool
+	Actor   string
+	Reason  string
 }
 
 type Service struct {
@@ -133,6 +142,22 @@ func (s *Service) Release(ctx context.Context, namespace, lockID string) error {
 		return ErrLockMismatch
 	}
 	return s.repository.Release(ctx, namespace, lockID)
+}
+
+func (s *Service) RecoverStale(ctx context.Context, namespace, lockID string, authorization RecoveryAuthorization) error {
+	if err := ValidateNamespace(namespace); err != nil {
+		return err
+	}
+	if !authorization.Allowed {
+		return ErrRecoveryForbidden
+	}
+	lockID = strings.TrimSpace(lockID)
+	actor := strings.TrimSpace(authorization.Actor)
+	reason := strings.TrimSpace(authorization.Reason)
+	if lockID == "" || actor == "" || reason == "" || len(reason) > 2048 {
+		return errors.New("stale lock recovery requires lock ID, actor, and bounded audit reason")
+	}
+	return s.repository.Recover(ctx, namespace, lockID, actor, reason)
 }
 
 func validateEncryptedState(data []byte) error {

@@ -82,6 +82,16 @@ func (m *memoryRepository) Release(_ context.Context, namespace, lockID string) 
 	return nil
 }
 
+func (m *memoryRepository) Recover(_ context.Context, namespace, lockID, _, _ string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if existing, ok := m.locks[namespace]; !ok || existing.ID != lockID {
+		return ErrLockMismatch
+	}
+	delete(m.locks, namespace)
+	return nil
+}
+
 func (m *memoryRepository) RecordState(context.Context, string, Blob, string) error { return nil }
 
 func encryptedFixture() []byte {
@@ -162,6 +172,46 @@ func TestStateHTTP_RejectsPlaintextAndRoundTripsEncryptedState(t *testing.T) {
 	}
 	if status := request(t, handler, "UNLOCK", "/api/v1/state/admin/lock", lock, "admin", "secret").Code; status != http.StatusOK {
 		t.Fatalf("unlock status=%d", status)
+	}
+}
+
+func TestStateHTTP_StaleRecoveryRequiresAuthorizedCredentialAndReason(t *testing.T) {
+	repository := &memoryRepository{locks: map[string]Lock{}}
+	service, err := NewService(&memoryBlobs{data: map[string]Blob{}}, repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	worker, err := NewStaticCredential("worker", "worker-secret", Claims{
+		Namespace: "admin", Actor: "workspace-agent", ExpiresAt: time.Now().Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	operator, err := NewStaticCredential("operator", "operator-secret", Claims{
+		Namespace: "admin", Actor: "operator-1", ExpiresAt: time.Now().Add(time.Hour), CanRecoverStale: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	credentials, err := NewCredentialSet(worker, operator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewHandler(service, credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock := []byte(`{"ID":"lock-1","Who":"workspace-1"}`)
+	if status := request(t, handler, "LOCK", "/api/v1/state/admin/lock", lock, "worker", "worker-secret").Code; status != http.StatusOK {
+		t.Fatalf("lock status=%d", status)
+	}
+	recovery := []byte(`{"ID":"lock-1","Reason":"workspace lease expired after provider timeout"}`)
+	if status := request(t, handler, "RECOVER", "/api/v1/state/admin/lock", recovery, "worker", "worker-secret").Code; status != http.StatusForbidden {
+		t.Fatalf("unprivileged recovery status=%d", status)
+	}
+	withoutReason := []byte(`{"ID":"lock-1"}`)
+	if status := request(t, handler, "RECOVER", "/api/v1/state/admin/lock", withoutReason, "operator", "operator-secret").Code; status != http.StatusBadRequest {
+		t.Fatalf("reasonless recovery status=%d", status)
 	}
 }
 

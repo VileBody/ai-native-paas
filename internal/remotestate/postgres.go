@@ -50,6 +50,17 @@ CREATE TABLE IF NOT EXISTS state_service.locks (
     lease_expires_at timestamptz NOT NULL
 );
 CREATE INDEX IF NOT EXISTS state_locks_expiry_idx ON state_service.locks(lease_expires_at);
+CREATE TABLE IF NOT EXISTS state_service.lock_recoveries (
+    recovery_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    namespace text NOT NULL,
+    lock_id text NOT NULL,
+    lock_info jsonb NOT NULL,
+    recovered_by text NOT NULL,
+    reason text NOT NULL CHECK (length(reason) BETWEEN 1 AND 2048),
+    recovered_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS state_lock_recoveries_namespace_idx
+    ON state_service.lock_recoveries(namespace, recovered_at DESC);
 `)
 	if err != nil {
 		return fmt.Errorf("migrate state service: %w", err)
@@ -83,7 +94,7 @@ WHERE state_service.namespaces.tenant_id = EXCLUDED.tenant_id
 }
 
 func (r *PostgresRepository) Acquire(ctx context.Context, namespace string, lock Lock, actor string) (*Lock, error) {
-	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, err
 	}
@@ -93,11 +104,17 @@ func (r *PostgresRepository) Acquire(ctx context.Context, namespace string, lock
 	}
 	var existingJSON []byte
 	var existingID string
-	err = tx.QueryRowContext(ctx, `SELECT lock_id, lock_info FROM state_service.locks WHERE namespace=$1 AND lease_expires_at > now()`, namespace).Scan(&existingID, &existingJSON)
-	if err == nil && existingID != lock.ID {
+	var active bool
+	err = tx.QueryRowContext(ctx, `SELECT lock_id, lock_info, lease_expires_at > now() FROM state_service.locks WHERE namespace=$1`, namespace).Scan(&existingID, &existingJSON, &active)
+	if err == nil {
 		var existing Lock
 		_ = json.Unmarshal(existingJSON, &existing)
-		return &existing, ErrLocked
+		if !active {
+			return &existing, ErrStaleLock
+		}
+		if existingID != lock.ID {
+			return &existing, ErrLocked
+		}
 	}
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
@@ -119,6 +136,49 @@ ON CONFLICT (namespace) DO UPDATE SET
 		return nil, err
 	}
 	return nil, nil
+}
+
+func (r *PostgresRepository) Recover(ctx context.Context, namespace, lockID, actor, reason string) error {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, namespace); err != nil {
+		return err
+	}
+	var existingID string
+	var existingJSON []byte
+	var active bool
+	if err := tx.QueryRowContext(ctx, `SELECT lock_id, lock_info, lease_expires_at > now() FROM state_service.locks WHERE namespace=$1`, namespace).Scan(&existingID, &existingJSON, &active); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrLockMismatch
+		}
+		return err
+	}
+	if existingID != lockID {
+		return ErrLockMismatch
+	}
+	if active {
+		return ErrLocked
+	}
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO state_service.lock_recoveries(namespace, lock_id, lock_info, recovered_by, reason)
+VALUES ($1, $2, $3, $4, $5)`, namespace, existingID, existingJSON, actor, reason); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `DELETE FROM state_service.locks WHERE namespace=$1 AND lock_id=$2`, namespace, existingID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return ErrLockMismatch
+	}
+	return tx.Commit()
 }
 
 func (r *PostgresRepository) Verify(ctx context.Context, namespace, lockID string) error {

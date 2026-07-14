@@ -13,12 +13,13 @@ import (
 )
 
 type Claims struct {
-	Username  string
-	Namespace string
-	TenantID  string
-	ProjectID string
-	Actor     string
-	ExpiresAt time.Time
+	Username        string
+	Namespace       string
+	TenantID        string
+	ProjectID       string
+	Actor           string
+	ExpiresAt       time.Time
+	CanRecoverStale bool
 }
 
 type CredentialVerifier interface {
@@ -175,15 +176,18 @@ func (h *Handler) handleLock(response http.ResponseWriter, request *http.Request
 		http.Error(response, "lock payload is too large", http.StatusRequestEntityTooLarge)
 		return
 	}
-	var lock Lock
-	if err := json.Unmarshal(data, &lock); err != nil {
+	var payload struct {
+		Lock
+		Reason string `json:"Reason,omitempty"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
 		http.Error(response, "invalid lock payload", http.StatusBadRequest)
 		return
 	}
 	switch request.Method {
 	case "LOCK":
-		existing, err := h.service.Acquire(request.Context(), claims.Namespace, claims.Actor, lock)
-		if errors.Is(err, ErrLocked) {
+		existing, err := h.service.Acquire(request.Context(), claims.Namespace, claims.Actor, payload.Lock)
+		if errors.Is(err, ErrLocked) || errors.Is(err, ErrStaleLock) {
 			response.Header().Set("Content-Type", "application/json")
 			response.WriteHeader(http.StatusLocked)
 			_ = json.NewEncoder(response).Encode(existing)
@@ -191,9 +195,15 @@ func (h *Handler) handleLock(response http.ResponseWriter, request *http.Request
 		}
 		h.writeMutationResult(response, err)
 	case "UNLOCK":
-		h.writeMutationResult(response, h.service.Release(request.Context(), claims.Namespace, lock.ID))
+		h.writeMutationResult(response, h.service.Release(request.Context(), claims.Namespace, payload.ID))
+	case "RECOVER":
+		h.writeMutationResult(response, h.service.RecoverStale(request.Context(), claims.Namespace, payload.ID, RecoveryAuthorization{
+			Allowed: claims.CanRecoverStale,
+			Actor:   claims.Actor,
+			Reason:  payload.Reason,
+		}))
 	default:
-		response.Header().Set("Allow", "LOCK, UNLOCK")
+		response.Header().Set("Allow", "LOCK, UNLOCK, RECOVER")
 		http.Error(response, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
@@ -202,8 +212,10 @@ func (h *Handler) writeMutationResult(response http.ResponseWriter, err error) {
 	switch {
 	case err == nil:
 		response.WriteHeader(http.StatusOK)
-	case errors.Is(err, ErrLocked), errors.Is(err, ErrLockMismatch):
+	case errors.Is(err, ErrLocked), errors.Is(err, ErrStaleLock), errors.Is(err, ErrLockMismatch):
 		http.Error(response, "state lock conflict", http.StatusLocked)
+	case errors.Is(err, ErrRecoveryForbidden):
+		http.Error(response, "stale lock recovery is forbidden", http.StatusForbidden)
 	case strings.Contains(err.Error(), "payload"), strings.Contains(err.Error(), "plaintext"), strings.Contains(err.Error(), "lock ID"):
 		http.Error(response, err.Error(), http.StatusBadRequest)
 	default:

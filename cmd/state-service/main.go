@@ -79,11 +79,12 @@ func main() {
 			os.Exit(1)
 		}
 		credential, err := remotestate.NewStaticCredential(config.Username, config.Password, remotestate.Claims{
-			Namespace: config.Namespace,
-			TenantID:  config.TenantID,
-			ProjectID: config.ProjectID,
-			Actor:     config.Actor,
-			ExpiresAt: config.ExpiresAt,
+			Namespace:       config.Namespace,
+			TenantID:        config.TenantID,
+			ProjectID:       config.ProjectID,
+			Actor:           config.Actor,
+			ExpiresAt:       config.ExpiresAt,
+			CanRecoverStale: config.CanRecoverStale,
 		})
 		if err != nil {
 			logger.Error("initialize bootstrap credential", "namespace", config.Namespace, "error", err)
@@ -127,13 +128,14 @@ func main() {
 }
 
 type credentialConfig struct {
-	Username  string    `json:"username"`
-	Password  string    `json:"password"`
-	Namespace string    `json:"namespace"`
-	TenantID  string    `json:"tenant_id"`
-	ProjectID string    `json:"project_id"`
-	Actor     string    `json:"actor"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Username        string    `json:"username"`
+	Password        string    `json:"password"`
+	Namespace       string    `json:"namespace"`
+	TenantID        string    `json:"tenant_id"`
+	ProjectID       string    `json:"project_id"`
+	Actor           string    `json:"actor"`
+	ExpiresAt       time.Time `json:"expires_at"`
+	CanRecoverStale bool      `json:"can_recover_stale,omitempty"`
 }
 
 func loadCredentialConfigs(logger *slog.Logger) []credentialConfig {
