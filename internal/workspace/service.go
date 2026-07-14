@@ -108,6 +108,24 @@ func (s *Service) reconcileProvision(ctx context.Context, workspace Workspace) (
 	if err := validateProviderVM(workspace, vm); err != nil {
 		return workspace.Ref(), err
 	}
+	if workspace.ProviderVMID == "" {
+		expected := workspace.Version
+		workspace.ProviderVMID = vm.VMID
+		workspace.ProviderDiskIDs = append([]string(nil), vm.DiskIDs...)
+		workspace.ProviderFirewallGroupIDs = append([]string(nil), vm.FirewallGroupIDs...)
+		workspace.ProviderFingerprint = providerFingerprint(vm)
+		workspace.LastError = ""
+		workspace.ReconcileOwner = ""
+		workspace.ReconcileLeaseUntil = time.Time{}
+		workspace.UpdatedBy = s.ReconcilerID
+		workspace.UpdatedAt = s.Clock.Now().UTC()
+		workspace.Version++
+		if err := s.Store.UpdateWorkspace(ctx, workspace, expected); err != nil {
+			return workspacev1.WorkspaceRef{}, err
+		}
+	} else if workspace.ProviderVMID != vm.VMID || !sameSet(workspace.ProviderDiskIDs, vm.DiskIDs) || !sameSet(workspace.ProviderFirewallGroupIDs, vm.FirewallGroupIDs) || workspace.ProviderFingerprint != providerFingerprint(vm) {
+		return workspace.Ref(), errors.New("workspace provider identity changed after persistence")
+	}
 	connected, err := s.Sessions.Connected(ctx, workspace.ID, vm.VMID)
 	if err != nil {
 		return workspace.Ref(), err
@@ -116,10 +134,6 @@ func (s *Service) reconcileProvision(ctx context.Context, workspace Workspace) (
 		return workspace.Ref(), nil
 	}
 	expected := workspace.Version
-	workspace.ProviderVMID = vm.VMID
-	workspace.ProviderDiskIDs = append([]string(nil), vm.DiskIDs...)
-	workspace.ProviderFirewallGroupIDs = append([]string(nil), vm.FirewallGroupIDs...)
-	workspace.ProviderFingerprint = providerFingerprint(vm)
 	workspace.State = workspacev1.WorkspaceReady
 	workspace.LastError = ""
 	workspace.ReconcileOwner = ""
@@ -131,6 +145,33 @@ func (s *Service) reconcileProvision(ctx context.Context, workspace Workspace) (
 		return workspacev1.WorkspaceRef{}, err
 	}
 	return workspace.Ref(), nil
+}
+
+// ResolveAgentBinding maps a certificate-scoped workspace correlation to the
+// provider VM identity already persisted by the reconciler. Caller-supplied
+// VM IDs are never an identity source.
+func (s *Service) ResolveAgentBinding(ctx context.Context, tenantID, projectID, workspaceID, taskID, correlationID string) (string, error) {
+	if err := s.requireStore(); err != nil {
+		return "", err
+	}
+	for _, value := range []string{tenantID, projectID, workspaceID, taskID, correlationID} {
+		if strings.TrimSpace(value) == "" {
+			return "", ErrNotFound
+		}
+	}
+	value, err := s.Store.GetWorkspace(ctx, tenantID, projectID, workspaceID)
+	if err != nil {
+		return "", err
+	}
+	if value.TaskID != taskID || value.CorrelationID != correlationID || value.ProviderVMID == "" {
+		return "", ErrNotFound
+	}
+	switch value.State {
+	case workspacev1.WorkspaceProvisioning, workspacev1.WorkspaceReady, workspacev1.WorkspaceBusy:
+		return value.ProviderVMID, nil
+	default:
+		return "", ErrConflict
+	}
 }
 
 func (s *Service) Destroy(ctx context.Context, scope Scope, workspaceID string) (workspacev1.WorkspaceRef, error) {
@@ -412,7 +453,7 @@ func (s *Service) EnforceTimeouts(ctx context.Context, limit int) (int, error) {
 func (s *Service) providerRequest(workspace Workspace) ProviderCreateRequest {
 	denied := append([]string{"169.254.169.254/32"}, s.DeniedCIDRs...)
 	return ProviderCreateRequest{
-		WorkspaceID: workspace.ID, ProjectID: workspace.ProjectID, TaskID: workspace.TaskID,
+		WorkspaceID: workspace.ID, TenantID: workspace.TenantID, ProjectID: workspace.ProjectID, TaskID: workspace.TaskID, AgentID: workspace.CreatedBy,
 		CorrelationID: workspace.CorrelationID, ImageDigest: workspace.Spec.ImageDigest,
 		CPUMillis: workspace.Spec.CPUMillis, MemoryMiB: workspace.Spec.MemoryMiB,
 		ExpiresAt: workspace.ExpiresAt, NetworkProfile: workspace.Spec.NetworkProfile,

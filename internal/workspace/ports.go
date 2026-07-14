@@ -39,8 +39,10 @@ type NetworkIsolation struct {
 
 type ProviderCreateRequest struct {
 	WorkspaceID      string
+	TenantID         string
 	ProjectID        string
 	TaskID           string
+	AgentID          string
 	CorrelationID    string
 	ImageDigest      string
 	CPUMillis        int64

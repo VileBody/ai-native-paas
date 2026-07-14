@@ -26,7 +26,7 @@ const defaultBaseURL = "https://api.timeweb.cloud/api/v1"
 
 var providerIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
-type CloudInitRenderer func(workspace.ProviderCreateRequest) (string, error)
+type CloudInitRenderer func(context.Context, workspace.ProviderCreateRequest) (string, error)
 
 type Config struct {
 	BaseURL            string
@@ -128,7 +128,7 @@ func (p *Provider) Create(ctx context.Context, request workspace.ProviderCreateR
 	if err := p.validateCreate(request); err != nil {
 		return workspace.ProviderVM{}, err
 	}
-	cloudInit, err := p.renderCloudInit(request)
+	cloudInit, err := p.renderCloudInit(ctx, request)
 	if err != nil {
 		return workspace.ProviderVM{}, fmt.Errorf("render workspace cloud-init: %w", err)
 	}
@@ -287,7 +287,7 @@ func (p *Provider) failClosedCleanup(ctx context.Context, serverID, workspaceID 
 }
 
 func (p *Provider) validateCreate(request workspace.ProviderCreateRequest) error {
-	if strings.TrimSpace(request.WorkspaceID) == "" || strings.TrimSpace(request.ProjectID) == "" || strings.TrimSpace(request.TaskID) == "" || strings.TrimSpace(request.CorrelationID) == "" || request.CPUMillis < 1000 || request.CPUMillis%1000 != 0 || request.MemoryMiB < 1024 || request.NetworkProfile != "isolated-governed" {
+	if strings.TrimSpace(request.WorkspaceID) == "" || strings.TrimSpace(request.TenantID) == "" || strings.TrimSpace(request.ProjectID) == "" || strings.TrimSpace(request.TaskID) == "" || strings.TrimSpace(request.AgentID) == "" || strings.TrimSpace(request.CorrelationID) == "" || request.CPUMillis < 1000 || request.CPUMillis%1000 != 0 || request.MemoryMiB < 1024 || request.NetworkProfile != "isolated-governed" {
 		return errors.New("invalid Timeweb workspace request")
 	}
 	if _, ok := p.imageIDs[request.ImageDigest]; !ok || !request.NetworkIsolation.PrivateAddressOnly || !request.NetworkIsolation.DenyAllInbound || !request.NetworkIsolation.OutboundGatewayMTLS || strings.TrimSpace(request.NetworkIsolation.VPCID) == "" {

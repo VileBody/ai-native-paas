@@ -1,23 +1,17 @@
-name: project-control-plane
+name: workspace-manager
 
 on:
   push:
     paths:
-      - 'cmd/project-api/**'
-      - 'internal/project/**'
-      - 'internal/identity/**'
-      - 'internal/agent/enrollment/**'
-      - 'internal/source/**'
+      - 'cmd/workspace-manager/**'
       - 'internal/workspace/**'
-      - 'pkg/contracts/agent/v2/**'
-      - 'pkg/contracts/project/v2/**'
       - 'pkg/contracts/workspace/v1/**'
-      - 'test/integration/postgres_enrollment_test.go'
-      - 'test/integration/postgres_identity_test.go'
+      - 'test/integration/postgres_workspace_test.go'
+      - 'test/architecture/workspace_execution_boundary_test.go'
       - 'go.mod'
       - 'go.sum'
       - '.dockerignore'
-      - '.github/workflows/project-control-plane.yml'
+      - '.github/workflows/workspace-manager.yml'
   pull_request:
   workflow_dispatch:
 
@@ -35,8 +29,9 @@ jobs:
           go-version: '1.25.x'
           cache: true
       - run: make fmt-check
-      - run: go vet ./cmd/project-api ./internal/project/... ./internal/identity/... ./internal/agent/enrollment/... ./internal/source/... ./internal/workspace/... ./pkg/contracts/agent/v2 ./pkg/contracts/project/v2 ./pkg/contracts/workspace/v1
-      - run: go test -count=1 ./internal/project/... ./internal/identity/... ./internal/agent/enrollment/... ./internal/source/... ./internal/workspace/... ./pkg/contracts/agent/v2 ./pkg/contracts/project/v2 ./pkg/contracts/workspace/v1
+      - run: go vet ./cmd/workspace-manager ./internal/workspace/... ./pkg/contracts/workspace/v1
+      - run: go test -race -count=1 ./internal/workspace/... ./pkg/contracts/workspace/v1 ./test/architecture
+      - run: go build -trimpath ./cmd/workspace-manager
 
   postgres:
     runs-on: ubuntu-latest
@@ -63,7 +58,8 @@ jobs:
         with:
           go-version: '1.25.x'
           cache: true
-      - run: go test -count=1 -tags=postgres_integration ./test/integration -run 'TestPostgres_(AgentEnrollment|OIDCSubject|Workspace)'
+      - run: sudo apt-get update && sudo apt-get install -y libpq-dev pkg-config postgresql-client
+      - run: go test -race -count=1 -tags=postgres_integration ./test/integration -run '^TestPostgres_Workspace' -v
 
   image:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -90,10 +86,10 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: cmd/project-api/Dockerfile
+          file: cmd/workspace-manager/Dockerfile
           push: true
           provenance: mode=max
           sbom: true
           tags: |
-            ghcr.io/vilebody/ai-native-paas-project-api:${{ github.sha }}
-            ${{ secrets.TWC_REGISTRY_HOST }}/ai-native-paas-project-api:${{ github.sha }}
+            ghcr.io/vilebody/ai-native-paas-workspace-manager:${{ github.sha }}
+            ${{ secrets.TWC_REGISTRY_HOST }}/ai-native-paas-workspace-manager:${{ github.sha }}

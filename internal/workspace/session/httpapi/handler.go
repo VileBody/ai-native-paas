@@ -3,6 +3,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -18,9 +19,14 @@ import (
 type Handler struct {
 	Registry     *session.Registry
 	Workspaces   *workspace.Service
+	Bindings     AgentBindingResolver
 	Principals   PrincipalResolver
 	MaxBodyBytes int64
 	LongPoll     time.Duration
+}
+
+type AgentBindingResolver interface {
+	ResolveAgentBinding(context.Context, string, string, string, string, string) (string, error)
 }
 
 func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
@@ -53,7 +59,16 @@ func (h Handler) connect(response http.ResponseWriter, request *http.Request) {
 		writeError(response, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid workspace session request")
 		return
 	}
-	view, err := h.Registry.Connect(request.Context(), principal, body.VMID)
+	if h.Bindings == nil || strings.TrimSpace(body.CorrelationID) == "" {
+		writeError(response, http.StatusUnauthorized, "UNAUTHENTICATED", "workspace provider binding is required")
+		return
+	}
+	vmID, err := h.Bindings.ResolveAgentBinding(request.Context(), principal.TenantID, principal.ProjectID, principal.WorkspaceID, principal.TaskID, body.CorrelationID)
+	if err != nil {
+		writeError(response, http.StatusUnauthorized, "UNAUTHENTICATED", "workspace provider binding is invalid")
+		return
+	}
+	view, err := h.Registry.Connect(request.Context(), principal, vmID)
 	if err != nil {
 		writeSessionError(response, err)
 		return

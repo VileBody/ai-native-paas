@@ -20,3 +20,6 @@ Deploy the sealed, uninitialized release:
 
 Initialization is intentionally excluded from automation. Follow
 `docs/runbooks/openbao-shamir-ceremony.md` with five holders and a 3-share threshold.
+After the cluster is initialized and Kubernetes auth is enabled, configure the
+least-privilege workspace PKI role with
+`docs/runbooks/openbao-workspace-identity.md`.

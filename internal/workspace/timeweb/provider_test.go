@@ -163,7 +163,9 @@ func newProvider(t *testing.T, handler http.Handler) (*Provider, *httptest.Serve
 		AvailabilityZone: "msk-1", BandwidthMbps: 100, SystemDiskMiB: 40960,
 		ImageIDs: map[string]string{testDigest: "image-uuid-1"}, EgressGatewayCIDRs: []string{"192.168.75.4/32"},
 		DNSResolverCIDRs: []string{"192.168.75.1/32"}, HTTPClient: server.Client(),
-		RenderCloudInit: func(workspace.ProviderCreateRequest) (string, error) { return "#cloud-config\nwrite_files: []\n", nil },
+		RenderCloudInit: func(context.Context, workspace.ProviderCreateRequest) (string, error) {
+			return "#cloud-config\nwrite_files: []\n", nil
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -173,7 +175,7 @@ func newProvider(t *testing.T, handler http.Handler) (*Provider, *httptest.Serve
 
 func providerRequest() workspace.ProviderCreateRequest {
 	return workspace.ProviderCreateRequest{
-		WorkspaceID: "workspace-1", ProjectID: "project-1", TaskID: "task-1", CorrelationID: "correlation-1",
+		WorkspaceID: "workspace-1", TenantID: "tenant-1", ProjectID: "project-1", TaskID: "task-1", AgentID: "agent-1", CorrelationID: "correlation-1",
 		ImageDigest: testDigest, CPUMillis: 2000, MemoryMiB: 4096, ExpiresAt: time.Now().Add(15 * time.Minute),
 		NetworkProfile: "isolated-governed", NetworkIsolation: workspace.NetworkIsolation{
 			VPCID: "vpc-workspace", PrivateAddressOnly: true, DenyAllInbound: true, OutboundGatewayMTLS: true,

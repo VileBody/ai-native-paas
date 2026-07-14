@@ -244,6 +244,35 @@ func TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials(t *testing.T) 
 	}
 }
 
+func TestWorkspace_ProviderIdentityPersistsBeforeAgentCorrelationBinding(t *testing.T) {
+	f := newFixture()
+	f.sessions.connected = false
+	created, err := f.service.Create(context.Background(), CreateRequest{Scope: f.scope, Spec: f.spec, IdempotencyKey: "create-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pending, err := f.service.Reconcile(context.Background(), created.WorkspaceID)
+	if err != nil || pending.State != workspacev1.WorkspaceProvisioning {
+		t.Fatalf("provider identity persistence reconcile=%#v err=%v", pending, err)
+	}
+	stored, err := f.store.GetWorkspace(context.Background(), f.scope.TenantID, f.scope.ProjectID, created.WorkspaceID)
+	if err != nil || stored.ProviderVMID != "twc-vm-1" || len(stored.ProviderDiskIDs) != 1 || len(stored.ProviderFirewallGroupIDs) != 1 {
+		t.Fatalf("provider identity was not persisted before agent connect: %#v err=%v", stored, err)
+	}
+	vmID, err := f.service.ResolveAgentBinding(context.Background(), stored.TenantID, stored.ProjectID, stored.ID, stored.TaskID, stored.CorrelationID)
+	if err != nil || vmID != stored.ProviderVMID {
+		t.Fatalf("correlation binding vm=%q err=%v", vmID, err)
+	}
+	if _, err := f.service.ResolveAgentBinding(context.Background(), stored.TenantID, stored.ProjectID, stored.ID, stored.TaskID, "foreign-correlation"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("foreign correlation binding err=%v", err)
+	}
+	f.sessions.connected = true
+	ready, err := f.service.Reconcile(context.Background(), created.WorkspaceID)
+	if err != nil || ready.State != workspacev1.WorkspaceReady || len(f.provider.requests) != 1 {
+		t.Fatalf("agent connect did not complete readiness: ref=%#v creates=%d err=%v", ready, len(f.provider.requests), err)
+	}
+}
+
 func TestWorkspace_CommandRunsOnlyInsideWorkspaceNotControlPlaneHost(t *testing.T) {
 	f := newFixture()
 	ready := f.ready(t)

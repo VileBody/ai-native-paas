@@ -131,7 +131,11 @@ type AgentMessage struct {
 }
 
 type AgentSessionConnect struct {
-	VMID string `json:"vm_id"`
+	// VMID remains additive compatibility metadata for early v1 agents. The
+	// control plane never trusts it for binding; CorrelationID is resolved
+	// against the durable workspace/provider record.
+	VMID          string `json:"vm_id,omitempty"`
+	CorrelationID string `json:"correlation_id"`
 }
 
 type AgentSessionView struct {

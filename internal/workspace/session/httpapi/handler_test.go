@@ -28,6 +28,15 @@ type handlerIDs struct {
 	next int
 }
 
+type bindingResolver struct{}
+
+func (bindingResolver) ResolveAgentBinding(_ context.Context, tenantID, projectID, workspaceID, taskID, correlationID string) (string, error) {
+	if tenantID != "tenant-1" || projectID != "project-1" || workspaceID != "workspace-1" || taskID != "task-1" || correlationID != "correlation-1" {
+		return "", workspace.ErrNotFound
+	}
+	return "vm-1", nil
+}
+
 func (i *handlerIDs) New(prefix string) string {
 	i.mu.Lock()
 	defer i.mu.Unlock()
@@ -57,7 +66,7 @@ func handlerFixture(t *testing.T) (Handler, *session.Registry, handlerClock, *x5
 	clock := handlerClock{now: time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)}
 	registry := &session.Registry{Store: session.NewMemoryStore(), Clock: clock, IDs: &handlerIDs{}, AckPollInterval: time.Millisecond, DispatchAckTimeout: time.Second}
 	certificate := clientCertificate(t, clock.now, "/tenant/tenant-1/project/project-1/workspace/workspace-1/task/task-1/agent/agent-1")
-	return Handler{Registry: registry, Principals: SPIFFEResolver{TrustDomain: "workspace.platform.example.com"}, MaxBodyBytes: 4096, LongPoll: 5 * time.Millisecond}, registry, clock, certificate
+	return Handler{Registry: registry, Bindings: bindingResolver{}, Principals: SPIFFEResolver{TrustDomain: "workspace.platform.example.com"}, MaxBodyBytes: 4096, LongPoll: 5 * time.Millisecond}, registry, clock, certificate
 }
 
 func serve(handler Handler, request *http.Request) *httptest.ResponseRecorder {
@@ -68,7 +77,7 @@ func serve(handler Handler, request *http.Request) *httptest.ResponseRecorder {
 
 func connectAgent(t *testing.T, handler Handler, certificate *x509.Certificate) workspacev1.AgentSessionView {
 	t.Helper()
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/session", strings.NewReader(`{"vm_id":"vm-1"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/session", strings.NewReader(`{"vm_id":"attacker-supplied-vm","correlation_id":"correlation-1"}`))
 	response := serve(handler, withCertificate(request, certificate))
 	if response.Code != http.StatusCreated {
 		t.Fatalf("connect status=%d body=%s", response.Code, response.Body.String())
@@ -78,6 +87,21 @@ func connectAgent(t *testing.T, handler Handler, certificate *x509.Certificate) 
 		t.Fatal(err)
 	}
 	return view
+}
+
+func TestWorkspaceAgentHTTP_BindsVMFromPersistedCorrelationNotRequest(t *testing.T) {
+	handler, registry, _, certificate := handlerFixture(t)
+	connected := connectAgent(t, handler, certificate)
+	stored, err := registry.Store.GetSession(context.Background(), connected.SessionID)
+	if err != nil || stored.VMID != "vm-1" {
+		t.Fatalf("session VM binding=%#v err=%v", stored, err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/workspace-agent/session", strings.NewReader(`{"vm_id":"vm-1","correlation_id":"foreign-correlation"}`))
+	response := serve(handler, withCertificate(request, certificate))
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("foreign correlation accepted: %d %s", response.Code, response.Body.String())
+	}
 }
 
 func TestWorkspaceAgentHTTP_RequiresVerifiedMTLSAndIgnoresIdentityHeaders(t *testing.T) {
