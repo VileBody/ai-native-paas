@@ -148,7 +148,9 @@ func (s *Service) Invoke(ctx context.Context, req agentv1.InvocationRequest) (ag
 	var task domain.AgentTask
 	var replay *agentv1.InvocationResponse
 	var existingStarted bool
+	var budgetErr error
 	err = s.Store.Transact(ctx, func(tx Tx) error {
+		budgetErr = nil
 		p, ok := tx.GetPrincipal(req.AgentID)
 		if !ok || p.TenantID != req.TenantID || p.State != domain.PrincipalActive || (!p.CredentialExpiresAt.IsZero() && !p.CredentialExpiresAt.After(s.now())) {
 			return domain.NewError(domain.CodePermissionDenied, "agent principal denied")
@@ -191,7 +193,17 @@ func (s *Service) Invoke(ctx context.Context, req agentv1.InvocationRequest) (ag
 			return err
 		}
 		if err := reserveBudget(&t, req); err != nil {
-			return err
+			budgetErr = err
+			old := t.Version
+			t.State = domain.TaskPaused
+			t.Version++
+			t.UpdatedAt = s.now()
+			if err := tx.UpdateTask(t, old); err != nil {
+				return err
+			}
+			principal = p
+			task = t
+			return nil
 		}
 		if t.Version > 0 {
 			old := t.Version
@@ -212,6 +224,10 @@ func (s *Service) Invoke(ctx context.Context, req agentv1.InvocationRequest) (ag
 	if err != nil {
 		_ = s.auditDenied(ctx, req, err)
 		return s.failureResponse(s.newID("inv"), err), err
+	}
+	if budgetErr != nil {
+		_ = s.auditDenied(ctx, req, budgetErr)
+		return s.failureResponse(s.newID("inv"), budgetErr), budgetErr
 	}
 	if replay != nil {
 		return *replay, nil

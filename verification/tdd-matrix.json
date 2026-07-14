@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 950,
-  "discovered_unique_test_name_count": 948,
+  "discovered_go_test_count": 952,
+  "discovered_unique_test_name_count": 950,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1098,10 +1098,10 @@
       "id": "C13",
       "level": "Agent/Commerce",
       "name": "TestBudget_RepairLoopConsumesConfiguredNotUnlimitedBudget",
-      "status": "NEW",
-      "test_file": "test/pivot/commerce_v2_test.go",
+      "status": "REUSED",
+      "test_file": "internal/agent/application/agent_tdd_test.go",
       "test_name": "TestBudget_RepairLoopConsumesConfiguredNotUnlimitedBudget",
-      "test_ref": "test/pivot/commerce_v2_test.go::TestBudget_RepairLoopConsumesConfiguredNotUnlimitedBudget"
+      "test_ref": "internal/agent/application/agent_tdd_test.go::TestBudget_RepairLoopConsumesConfiguredNotUnlimitedBudget"
     },
     {
       "family": "C",
@@ -1398,10 +1398,10 @@
       "id": "G25",
       "level": "application",
       "name": "TestAgent_RepairLoopAndBudgetStopAutonomousSpend",
-      "status": "NEW",
-      "test_file": "test/pivot/agent_workspace_test.go",
+      "status": "REUSED",
+      "test_file": "internal/agent/application/agent_tdd_test.go",
       "test_name": "TestAgent_RepairLoopAndBudgetStopAutonomousSpend",
-      "test_ref": "test/pivot/agent_workspace_test.go::TestAgent_RepairLoopAndBudgetStopAutonomousSpend"
+      "test_ref": "internal/agent/application/agent_tdd_test.go::TestAgent_RepairLoopAndBudgetStopAutonomousSpend"
     },
     {
       "family": "G",
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 7,
-      "REUSED": 84
+      "NEW": 5,
+      "REUSED": 86
     },
     "unmapped": 0
   }

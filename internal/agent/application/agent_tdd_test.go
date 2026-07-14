@@ -407,6 +407,56 @@ func TestBudget_UsageIsAtomicUnderConcurrentToolCalls(t *testing.T) {
 	}
 }
 
+func TestBudget_RepairLoopConsumesConfiguredNotUnlimitedBudget(t *testing.T) {
+	f := newFixture(t, agentv1.BudgetPolicy{MaxBuildCount: 2, MaxBuildMinutes: 2, MaxDeployCount: 2, RepairThreshold: 10})
+	f.builds.Fail = errors.New("repository compile failure")
+	for index := 1; index <= 2; index++ {
+		if _, err := f.svc.Invoke(context.Background(), f.request(agentv1.ToolRequestBuild, buildArgs(1), fmt.Sprintf("repair-%d", index))); err == nil {
+			t.Fatalf("repair build %d unexpectedly succeeded", index)
+		}
+	}
+	if f.builds.RequestCalls != 2 {
+		t.Fatalf("provider build calls=%d", f.builds.RequestCalls)
+	}
+	if _, err := f.svc.Invoke(context.Background(), f.request(agentv1.ToolRequestBuild, buildArgs(1), "repair-3")); errCode(err) != domain.CodeBudgetExceeded {
+		t.Fatalf("budget stop error=%v", err)
+	}
+	view, err := f.svc.GetTask(context.Background(), f.tenant, f.task)
+	if err != nil || view.State != string(domain.TaskPaused) || view.BudgetUsage.BuildCount != 2 || view.BudgetUsage.BuildMinutes != 2 {
+		t.Fatalf("paused task=%+v error=%v", view, err)
+	}
+	if _, err := f.svc.Invoke(context.Background(), f.request(agentv1.ToolCreateProject, application.CreateProjectArguments{Name: "must-not-run"}, "after-budget")); errCode(err) != domain.CodePaused || f.source.CreateCalls != 0 {
+		t.Fatalf("post-budget side effect error=%v calls=%d", err, f.source.CreateCalls)
+	}
+}
+
+func TestAgent_RepairLoopAndBudgetStopAutonomousSpend(t *testing.T) {
+	f := newFixture(t, agentv1.BudgetPolicy{MaxBuildCount: 2, MaxBuildMinutes: 2, MaxDeployCount: 1, RepairThreshold: 2})
+	f.builds.Fail = errors.New("same deterministic compile failure")
+	for index := 1; index <= 2; index++ {
+		if _, err := f.svc.Invoke(context.Background(), f.request(agentv1.ToolRequestBuild, buildArgs(1), fmt.Sprintf("failure-%d", index))); err == nil {
+			t.Fatalf("failed build %d unexpectedly succeeded", index)
+		}
+	}
+	view, err := f.svc.GetTask(context.Background(), f.tenant, f.task)
+	if err != nil || view.State != string(domain.TaskPaused) || view.RepairCount != 2 || f.builds.RequestCalls != 2 {
+		t.Fatalf("repair threshold task=%+v calls=%d error=%v", view, f.builds.RequestCalls, err)
+	}
+	if _, err := f.svc.Invoke(context.Background(), f.request(agentv1.ToolRequestBuild, buildArgs(1), "autonomous-third")); errCode(err) != domain.CodePaused || f.builds.RequestCalls != 2 {
+		t.Fatalf("autonomous retry error=%v calls=%d", err, f.builds.RequestCalls)
+	}
+	if err := f.svc.ResumeTask(context.Background(), f.tenant, f.task, f.user); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.Invoke(context.Background(), f.request(agentv1.ToolRequestBuild, buildArgs(1), "human-resumed")); errCode(err) != domain.CodeBudgetExceeded || f.builds.RequestCalls != 2 {
+		t.Fatalf("exhausted budget retry error=%v calls=%d", err, f.builds.RequestCalls)
+	}
+	view, err = f.svc.GetTask(context.Background(), f.tenant, f.task)
+	if err != nil || view.State != string(domain.TaskPaused) {
+		t.Fatalf("budget did not re-pause task=%+v error=%v", view, err)
+	}
+}
+
 func TestRepairLoop_SameFailureFingerprintIncrementsCounter(t *testing.T) {
 	f := newFixture(t, agentv1.BudgetPolicy{})
 	_ = f.svc.RecordFailure(context.Background(), f.tenant, f.task, "compile:x", false)
