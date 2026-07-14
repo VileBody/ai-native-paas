@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **926**
-- Reused now: **61**
-- New local/contract tests required: **30**
+- Discovered Go tests/fuzz targets: **928**
+- Reused now: **63**
+- New local/contract tests required: **28**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -114,10 +114,10 @@ A release gate may become green only after every referenced test exists and pass
 | `C1` | REUSED | application/golden | `test/pivot/commerce_v2_test.go::TestCost_TofuPlanProducesDeterministicNormalizedEstimate` |
 | `C2` | LIVE_ONLY | domain | `test/pivot/commerce_v2_test.go::TestCost_UnknownProviderPriceProducesRangeAndApprovalRequirement` |
 | `C3` | LIVE_ONLY | application | `test/pivot/commerce_v2_test.go::TestCost_HelmResourcesContributeRequestedRuntimeAllocation` |
-| `C4` | NEW | domain | `test/pivot/commerce_v2_test.go::TestCost_ApprovalInvalidatedWhenPlanHashChanges` |
+| `C4` | REUSED | domain | `test/pivot/commerce_v2_test.go::TestCost_ApprovalInvalidatedWhenPlanHashChanges` |
 | `C5` | LIVE_ONLY | cross-domain application | `test/pivot/commerce_v2_test.go::TestQuota_ReservationCommittedBeforeExternalApply` |
 | `C6` | NEW | PostgreSQL + race | `test/pivot/commerce_v2_test.go::TestQuota_ConcurrentPlansCannotOversubscribeProjectBudget` |
-| `C7` | NEW | domain/fake clock | `test/pivot/commerce_v2_test.go::TestQuota_ExpiredReservationCannotAuthorizeLateApply` |
+| `C7` | REUSED | domain/fake clock | `test/pivot/commerce_v2_test.go::TestQuota_ExpiredReservationCannotAuthorizeLateApply` |
 | `C8` | LIVE_ONLY | application/provider | `test/pivot/commerce_v2_test.go::TestUsage_PartialApplySettlesCreatedResourcesAndReleasesRemainder` |
 | `C9` | LIVE_ONLY | integration | `test/pivot/commerce_v2_test.go::TestUsage_ProviderReportReplayDoesNotDoubleCharge` |
 | `C10` | LIVE_ONLY | capability gateway integration | `test/pivot/commerce_v2_test.go::TestUsage_OpenRouterTokensAreAttributedToProjectTaskAndModel` |

@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 926,
-  "discovered_unique_test_name_count": 924,
+  "discovered_go_test_count": 928,
+  "discovered_unique_test_name_count": 926,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -1008,7 +1008,7 @@
       "id": "C4",
       "level": "domain",
       "name": "TestCost_ApprovalInvalidatedWhenPlanHashChanges",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/commerce_v2_test.go",
       "test_name": "TestCost_ApprovalInvalidatedWhenPlanHashChanges",
       "test_ref": "test/pivot/commerce_v2_test.go::TestCost_ApprovalInvalidatedWhenPlanHashChanges"
@@ -1038,7 +1038,7 @@
       "id": "C7",
       "level": "domain/fake clock",
       "name": "TestQuota_ExpiredReservationCannotAuthorizeLateApply",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/commerce_v2_test.go",
       "test_name": "TestQuota_ExpiredReservationCannotAuthorizeLateApply",
       "test_ref": "test/pivot/commerce_v2_test.go::TestQuota_ExpiredReservationCannotAuthorizeLateApply"
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 30,
-      "REUSED": 61
+      "NEW": 28,
+      "REUSED": 63
     },
     "unmapped": 0
   }
