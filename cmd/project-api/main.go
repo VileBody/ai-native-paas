@@ -29,6 +29,8 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/source/gitlab"
 	sourcepostgres "github.com/keir-research/ai-native-paas/internal/source/postgres"
 	sourcesupport "github.com/keir-research/ai-native-paas/internal/source/support"
+	"github.com/keir-research/ai-native-paas/internal/workspace"
+	workspacepostgres "github.com/keir-research/ai-native-paas/internal/workspace/postgres"
 )
 
 func main() {
@@ -45,6 +47,7 @@ func main() {
 		platformprofile.Prod("gitlab-api"),
 		platformprofile.Prod("oidc-jwks-verifier"),
 		platformprofile.Prod("postgres-membership-resolver"),
+		platformprofile.Prod("workspace-postgres-intent-store"),
 	); err != nil {
 		log.Fatal(err)
 	}
@@ -59,6 +62,10 @@ func main() {
 
 	sourceStore := &sourcepostgres.Store{DB: db, MaxSerializableRetries: 32}
 	if err := postgresbootstrap.WithMigrationLock(ctx, db, "source", sourceStore.Migrate); err != nil {
+		log.Fatal(err)
+	}
+	workspaceStore := &workspacepostgres.Store{DB: db}
+	if err := postgresbootstrap.WithMigrationLock(ctx, db, "workspace", workspaceStore.Migrate); err != nil {
 		log.Fatal(err)
 	}
 	enrollmentStore, err := enrollmentpostgres.New(db)
@@ -99,10 +106,12 @@ func main() {
 	gitLab := &gitlab.Client{BaseURL: gitLabURL, AdminToken: string(gitLabToken)}
 	source := &sourceapp.Service{Store: sourceStore, Provider: gitLab, Clock: sourcesupport.RealClock{}, IDs: &sourcesupport.IDs{}}
 	clock := agentsupport.Clock{}
+	runtimeIDs := &agentsupport.IDs{}
 	enrollmentService := &enrollment.Service{
-		Store: enrollmentStore, Clock: clock, IDs: enrollmentIDs{inner: &agentsupport.IDs{}},
+		Store: enrollmentStore, Clock: clock, IDs: enrollmentIDs{inner: runtimeIDs},
 		Secrets: enrollment.CryptoSecrets{}, Signer: enrollment.HMACSigner{Key: append([]byte(nil), signingKey...)},
 	}
+	workspaceService := &workspace.Service{Store: workspaceStore, Clock: clock, IDs: enrollmentIDs{inner: runtimeIDs}, Policy: workspace.DefaultCommandPolicy()}
 	projects := &projectapp.Service{
 		Source: source, Bootstrapper: gitLab, Enrollment: enrollmentService,
 		GitLabNamespaceID: namespaceID, MCPBaseURL: os.Getenv("MCP_BASE_URL"), WorkspaceImageDigest: os.Getenv("WORKSPACE_IMAGE_DIGEST"),
@@ -114,7 +123,7 @@ func main() {
 
 	projectHandler := projecthttp.Handler{Projects: projects, MaxBodyBytes: 64 << 10}
 	enrollmentHandler := enrollmenthttp.Handler{Enrollment: enrollmentService, MaxBodyBytes: 64 << 10}
-	mcpHandler := projectmcp.Handler{Enrollment: enrollmentService, Projects: source, MaxBodyBytes: 1 << 20}
+	mcpHandler := projectmcp.Handler{Enrollment: enrollmentService, Projects: source, Workspaces: workspaceService, MaxBodyBytes: 1 << 20}
 	humanHandler := (httpauth.Middleware{
 		Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}},
 	}).Wrap(projectHandler)

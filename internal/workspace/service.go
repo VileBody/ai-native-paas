@@ -37,7 +37,7 @@ type CreateRequest struct {
 }
 
 func (s *Service) Create(ctx context.Context, request CreateRequest) (workspacev1.WorkspaceRef, error) {
-	if err := s.require(); err != nil {
+	if err := s.requireCreate(); err != nil {
 		return workspacev1.WorkspaceRef{}, err
 	}
 	if err := request.Scope.validate(); err != nil || request.Spec.Validate() != nil || request.Spec.ProjectID != request.Scope.ProjectID || strings.TrimSpace(request.IdempotencyKey) == "" || len(request.IdempotencyKey) > 128 {
@@ -63,7 +63,7 @@ func (s *Service) Create(ctx context.Context, request CreateRequest) (workspacev
 }
 
 func (s *Service) Get(ctx context.Context, scope Scope, workspaceID string) (workspacev1.WorkspaceRef, error) {
-	if err := s.require(); err != nil {
+	if err := s.requireStore(); err != nil {
 		return workspacev1.WorkspaceRef{}, err
 	}
 	if err := scope.validate(); err != nil {
@@ -79,7 +79,7 @@ func (s *Service) Get(ctx context.Context, scope Scope, workspaceID string) (wor
 // Reconcile performs a single idempotent provider step. It is intended for a
 // durable worker consuming the workspace outbox, not for the request handler.
 func (s *Service) Reconcile(ctx context.Context, workspaceID string) (workspacev1.WorkspaceRef, error) {
-	if err := s.require(); err != nil {
+	if err := s.requireReconciler(); err != nil {
 		return workspacev1.WorkspaceRef{}, err
 	}
 	now := s.Clock.Now().UTC()
@@ -134,7 +134,7 @@ func (s *Service) reconcileProvision(ctx context.Context, workspace Workspace) (
 }
 
 func (s *Service) Destroy(ctx context.Context, scope Scope, workspaceID string) (workspacev1.WorkspaceRef, error) {
-	if err := s.require(); err != nil {
+	if err := s.requireClockStore(); err != nil {
 		return workspacev1.WorkspaceRef{}, err
 	}
 	if err := scope.validate(); err != nil {
@@ -207,7 +207,7 @@ type ExecRequest struct {
 }
 
 func (s *Service) Exec(ctx context.Context, request ExecRequest) (workspacev1.CommandView, error) {
-	if err := s.require(); err != nil {
+	if err := s.requireCommandRequest(); err != nil {
 		return workspacev1.CommandView{}, err
 	}
 	if err := request.Scope.validate(); err != nil || strings.TrimSpace(request.WorkspaceID) == "" || strings.TrimSpace(request.Kind) == "" || strings.TrimSpace(request.IdempotencyKey) == "" {
@@ -252,7 +252,7 @@ func (s *Service) Exec(ctx context.Context, request ExecRequest) (workspacev1.Co
 // duplicate dispatch uses the same durable command ID, which the workspace
 // agent must also treat idempotently.
 func (s *Service) Dispatch(ctx context.Context, scope Scope, commandID string) (workspacev1.CommandView, error) {
-	if err := s.require(); err != nil {
+	if err := s.requireDispatcher(); err != nil {
 		return workspacev1.CommandView{}, err
 	}
 	if err := scope.validate(); err != nil || strings.TrimSpace(commandID) == "" {
@@ -317,7 +317,7 @@ type CommandOutcome struct {
 }
 
 func (s *Service) RecordOutcome(ctx context.Context, outcome CommandOutcome) (workspacev1.CommandView, error) {
-	if err := s.require(); err != nil {
+	if err := s.requireOutcomeRecorder(); err != nil {
 		return workspacev1.CommandView{}, err
 	}
 	command, err := s.Store.GetCommand(ctx, outcome.TenantID, outcome.ProjectID, outcome.CommandID)
@@ -360,7 +360,7 @@ func (s *Service) RecordOutcome(ctx context.Context, outcome CommandOutcome) (wo
 }
 
 func (s *Service) Expire(ctx context.Context, limit int) (int, error) {
-	if err := s.require(); err != nil {
+	if err := s.requireClockStore(); err != nil {
 		return 0, err
 	}
 	if limit < 1 || limit > 1000 {
@@ -383,7 +383,7 @@ func (s *Service) Expire(ctx context.Context, limit int) (int, error) {
 // session. TIMED_OUT and usage are recorded later from mTLS-bound termination
 // evidence, never from a control-plane assumption.
 func (s *Service) EnforceTimeouts(ctx context.Context, limit int) (int, error) {
-	if err := s.require(); err != nil {
+	if err := s.requireDispatcher(); err != nil {
 		return 0, err
 	}
 	if limit < 1 || limit > 1000 {
@@ -425,8 +425,50 @@ func (s *Service) providerRequest(workspace Workspace) ProviderCreateRequest {
 	}
 }
 
-func (s *Service) require() error {
-	if s == nil || s.Store == nil || s.Provider == nil || s.Sessions == nil || s.Leases == nil || s.Clock == nil || s.IDs == nil || strings.TrimSpace(s.ReconcilerID) == "" || strings.TrimSpace(s.WorkspaceVPCID) == "" || len(s.Policy.AllowedExecutables) == 0 || len(s.EgressGatewayCIDRs) == 0 || len(s.DNSResolverCIDRs) == 0 {
+func (s *Service) requireStore() error {
+	if s == nil || s.Store == nil {
+		return errors.New("workspace service dependencies are unavailable")
+	}
+	return nil
+}
+
+func (s *Service) requireClockStore() error {
+	if err := s.requireStore(); err != nil || s.Clock == nil {
+		return errors.New("workspace service dependencies are unavailable")
+	}
+	return nil
+}
+
+func (s *Service) requireCreate() error {
+	if err := s.requireClockStore(); err != nil || s.IDs == nil {
+		return errors.New("workspace service dependencies are unavailable")
+	}
+	return nil
+}
+
+func (s *Service) requireCommandRequest() error {
+	if err := s.requireCreate(); err != nil || len(s.Policy.AllowedExecutables) == 0 {
+		return errors.New("workspace service dependencies are unavailable")
+	}
+	return nil
+}
+
+func (s *Service) requireReconciler() error {
+	if err := s.requireClockStore(); err != nil || s.Provider == nil || s.Sessions == nil || s.Leases == nil || strings.TrimSpace(s.ReconcilerID) == "" || strings.TrimSpace(s.WorkspaceVPCID) == "" || len(s.EgressGatewayCIDRs) == 0 || len(s.DNSResolverCIDRs) == 0 {
+		return errors.New("workspace service dependencies are unavailable")
+	}
+	return nil
+}
+
+func (s *Service) requireDispatcher() error {
+	if err := s.requireClockStore(); err != nil || s.Sessions == nil {
+		return errors.New("workspace service dependencies are unavailable")
+	}
+	return nil
+}
+
+func (s *Service) requireOutcomeRecorder() error {
+	if err := s.requireClockStore(); err != nil || s.Leases == nil {
 		return errors.New("workspace service dependencies are unavailable")
 	}
 	return nil

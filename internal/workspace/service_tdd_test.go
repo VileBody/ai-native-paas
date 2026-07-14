@@ -210,6 +210,27 @@ func TestWorkspace_CreateUsesPinnedImageDigestAndPolicyProfile(t *testing.T) {
 	}
 }
 
+func TestWorkspace_RequestPlanePersistsIntentWithoutProviderAuthority(t *testing.T) {
+	clock := &testClock{now: time.Date(2026, 7, 14, 6, 5, 0, 0, time.UTC)}
+	requestPlane := &Service{Store: NewMemoryStore(), Clock: clock, IDs: &testIDs{}, Policy: DefaultCommandPolicy()}
+	scope := Scope{TenantID: "tenant-request", ProjectID: "project-request", ActorID: "agent-request"}
+	spec := workspacev1.WorkspaceSpec{
+		ProjectID: "project-request", TaskID: "task-request",
+		ImageDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		CPUMillis:   2000, MemoryMiB: 4096, TTLSeconds: 900, NetworkProfile: "isolated-governed",
+	}
+	created, err := requestPlane.Create(context.Background(), CreateRequest{Scope: scope, Spec: spec, IdempotencyKey: "request-only-create"})
+	if err != nil || created.State != workspacev1.WorkspaceProvisioning {
+		t.Fatalf("request plane did not persist intent: ref=%#v err=%v", created, err)
+	}
+	if _, err := requestPlane.Get(context.Background(), scope, created.WorkspaceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := requestPlane.Reconcile(context.Background(), created.WorkspaceID); err == nil {
+		t.Fatal("request plane acquired provider reconciliation authority")
+	}
+}
+
 func TestWorkspace_IsEphemeralAndDestroyRemovesDiskAndCredentials(t *testing.T) {
 	f := newFixture()
 	ready := f.ready(t)

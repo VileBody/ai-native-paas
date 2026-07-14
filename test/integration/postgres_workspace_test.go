@@ -138,7 +138,7 @@ func TestPostgres_WorkspaceOutboxLeaseHasOneWinnerAndCrashTakeover(t *testing.T)
 	if err := store.DeferOutbox(context.Background(), winner.records[0].EventID, winner.owner, retryAt); err != nil {
 		t.Fatal(err)
 	}
-	before, err := store.ClaimOutbox(context.Background(), "takeover-worker", retryAt.Add(-time.Nanosecond), retryAt.Add(time.Minute), 1)
+	before, err := store.ClaimOutbox(context.Background(), "takeover-worker", retryAt.Add(-time.Millisecond), retryAt.Add(time.Minute), 1)
 	if err != nil || len(before) != 0 {
 		t.Fatalf("unexpired lease takeover records=%#v err=%v", before, err)
 	}
