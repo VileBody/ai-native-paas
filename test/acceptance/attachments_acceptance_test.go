@@ -33,7 +33,7 @@ func TestApplicationAttachments_FullLifecycleDoesNotDiscloseSecretsOrDeleteManag
 			"env-a": {TenantID: "tenant-a", ApplicationID: "app-a", EnvironmentID: "env-a", Name: "production", Ready: true},
 		}},
 		Secrets: vault, Provider: provider, DNS: dns, Certificates: certificates,
-		Approvals: &testkit.Approvals{Grants: map[string][3]string{}}, Runtime: runtime,
+		Approvals: &testkit.Approvals{Grants: map[string]application.ApprovalBinding{}}, Runtime: runtime,
 		Commerce: &testkit.Commerce{Allowed: true}, Usage: &testkit.Usage{}, Logger: logger,
 		Clock: clock, IDs: &application.SequentialIDs{}, DefaultDomain: "apps.example.test",
 		DNSObservationDelay: time.Minute, DomainQuarantine: 24 * time.Hour,

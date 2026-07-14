@@ -16,7 +16,7 @@ type Service struct {
 }
 
 type PurgeRequest struct {
-	TenantID, ServiceInstanceID, ActorID, ApprovalRef, IdempotencyKey string
+	TenantID, ServiceInstanceID, PlanHash, ActorID, ApprovalRef, IdempotencyKey string
 }
 
 var _ attachmentsv1.Service = (*Service)(nil)
@@ -171,7 +171,8 @@ func (f *Service) AddDomain(ctx context.Context, r attachmentsv1.DomainRequest) 
 
 // Purge is intentionally outside the broad agent-facing v1 Service contract:
 // callers must supply an approval reference that the core verifies against the
-// tenant, actor, and exact service instance before the provider is touched.
+// tenant, actor, exact service instance, and canonical destructive plan before
+// the provider is touched.
 func (f *Service) Purge(ctx context.Context, r PurgeRequest) (attachmentsv1.ServiceInstanceRef, error) {
 	core, err := f.core()
 	if err != nil {
@@ -179,7 +180,7 @@ func (f *Service) Purge(ctx context.Context, r PurgeRequest) (attachmentsv1.Serv
 	}
 	instance, err := core.PurgeService(ctx, application.PurgeServiceRequest{
 		TenantID: r.TenantID, InstanceID: r.ServiceInstanceID, ActorID: r.ActorID,
-		ApprovalRef: r.ApprovalRef, IdempotencyKey: r.IdempotencyKey,
+		PlanHash: r.PlanHash, ApprovalRef: r.ApprovalRef, IdempotencyKey: r.IdempotencyKey,
 	})
 	if err != nil {
 		return attachmentsv1.ServiceInstanceRef{}, err

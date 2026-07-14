@@ -179,6 +179,48 @@ type ServicePlan struct {
 	CreatedAt              time.Time                 `json:"created_at"`
 }
 
+// ProviderResourceDestroyPlan is the value-only, canonical intent that must be
+// approved before a managed provider resource can be destroyed. It binds the
+// approval to both the external target and the immutable provider mapping.
+type ProviderResourceDestroyPlan struct {
+	Action                 string                    `json:"action"`
+	TenantID               string                    `json:"tenant_id"`
+	ResourceID             string                    `json:"resource_id"`
+	ProviderID             string                    `json:"provider_id"`
+	ServiceType            attachmentsv1.ServiceType `json:"service_type"`
+	PlanID                 string                    `json:"plan_id"`
+	PlanVersion            int64                     `json:"plan_version"`
+	Provider               string                    `json:"provider"`
+	ProviderPlan           string                    `json:"provider_plan"`
+	ProviderMappingVersion string                    `json:"provider_mapping_version"`
+	BackupBeforePurge      bool                      `json:"backup_before_purge"`
+}
+
+func NewProviderResourceDestroyPlan(instance ServiceInstance, plan ServicePlan) (ProviderResourceDestroyPlan, error) {
+	value := ProviderResourceDestroyPlan{
+		Action:                 "destroy",
+		TenantID:               strings.TrimSpace(instance.TenantID),
+		ResourceID:             strings.TrimSpace(instance.ID),
+		ProviderID:             strings.TrimSpace(instance.ProviderID),
+		ServiceType:            instance.Type,
+		PlanID:                 strings.TrimSpace(plan.ID),
+		PlanVersion:            plan.Version,
+		Provider:               strings.TrimSpace(plan.Provider),
+		ProviderPlan:           strings.TrimSpace(plan.ProviderPlan),
+		ProviderMappingVersion: strings.TrimSpace(plan.ProviderMappingVersion),
+		BackupBeforePurge:      plan.BackupBeforePurge,
+	}
+	if value.TenantID == "" || value.ResourceID == "" || value.ProviderID == "" || value.PlanID == "" || value.PlanVersion < 1 ||
+		value.Provider == "" || value.ProviderPlan == "" || value.ProviderMappingVersion == "" || instance.PlanID != plan.ID || instance.PlanVersion != plan.Version || instance.Type != plan.Type {
+		return ProviderResourceDestroyPlan{}, NewError(CodeInvalidArgument, "invalid provider resource destroy plan")
+	}
+	return value, nil
+}
+
+func (p ProviderResourceDestroyPlan) PlanHash() string {
+	return "sha256:" + Hash(p)
+}
+
 func NewServicePlan(id string, version int64, serviceType attachmentsv1.ServiceType, provider, providerPlan, mappingVersion string, dedicated bool, capabilities []string, enabled, backupBeforePurge bool, createdAt time.Time) (ServicePlan, error) {
 	plan := ServicePlan{ID: strings.TrimSpace(id), Version: version, Type: serviceType, Provider: strings.TrimSpace(provider), ProviderPlan: strings.TrimSpace(providerPlan), ProviderMappingVersion: strings.TrimSpace(mappingVersion), Dedicated: dedicated, Capabilities: CanonicalStrings(capabilities), Enabled: enabled, BackupBeforePurge: backupBeforePurge, CreatedAt: createdAt.UTC()}
 	if plan.ID == "" || plan.Version < 1 || plan.Provider == "" || plan.ProviderPlan == "" || plan.ProviderMappingVersion == "" || plan.CreatedAt.IsZero() || len(plan.Capabilities) == 0 {

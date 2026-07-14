@@ -256,11 +256,13 @@ func (c *Certificates) Status(context.Context, string) (application.CertificateR
 	return c.StatusResult, c.StatusErr
 }
 
-type Approvals struct{ Grants map[string][3]string }
+type Approvals struct {
+	Grants map[string]application.ApprovalBinding
+}
 
-func (a *Approvals) Verify(_ context.Context, ref, tenant, actor, resource string) error {
+func (a *Approvals) Verify(_ context.Context, ref string, binding application.ApprovalBinding) error {
 	value, ok := a.Grants[ref]
-	if !ok || value != [3]string{tenant, actor, resource} {
+	if !ok || value != binding {
 		return errors.New("approval denied")
 	}
 	delete(a.Grants, ref)

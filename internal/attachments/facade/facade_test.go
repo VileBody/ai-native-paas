@@ -24,7 +24,7 @@ func facadeFixture(t *testing.T) (*facade.Service, *testkit.Vault, *testkit.Prov
 		Environments: &testkit.Environments{Values: map[string]application.EnvironmentRef{
 			"env-1": {TenantID: "tenant-1", ApplicationID: "app-1", EnvironmentID: "env-1", Ready: true},
 		}},
-		Secrets: vault, Provider: provider, Approvals: &testkit.Approvals{Grants: map[string][3]string{}},
+		Secrets: vault, Provider: provider, Approvals: &testkit.Approvals{Grants: map[string]application.ApprovalBinding{}},
 		Commerce: &testkit.Commerce{Allowed: true}, Usage: &testkit.Usage{}, Runtime: testkit.NewRuntime(),
 		Clock: clock, IDs: &application.SequentialIDs{},
 	}

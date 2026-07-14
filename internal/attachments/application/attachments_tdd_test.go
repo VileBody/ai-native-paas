@@ -29,6 +29,7 @@ type fixture struct {
 	runtime  *testkit.Runtime
 	logger   *testkit.Logger
 	approval *testkit.Approvals
+	plan     domain.ServicePlan
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -41,13 +42,29 @@ func newFixture(t *testing.T) *fixture {
 	certs := &testkit.Certificates{EnsureResult: application.CertificateResult{CertificateID: "cert-1", Status: application.CertificateReady}}
 	runtime := testkit.NewRuntime()
 	logger := &testkit.Logger{}
-	approval := &testkit.Approvals{Grants: map[string][3]string{}}
+	approval := &testkit.Approvals{Grants: map[string]application.ApprovalBinding{}}
 	service := &application.Service{Store: store, Environments: &testkit.Environments{Values: map[string]application.EnvironmentRef{"env-1": {TenantID: "tenant-1", ApplicationID: "app-1", EnvironmentID: "env-1", Name: "production", Ready: true}}}, Secrets: vault, Provider: provider, DNS: dns, Certificates: certs, Approvals: approval, Runtime: runtime, Commerce: &testkit.Commerce{Allowed: true}, Usage: &testkit.Usage{}, Logger: logger, Clock: clock, IDs: &application.SequentialIDs{}, DefaultDomain: "apps.example.test", DNSObservationDelay: time.Minute, DomainQuarantine: time.Hour}
 	plan, err := domain.NewServicePlan("pg-small", 1, attachmentsv1.ServicePostgreSQL, "cozystack", "small", "mapping-v1", false, []string{"connect", "read", "write"}, true, true, clock.Now())
 	if err != nil || service.RegisterServicePlan(context.Background(), plan, "system") != nil {
 		t.Fatalf("register plan: %v", err)
 	}
-	return &fixture{service: service, store: store, clock: clock, vault: vault, provider: provider, dns: dns, certs: certs, runtime: runtime, logger: logger, approval: approval}
+	return &fixture{service: service, store: store, clock: clock, vault: vault, provider: provider, dns: dns, certs: certs, runtime: runtime, logger: logger, approval: approval, plan: plan}
+}
+
+func (f *fixture) purgePlanHash(t *testing.T, value domain.ServiceInstance) string {
+	t.Helper()
+	plan, err := domain.NewProviderResourceDestroyPlan(value, f.plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan.PlanHash()
+}
+
+func (f *fixture) grantPurge(t *testing.T, ref, actor string, value domain.ServiceInstance) application.PurgeServiceRequest {
+	t.Helper()
+	planHash := f.purgePlanHash(t, value)
+	f.approval.Grants[ref] = application.ApprovalBinding{TenantID: value.TenantID, ActorID: actor, TargetID: value.ID, PlanHash: planHash}
+	return application.PurgeServiceRequest{TenantID: value.TenantID, InstanceID: value.ID, PlanHash: planHash, ActorID: actor, ApprovalRef: ref}
 }
 
 func (f *fixture) setRuntime(t *testing.T, name, value, key string) attachmentsv1.SecretMetadata {
@@ -432,16 +449,17 @@ func TestServicePurge_RequiresValidApprovalReference(t *testing.T) {
 func TestServicePurge_ApprovalMustMatchInstanceAndActor(t *testing.T) {
 	f := newFixture(t)
 	value := f.provision(t)
-	f.approval.Grants["grant"] = [3]string{"tenant-1", "other", value.ID}
-	if _, err := f.service.PurgeService(context.Background(), application.PurgeServiceRequest{TenantID: "tenant-1", InstanceID: value.ID, ActorID: "user-1", ApprovalRef: "grant"}); err == nil {
+	planHash := f.purgePlanHash(t, value)
+	f.approval.Grants["grant"] = application.ApprovalBinding{TenantID: "tenant-1", ActorID: "other", TargetID: value.ID, PlanHash: planHash}
+	if _, err := f.service.PurgeService(context.Background(), application.PurgeServiceRequest{TenantID: "tenant-1", InstanceID: value.ID, PlanHash: planHash, ActorID: "user-1", ApprovalRef: "grant"}); err == nil {
 		t.Fatal("mismatched approval accepted")
 	}
 }
 func TestServicePurge_CreatesFinalBackupWhenPolicyRequires(t *testing.T) {
 	f := newFixture(t)
 	value := f.provision(t)
-	f.approval.Grants["grant"] = [3]string{"tenant-1", "user-1", value.ID}
-	value, err := f.service.PurgeService(context.Background(), application.PurgeServiceRequest{TenantID: "tenant-1", InstanceID: value.ID, ActorID: "user-1", ApprovalRef: "grant"})
+	request := f.grantPurge(t, "grant", "user-1", value)
+	value, err := f.service.PurgeService(context.Background(), request)
 	if err != nil || value.State != attachmentsv1.ServiceDeleted || value.FinalBackupID == "" {
 		t.Fatalf("value=%+v err=%v", value, err)
 	}
@@ -449,8 +467,8 @@ func TestServicePurge_CreatesFinalBackupWhenPolicyRequires(t *testing.T) {
 func TestServicePurge_IsIrreversibleAfterProviderDelete(t *testing.T) {
 	f := newFixture(t)
 	value := f.provision(t)
-	f.approval.Grants["grant"] = [3]string{"tenant-1", "user-1", value.ID}
-	_, _ = f.service.PurgeService(context.Background(), application.PurgeServiceRequest{TenantID: "tenant-1", InstanceID: value.ID, ActorID: "user-1", ApprovalRef: "grant"})
+	request := f.grantPurge(t, "grant", "user-1", value)
+	_, _ = f.service.PurgeService(context.Background(), request)
 	_, err := f.service.PurgeService(context.Background(), application.PurgeServiceRequest{TenantID: "tenant-1", InstanceID: value.ID, ActorID: "user-1", ApprovalRef: "other"})
 	if err != nil || f.provider.DeleteCalls != 1 {
 		t.Fatalf("deletes=%d err=%v", f.provider.DeleteCalls, err)
@@ -459,8 +477,8 @@ func TestServicePurge_IsIrreversibleAfterProviderDelete(t *testing.T) {
 func TestServicePurge_AuditContainsNoCredential(t *testing.T) {
 	f := newFixture(t)
 	value := f.provision(t)
-	f.approval.Grants["grant"] = [3]string{"tenant-1", "user-1", value.ID}
-	_, _ = f.service.PurgeService(context.Background(), application.PurgeServiceRequest{TenantID: "tenant-1", InstanceID: value.ID, ActorID: "user-1", ApprovalRef: "grant"})
+	request := f.grantPurge(t, "grant", "user-1", value)
+	_, _ = f.service.PurgeService(context.Background(), request)
 	if containsJSON(f.store.Audit(), sentinel) || containsJSON(f.store.Audit(), "postgres://secret") {
 		t.Fatal("audit leaked credential")
 	}

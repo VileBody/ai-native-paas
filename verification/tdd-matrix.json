@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 943,
-  "discovered_unique_test_name_count": 941,
+  "discovered_go_test_count": 944,
+  "discovered_unique_test_name_count": 942,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -838,7 +838,7 @@
       "id": "A5.19",
       "level": "governance",
       "name": "TestProviderResource_DestroyRequiresMatchingPlanHashApproval",
-      "status": "NEW",
+      "status": "REUSED",
       "test_file": "test/pivot/attachments_v2_test.go",
       "test_name": "TestProviderResource_DestroyRequiresMatchingPlanHashApproval",
       "test_ref": "test/pivot/attachments_v2_test.go::TestProviderResource_DestroyRequiresMatchingPlanHashApproval"
@@ -1590,8 +1590,8 @@
     },
     "statuses": {
       "LIVE_ONLY": 66,
-      "NEW": 14,
-      "REUSED": 77
+      "NEW": 13,
+      "REUSED": 78
     },
     "unmapped": 0
   }

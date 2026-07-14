@@ -929,13 +929,24 @@ func (s *Service) PurgeService(ctx context.Context, r PurgeServiceRequest) (doma
 	if v.State == attachmentsv1.ServiceDeleted {
 		return v, nil
 	}
+	p, err := s.plan(ctx, v.PlanID, v.PlanVersion)
+	if err != nil {
+		return v, err
+	}
+	destroyPlan, err := domain.NewProviderResourceDestroyPlan(v, p)
+	if err != nil {
+		return v, err
+	}
+	actualPlanHash := destroyPlan.PlanHash()
 	if r.ApprovalRef == "" || s.Approvals == nil {
 		return v, domain.NewError(domain.CodeApprovalRequired, "purge approval required")
 	}
-	if err = s.Approvals.Verify(ctx, r.ApprovalRef, r.TenantID, r.ActorID, r.InstanceID); err != nil {
+	if r.PlanHash != actualPlanHash {
+		return v, domain.NewError(domain.CodeForbidden, "destructive plan hash mismatch")
+	}
+	if err = s.Approvals.Verify(ctx, r.ApprovalRef, ApprovalBinding{TenantID: r.TenantID, ActorID: r.ActorID, TargetID: r.InstanceID, PlanHash: actualPlanHash}); err != nil {
 		return v, domain.NewError(domain.CodeForbidden, "approval mismatch")
 	}
-	p, _ := s.plan(ctx, v.PlanID, v.PlanVersion)
 	now := s.Clock.Now()
 	err = s.Store.Transact(ctx, func(tx Tx) error {
 		cur, _ := tx.GetInstance(v.ID)
@@ -947,7 +958,7 @@ func (s *Service) PurgeService(ctx context.Context, r PurgeServiceRequest) (doma
 			return err
 		}
 		v = cur
-		return s.records(tx, now, r.TenantID, r.ActorID, "attachments.service.purge.started", cur.ID, map[string]any{"instance_id": cur.ID, "approval_ref": r.ApprovalRef})
+		return s.records(tx, now, r.TenantID, r.ActorID, "attachments.service.purge.started", cur.ID, map[string]any{"instance_id": cur.ID, "approval_ref": r.ApprovalRef, "plan_hash": actualPlanHash})
 	})
 	if err != nil {
 		return v, err

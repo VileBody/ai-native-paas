@@ -3,9 +3,9 @@
 Generated from `docs/pivot/tdd-catalog.json`. Do not edit by hand.
 
 - Pivot requirements: **157**
-- Discovered Go tests/fuzz targets: **943**
-- Reused now: **77**
-- New local/contract tests required: **14**
+- Discovered Go tests/fuzz targets: **944**
+- Reused now: **78**
+- New local/contract tests required: **13**
 - Live/provider/system tests required: **66**
 - Unmapped: **0**
 
@@ -97,7 +97,7 @@ A release gate may become green only after every referenced test exists and pass
 | `A5.16` | LIVE_ONLY | provider contract | `test/pivot/attachments_v2_test.go::TestProviderResource_LostApplyResponseRecoveredByExternalIdentity` |
 | `A5.17` | LIVE_ONLY | application | `test/pivot/attachments_v2_test.go::TestProviderResource_ObservedReadyCreatesBindingsAndUsageOnce` |
 | `A5.18` | LIVE_ONLY | application/provider | `test/pivot/attachments_v2_test.go::TestProviderResource_DeletePolicyRetainDoesNotDestroyData` |
-| `A5.19` | NEW | governance | `test/pivot/attachments_v2_test.go::TestProviderResource_DestroyRequiresMatchingPlanHashApproval` |
+| `A5.19` | REUSED | governance | `test/pivot/attachments_v2_test.go::TestProviderResource_DestroyRequiresMatchingPlanHashApproval` |
 | `A5.20` | LIVE_ONLY | provider/system | `test/pivot/attachments_v2_test.go::TestProviderResource_FinalBackupCompletesBeforeApprovedPurge` |
 | `A5.21` | LIVE_ONLY | gateway integration | `test/pivot/attachments_v2_test.go::TestCapability_OpenRouterTokenIsProjectScopedAndMasterKeyHidden` |
 | `A5.22` | LIVE_ONLY | commerce/gateway | `test/pivot/attachments_v2_test.go::TestCapability_BudgetExceededStopsRequestBeforeProviderCall` |

@@ -118,8 +118,15 @@ type CertificateProvider interface {
 	Status(context.Context, string) (CertificateResult, error)
 }
 
+type ApprovalBinding struct {
+	TenantID string
+	ActorID  string
+	TargetID string
+	PlanHash string
+}
+
 type ApprovalVerifier interface {
-	Verify(context.Context, string, string, string, string) error
+	Verify(context.Context, string, ApprovalBinding) error
 }
 
 type RuntimeSnapshotPublisher interface {
@@ -188,7 +195,7 @@ type BindServiceRequest struct {
 }
 type RotateBindingRequest struct{ TenantID, BindingID, ActorID, IdempotencyKey string }
 type RevokeBindingRequest struct{ TenantID, BindingID, ActorID, IdempotencyKey string }
-type PurgeServiceRequest struct{ TenantID, InstanceID, ApprovalRef, ActorID, IdempotencyKey string }
+type PurgeServiceRequest struct{ TenantID, InstanceID, PlanHash, ApprovalRef, ActorID, IdempotencyKey string }
 type GeneratedDomainRequest struct{ TenantID, ApplicationID, EnvironmentID, PreferredName, ActorID, IdempotencyKey string }
 type ClaimDomainRequest struct{ TenantID, ApplicationID, EnvironmentID, Hostname, ActorID, IdempotencyKey string }
 type VerifyDomainRequest struct{ TenantID, ClaimID, ActorID string }

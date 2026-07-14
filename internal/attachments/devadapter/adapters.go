@@ -112,7 +112,7 @@ func (Certificates) Status(_ context.Context, id string) (application.Certificat
 
 type Approvals struct{}
 
-func (Approvals) Verify(context.Context, string, string, string, string) error { return nil }
+func (Approvals) Verify(context.Context, string, application.ApprovalBinding) error { return nil }
 
 type Runtime struct {
 	mu        sync.Mutex
