@@ -51,6 +51,10 @@ Implemented:
   stored workspace credentials and is reversible without changing provider
   identity. Purge is a separate fail-closed command bound to an exact approval
   grant and records GitLab.com's delayed deletion as `PURGE_PENDING`.
+- Direct-group reconciliation never adopts a path match. Unknown GitLab
+  projects without the exact platform correlation marker and managed topic are
+  persisted in platform quarantine without changing tenant repository
+  identity.
 
 Evidence:
 
@@ -66,8 +70,8 @@ Evidence:
   `TestPostgres_WorkspaceCommitReceiptMigrationAndRoundTrip` passed. The pod
   was deleted immediately after the test.
 - Pivot matrix discovers executable evidence for S1, S2, S3, S4, S5, S6, S7,
-  S9, S10, S12, S13, S14, S15, S16 and S17; the complete matrix remains mapped
-  at 157 requirements and now discovers 903 Go test/fuzz targets.
+  S9, S10, S12, S13, S14, S15, S16, S17 and S18; the complete matrix remains
+  mapped at 157 requirements and now discovers 907 Go test/fuzz targets.
 - Managed PostgreSQL migration `004_branch_environment_cleanup.sql`, the full
   tagged Source suite and the real Store round-trip passed in temporary
   in-cluster test pods; see
@@ -81,11 +85,13 @@ Evidence:
   `docs/evidence/phase-4/gitlab-project-archive-2026-07-14.md`.
 - Exact-base v2 repository bootstrap and durable bootstrap revision pass the S1
   contract; see `docs/evidence/phase-4/project-bootstrap-v2-2026-07-14.md`.
+- Unknown-provider quarantine without tenant adoption passes the S18 contract;
+  see `docs/evidence/phase-4/gitlab-provider-quarantine-2026-07-14.md`.
 
 Remaining source gates:
 
 - GitLab.com live token isolation, rename/transfer and lifecycle mutation
-  tests;
+  tests, plus the live unknown-project inventory gate;
 - runtime consumption of preview cleanup intents;
 - live signed-image proof for the implemented task-UID and command-scoped
   identity-FD boundary; see

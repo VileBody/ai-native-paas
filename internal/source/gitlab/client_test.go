@@ -33,12 +33,34 @@ func TestGitLab_CreateRepositoryUsesNumericNamespaceAndPrivateVisibility(t *test
 	if err != nil || repo.ID != 42 {
 		t.Fatal(repo, err)
 	}
-	if body["namespace_id"] != float64(7) || body["visibility"] != "private" {
+	topics, topicsOK := body["topics"].([]any)
+	if body["namespace_id"] != float64(7) || body["visibility"] != "private" || !topicsOK || len(topics) != 1 || topics[0] != "ai-native-paas" {
 		t.Fatalf("body=%v", body)
 	}
 	raw, _ := json.Marshal(body)
 	if strings.Contains(string(raw), "admin-secret") {
 		t.Fatal("admin token leaked into body")
+	}
+}
+func TestGitLab_ListNamespaceRepositoriesReturnsManagedIdentityWithoutSharedProjects(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/v4/groups/7/projects" || r.URL.Query().Get("with_shared") != "false" || r.URL.Query().Get("include_subgroups") != "false" || r.URL.Query().Get("per_page") != "100" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+		_, _ = io.WriteString(w, `[
+          {"id":42,"namespace":{"id":7},"path":"booking","path_with_namespace":"acme/booking","web_url":"https://git/acme/booking","default_branch":"main","description":"[paas-correlation:corr-42]","topics":["ai-native-paas"]},
+          {"id":99,"namespace":{"id":8},"path":"shared","path_with_namespace":"other/shared","description":"[paas-correlation:other]","topics":["ai-native-paas"]}
+        ]`)
+	}))
+	defer server.Close()
+	c := gitlab.Client{BaseURL: server.URL}
+	repositories, err := c.ListRepositoriesByNamespace(context.Background(), 7)
+	if err != nil || len(repositories) != 1 {
+		t.Fatalf("repositories=%+v err=%v", repositories, err)
+	}
+	repository := repositories[0]
+	if repository.ID != 42 || repository.ExternalID != "corr-42" || len(repository.Topics) != 1 || repository.Topics[0] != "ai-native-paas" {
+		t.Fatalf("repository=%+v", repository)
 	}
 }
 func TestGitLab_CreateConflictRecoversByCorrelationMarker(t *testing.T) {
@@ -52,7 +74,7 @@ func TestGitLab_CreateConflictRecoversByCorrelationMarker(t *testing.T) {
 			http.Error(w, `{"message":"has already been taken"}`, http.StatusConflict)
 			return
 		}
-		_, _ = io.WriteString(w, `[{"id":42,"namespace":{"id":7},"path":"booking","path_with_namespace":"acme/booking","web_url":"https://git/acme/booking","default_branch":"main","description":"[paas-correlation:corr]"}]`)
+		_, _ = io.WriteString(w, `[{"id":42,"namespace":{"id":7},"path":"booking","path_with_namespace":"acme/booking","web_url":"https://git/acme/booking","default_branch":"main","description":"[paas-correlation:corr]","topics":["ai-native-paas"]}]`)
 	}))
 	defer server.Close()
 	c := gitlab.Client{BaseURL: server.URL}

@@ -228,6 +228,34 @@ func (a *txAdapter) ListRepositories() []domain.Repository {
 	a.capture(rows.Err())
 	return out
 }
+func scanProviderQuarantine(row interface{ Scan(...any) error }) (domain.ProviderQuarantine, error) {
+	var value domain.ProviderQuarantine
+	err := row.Scan(
+		&value.Provider, &value.ProviderNamespaceID, &value.ProviderProjectID, &value.ProviderPath, &value.WebURL,
+		&value.CandidateRepositoryID, &value.Reason, &value.ExternalIdentityMatched, &value.ManagedLabelPresent,
+		&value.FirstObservedAt, &value.LastObservedAt, &value.Version,
+	)
+	return value, err
+}
+
+const providerQuarantineColumns = "provider,provider_namespace_id,provider_project_id,provider_path,web_url,candidate_repository_id,reason,external_identity_matched,managed_label_present,first_observed_at,last_observed_at,version"
+
+func (a *txAdapter) GetProviderQuarantine(provider string, providerProjectID int64) (domain.ProviderQuarantine, bool) {
+	value, err := scanProviderQuarantine(a.tx.QueryRow("SELECT "+providerQuarantineColumns+" FROM source.provider_project_quarantine WHERE provider=$1 AND provider_project_id=$2", provider, providerProjectID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return value, false
+	}
+	a.capture(err)
+	return value, err == nil
+}
+func (a *txAdapter) UpsertProviderQuarantine(value domain.ProviderQuarantine, expected int64) error {
+	if expected == 0 {
+		_, err := a.tx.Exec("INSERT INTO source.provider_project_quarantine("+providerQuarantineColumns+") VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)", value.Provider, value.ProviderNamespaceID, value.ProviderProjectID, value.ProviderPath, value.WebURL, value.CandidateRepositoryID, value.Reason, value.ExternalIdentityMatched, value.ManagedLabelPresent, value.FirstObservedAt, value.LastObservedAt, value.Version)
+		return mapDB(err)
+	}
+	res, err := a.tx.Exec("UPDATE source.provider_project_quarantine SET provider_namespace_id=$1,provider_path=$2,web_url=$3,candidate_repository_id=$4,reason=$5,external_identity_matched=$6,managed_label_present=$7,last_observed_at=$8,version=$9 WHERE provider=$10 AND provider_project_id=$11 AND version=$12", value.ProviderNamespaceID, value.ProviderPath, value.WebURL, value.CandidateRepositoryID, value.Reason, value.ExternalIdentityMatched, value.ManagedLabelPresent, value.LastObservedAt, value.Version, value.Provider, value.ProviderProjectID, expected)
+	return affected(res, err, "provider quarantine")
+}
 func (a *txAdapter) GetBranch(repo, name string) (domain.BranchHead, bool) {
 	var b domain.BranchHead
 	var eventAt, observedAt, deletedAt sql.NullTime

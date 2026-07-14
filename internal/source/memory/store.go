@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/keir-research/ai-native-paas/internal/source/application"
@@ -11,6 +12,7 @@ import (
 type state struct {
 	projects      map[string]domain.Project
 	repositories  map[string]domain.Repository
+	quarantines   map[string]domain.ProviderQuarantine
 	branches      map[string]domain.BranchHead
 	mergeRequests map[string]domain.MergeRequest
 	workspaces    map[string]domain.Workspace
@@ -26,7 +28,7 @@ type Store struct {
 
 func New() *Store { return &Store{s: newState()} }
 func newState() state {
-	return state{projects: map[string]domain.Project{}, repositories: map[string]domain.Repository{}, branches: map[string]domain.BranchHead{}, mergeRequests: map[string]domain.MergeRequest{}, workspaces: map[string]domain.Workspace{}, idempotency: map[string]application.IdempotencyRecord{}, webhooks: map[string]application.WebhookReceipt{}}
+	return state{projects: map[string]domain.Project{}, repositories: map[string]domain.Repository{}, quarantines: map[string]domain.ProviderQuarantine{}, branches: map[string]domain.BranchHead{}, mergeRequests: map[string]domain.MergeRequest{}, workspaces: map[string]domain.Workspace{}, idempotency: map[string]application.IdempotencyRecord{}, webhooks: map[string]application.WebhookReceipt{}}
 }
 func clone(in state) state {
 	out := newState()
@@ -35,6 +37,9 @@ func clone(in state) state {
 	}
 	for k, v := range in.repositories {
 		out.repositories[k] = v
+	}
+	for k, v := range in.quarantines {
+		out.quarantines[k] = v
 	}
 	for k, v := range in.branches {
 		out.branches[k] = v
@@ -160,6 +165,28 @@ func (t *tx) ListRepositories() []domain.Repository {
 		out = append(out, v)
 	}
 	return out
+}
+func quarantineKey(provider string, providerProjectID int64) string {
+	return provider + "\x00" + fmt.Sprintf("%d", providerProjectID)
+}
+func (t *tx) GetProviderQuarantine(provider string, providerProjectID int64) (domain.ProviderQuarantine, bool) {
+	value, ok := t.quarantines[quarantineKey(provider, providerProjectID)]
+	return value, ok
+}
+func (t *tx) UpsertProviderQuarantine(value domain.ProviderQuarantine, expected int64) error {
+	key := quarantineKey(value.Provider, value.ProviderProjectID)
+	current, exists := t.quarantines[key]
+	if !exists && expected != 0 {
+		return domain.NewError(domain.CodeStaleVersion, "provider quarantine does not exist")
+	}
+	if exists && current.Version != expected {
+		return domain.NewError(domain.CodeStaleVersion, "provider quarantine version mismatch")
+	}
+	if exists && (current.Provider != value.Provider || current.ProviderProjectID != value.ProviderProjectID) {
+		return domain.NewError(domain.CodeConflict, "provider quarantine identity immutable")
+	}
+	t.quarantines[key] = value
+	return nil
 }
 func branchKey(repo, name string) string { return repo + "\x00" + name }
 func (t *tx) GetBranch(repo, name string) (domain.BranchHead, bool) {

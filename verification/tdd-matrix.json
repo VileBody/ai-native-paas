@@ -1,6 +1,6 @@
 {
-  "discovered_go_test_count": 903,
-  "discovered_unique_test_name_count": 901,
+  "discovered_go_test_count": 907,
+  "discovered_unique_test_name_count": 905,
   "pivot_requirement_count": 157,
   "requirements": [
     {
@@ -318,7 +318,7 @@
       "id": "S18",
       "level": "reconciliation",
       "name": "TestSource_UnknownProviderProjectIsQuarantinedNotAdopted",
-      "status": "LIVE_ONLY",
+      "status": "REUSED",
       "test_file": "test/pivot/source_v2_test.go",
       "test_name": "TestSource_UnknownProviderProjectIsQuarantinedNotAdopted",
       "test_ref": "test/pivot/source_v2_test.go::TestSource_UnknownProviderProjectIsQuarantinedNotAdopted"
@@ -1589,9 +1589,9 @@
       "S": 18
     },
     "statuses": {
-      "LIVE_ONLY": 68,
+      "LIVE_ONLY": 67,
       "NEW": 44,
-      "REUSED": 45
+      "REUSED": 46
     },
     "unmapped": 0
   }

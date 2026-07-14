@@ -70,7 +70,7 @@ func (p *Provider) CreateRepository(_ context.Context, r application.CreateRepos
 		return p.Repositories[id], nil
 	}
 	p.NextID++
-	repo := application.ProviderRepository{ID: p.NextID, NamespaceID: r.NamespaceID, Path: r.Path, PathWithNamespace: fmt.Sprintf("group-%d/%s", r.NamespaceID, r.Path), WebURL: "https://git.example/" + r.Path, DefaultBranch: r.DefaultBranch, Description: "[paas-correlation:" + r.CorrelationID + "]"}
+	repo := application.ProviderRepository{ID: p.NextID, NamespaceID: r.NamespaceID, Path: r.Path, PathWithNamespace: fmt.Sprintf("group-%d/%s", r.NamespaceID, r.Path), WebURL: "https://git.example/" + r.Path, DefaultBranch: r.DefaultBranch, Description: "[paas-correlation:" + r.CorrelationID + "]", ExternalID: r.CorrelationID, Topics: []string{"ai-native-paas"}}
 	p.Repositories[repo.ID] = repo
 	p.Correlations[r.CorrelationID] = repo.ID
 	p.Heads[key(repo.ID, r.DefaultBranch)] = strings40("a")
@@ -79,6 +79,18 @@ func (p *Provider) CreateRepository(_ context.Context, r application.CreateRepos
 		return application.ProviderRepository{}, errors.New("lost response after create")
 	}
 	return repo, nil
+}
+func (p *Provider) ListRepositoriesByNamespace(_ context.Context, namespaceID int64) ([]application.ProviderRepository, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	var repositories []application.ProviderRepository
+	for id, repository := range p.Repositories {
+		if repository.NamespaceID == namespaceID && !p.DeletedProjects[id] {
+			repository.Topics = append([]string(nil), repository.Topics...)
+			repositories = append(repositories, repository)
+		}
+	}
+	return repositories, nil
 }
 func (p *Provider) FindRepositoryByCorrelation(_ context.Context, _ int64, corr string) (application.ProviderRepository, bool, error) {
 	p.mu.Lock()
@@ -219,6 +231,11 @@ func noteMarker(body string) string {
 func (p *Provider) SetHead(id int64, branch, sha string) {
 	p.mu.Lock()
 	p.Heads[key(id, branch)] = sha
+	p.mu.Unlock()
+}
+func (p *Provider) PutRepository(repository application.ProviderRepository) {
+	p.mu.Lock()
+	p.Repositories[repository.ID] = repository
 	p.mu.Unlock()
 }
 func (p *Provider) Rename(id int64, path string) {

@@ -57,6 +57,8 @@ type Tx interface {
 	InsertRepository(domain.Repository) error
 	UpdateRepository(domain.Repository, int64) error
 	ListRepositories() []domain.Repository
+	GetProviderQuarantine(provider string, providerProjectID int64) (domain.ProviderQuarantine, bool)
+	UpsertProviderQuarantine(domain.ProviderQuarantine, int64) error
 
 	GetBranch(repositoryID, name string) (domain.BranchHead, bool)
 	UpsertBranch(domain.BranchHead, int64) error
@@ -87,6 +89,8 @@ type ProviderRepository struct {
 	WebURL            string
 	DefaultBranch     string
 	Description       string
+	ExternalID        string
+	Topics            []string
 	Archived          bool
 }
 type ProviderCredential struct {
@@ -136,6 +140,7 @@ type RepositoryBootstrapper interface {
 
 type GitProvider interface {
 	CreateRepository(context.Context, CreateRepositoryRequest) (ProviderRepository, error)
+	ListRepositoriesByNamespace(context.Context, int64) ([]ProviderRepository, error)
 	FindRepositoryByCorrelation(context.Context, int64, string) (ProviderRepository, bool, error)
 	GetRepository(context.Context, int64) (ProviderRepository, error)
 	ProtectBranch(context.Context, int64, string) error

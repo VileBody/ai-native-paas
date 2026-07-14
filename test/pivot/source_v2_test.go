@@ -127,7 +127,11 @@ func TestSource_CreateProjectBootstrapsV2RepositoryLayout(t *testing.T) {
 			if body.NamespaceID != 77 || body.Path != "booking" || body.Visibility != "private" || !strings.Contains(body.Description, "paas-correlation:") {
 				t.Fatalf("unsafe project create body: %+v", body)
 			}
-			_, _ = io.WriteString(w, `{"id":42,"namespace":{"id":77},"path":"booking","path_with_namespace":"beta/booking","web_url":"https://gitlab.example/beta/booking","default_branch":"main","description":"platform-managed"}`)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id": 42, "namespace": map[string]any{"id": 77}, "path": "booking", "path_with_namespace": "beta/booking",
+				"web_url": "https://gitlab.example/beta/booking", "default_branch": "main", "description": body.Description,
+				"topics": []string{"ai-native-paas"},
+			})
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v4/projects/42/protected_branches":
 			w.WriteHeader(http.StatusCreated)
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v4/projects/42/repository/branches/main":
@@ -448,7 +452,7 @@ func TestSource_GitLab429UsesBoundedRetryAndPreservesIdempotency(t *testing.T) {
 			_ = json.NewEncoder(w).Encode([]map[string]any{{
 				"id": 42, "namespace": map[string]any{"id": 10}, "path": "rate-limited",
 				"path_with_namespace": "beta/rate-limited", "web_url": "https://gitlab.example/beta/rate-limited",
-				"default_branch": "main", "description": correlationDescription,
+				"default_branch": "main", "description": correlationDescription, "topics": []string{"ai-native-paas"},
 			}})
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v4/projects/42/protected_branches":
 			protectCalls++
@@ -558,5 +562,57 @@ func TestSource_ProjectArchiveIsTwoPhaseAndReversibleBeforePurge(t *testing.T) {
 	}
 	if _, err = fixture.service.RestoreRepository(context.Background(), sourceapp.RestoreRepositoryCommand{TenantID: "tenant-1", ActorID: "user-1", RepositoryID: fixture.repository.ID, IdempotencyKey: "restore-after-purge"}); !domain.HasCode(err, domain.CodeConflict) || fixture.provider.UnarchiveCalls != 1 {
 		t.Fatalf("purge-pending restore err=%v unarchive=%d", err, fixture.provider.UnarchiveCalls)
+	}
+}
+
+func TestSource_UnknownProviderProjectIsQuarantinedNotAdopted(t *testing.T) {
+	fixture := newSourceV2Fixture(t)
+	unknown := sourceapp.ProviderRepository{
+		ID: 909, NamespaceID: fixture.repository.ProviderNamespaceID, Path: fixture.project.Slug,
+		PathWithNamespace: "group-10/" + fixture.project.Slug, WebURL: "https://git.example/unmanaged",
+		DefaultBranch: "main", Description: "customer-created project without platform identity",
+	}
+	fixture.provider.PutRepository(unknown)
+	fixture.provider.PutRepository(sourceapp.ProviderRepository{
+		ID: 910, NamespaceID: fixture.repository.ProviderNamespaceID, Path: "unrelated-customer-project",
+		PathWithNamespace: "group-10/unrelated-customer-project", DefaultBranch: "main",
+	})
+	reconciler := sourceapp.Reconciler{Store: fixture.store, Provider: fixture.provider, Clock: fixture.clock, IDs: fixture.ids}
+	first, err := reconciler.ReconcileAll(context.Background())
+	if err != nil || first.Quarantines != 1 || first.QuarantineChanges != 1 || first.Errors != 0 {
+		t.Fatalf("first reconciliation=%+v err=%v", first, err)
+	}
+	var quarantined domain.ProviderQuarantine
+	var unrelatedFound bool
+	var repository domain.Repository
+	if err = fixture.store.Transact(context.Background(), func(tx sourceapp.Tx) error {
+		quarantined, _ = tx.GetProviderQuarantine("gitlab", unknown.ID)
+		_, unrelatedFound = tx.GetProviderQuarantine("gitlab", 910)
+		repository, _ = tx.GetRepository(fixture.repository.ID)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if quarantined.ProviderProjectID != unknown.ID || quarantined.CandidateRepositoryID != fixture.repository.ID || quarantined.Reason != domain.QuarantineExternalIdentityMismatch || quarantined.ExternalIdentityMatched || quarantined.ManagedLabelPresent {
+		t.Fatalf("quarantine=%+v", quarantined)
+	}
+	if unrelatedFound || repository.ProviderProjectID != fixture.repository.ProviderProjectID {
+		t.Fatalf("unrelated=%v repository was adopted=%+v", unrelatedFound, repository)
+	}
+	events := sourceV2Outbox(fixture.store, "source.provider_project_quarantined.v2")
+	if len(events) != 1 || strings.Contains(string(events[0].Payload), "tenant_id") {
+		t.Fatalf("quarantine events=%+v", events)
+	}
+	firstObserved := quarantined.FirstObservedAt
+	fixture.clock.Advance(time.Minute)
+	second, err := reconciler.ReconcileAll(context.Background())
+	if err != nil || second.Quarantines != 1 || second.QuarantineChanges != 0 || len(sourceV2Outbox(fixture.store, "source.provider_project_quarantined.v2")) != 1 {
+		t.Fatalf("second reconciliation=%+v err=%v", second, err)
+	}
+	if err = fixture.store.Transact(context.Background(), func(tx sourceapp.Tx) error {
+		quarantined, _ = tx.GetProviderQuarantine("gitlab", unknown.ID)
+		return nil
+	}); err != nil || !quarantined.FirstObservedAt.Equal(firstObserved) || !quarantined.LastObservedAt.After(firstObserved) {
+		t.Fatalf("quarantine observation=%+v err=%v", quarantined, err)
 	}
 }

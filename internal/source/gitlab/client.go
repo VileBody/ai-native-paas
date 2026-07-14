@@ -177,20 +177,21 @@ type projectJSON struct {
 	Namespace struct {
 		ID int64 `json:"id"`
 	} `json:"namespace"`
-	Path              string `json:"path"`
-	PathWithNamespace string `json:"path_with_namespace"`
-	WebURL            string `json:"web_url"`
-	DefaultBranch     string `json:"default_branch"`
-	Description       string `json:"description"`
-	Archived          bool   `json:"archived"`
+	Path              string   `json:"path"`
+	PathWithNamespace string   `json:"path_with_namespace"`
+	WebURL            string   `json:"web_url"`
+	DefaultBranch     string   `json:"default_branch"`
+	Description       string   `json:"description"`
+	Topics            []string `json:"topics"`
+	Archived          bool     `json:"archived"`
 }
 
 func toProvider(p projectJSON) application.ProviderRepository {
-	return application.ProviderRepository{ID: p.ID, NamespaceID: p.Namespace.ID, Path: p.Path, PathWithNamespace: p.PathWithNamespace, WebURL: p.WebURL, DefaultBranch: p.DefaultBranch, Description: p.Description, Archived: p.Archived}
+	return application.ProviderRepository{ID: p.ID, NamespaceID: p.Namespace.ID, Path: p.Path, PathWithNamespace: p.PathWithNamespace, WebURL: p.WebURL, DefaultBranch: p.DefaultBranch, Description: p.Description, ExternalID: projectExternalID(p.Description), Topics: append([]string(nil), p.Topics...), Archived: p.Archived}
 }
 func (c *Client) CreateRepository(ctx context.Context, r application.CreateRepositoryRequest) (application.ProviderRepository, error) {
 	description := "[paas-correlation:" + r.CorrelationID + "]"
-	body := map[string]any{"namespace_id": r.NamespaceID, "name": r.Name, "path": r.Path, "initialize_with_readme": true, "default_branch": r.DefaultBranch, "visibility": "private", "description": description}
+	body := map[string]any{"namespace_id": r.NamespaceID, "name": r.Name, "path": r.Path, "initialize_with_readme": true, "default_branch": r.DefaultBranch, "visibility": "private", "description": description, "topics": []string{"ai-native-paas"}}
 	var p projectJSON
 	err := c.do(ctx, http.MethodPost, "/projects", body, &p)
 	if err == nil {
@@ -204,19 +205,69 @@ func (c *Client) CreateRepository(ctx context.Context, r application.CreateRepos
 	}
 	return application.ProviderRepository{}, err
 }
+func (c *Client) ListRepositoriesByNamespace(ctx context.Context, namespaceID int64) ([]application.ProviderRepository, error) {
+	if namespaceID <= 0 {
+		return nil, errors.New("gitlab namespace id is invalid")
+	}
+	const perPage = 100
+	var result []application.ProviderRepository
+	for page := 1; page <= 100; page++ {
+		var projects []projectJSON
+		path := "/groups/" + strconv.FormatInt(namespaceID, 10) + "/projects?include_subgroups=false&order_by=id&page=" + strconv.Itoa(page) + "&per_page=" + strconv.Itoa(perPage) + "&sort=asc&with_shared=false"
+		if err := c.do(ctx, http.MethodGet, path, nil, &projects); err != nil {
+			return nil, err
+		}
+		for _, project := range projects {
+			if project.Namespace.ID == namespaceID {
+				result = append(result, toProvider(project))
+			}
+		}
+		if len(projects) < perPage {
+			return result, nil
+		}
+	}
+	return nil, errors.New("gitlab namespace project listing exceeded page limit")
+}
 func (c *Client) FindRepositoryByCorrelation(ctx context.Context, namespaceID int64, correlationID string) (application.ProviderRepository, bool, error) {
-	var projects []projectJSON
-	path := "/groups/" + strconv.FormatInt(namespaceID, 10) + "/projects?per_page=100&simple=true&include_subgroups=false"
-	if err := c.do(ctx, http.MethodGet, path, nil, &projects); err != nil {
+	projects, err := c.ListRepositoriesByNamespace(ctx, namespaceID)
+	if err != nil {
 		return application.ProviderRepository{}, false, err
 	}
-	marker := "[paas-correlation:" + correlationID + "]"
 	for _, p := range projects {
-		if strings.Contains(p.Description, marker) {
-			return toProvider(p), true, nil
+		if p.ExternalID == correlationID && gitlabTopicPresent(p.Topics, "ai-native-paas") {
+			return p, true, nil
 		}
 	}
 	return application.ProviderRepository{}, false, nil
+}
+
+func gitlabTopicPresent(topics []string, expected string) bool {
+	for _, topic := range topics {
+		if strings.EqualFold(strings.TrimSpace(topic), expected) {
+			return true
+		}
+	}
+	return false
+}
+
+func projectExternalID(description string) string {
+	const prefix = "[paas-correlation:"
+	start := strings.Index(description, prefix)
+	if start < 0 {
+		return ""
+	}
+	value := description[start+len(prefix):]
+	end := strings.IndexByte(value, ']')
+	if end <= 0 || end > 128 {
+		return ""
+	}
+	value = value[:end]
+	for _, r := range value {
+		if !(r == '-' || r == '_' || r == '.' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z') {
+			return ""
+		}
+	}
+	return value
 }
 func (c *Client) GetRepository(ctx context.Context, id int64) (application.ProviderRepository, error) {
 	var p projectJSON

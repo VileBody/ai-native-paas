@@ -61,3 +61,15 @@ func TestMigrations_BootstrapRevisionIsImmutableEvidenceShape(t *testing.T) {
 		}
 	}
 }
+
+func TestMigrations_ProviderQuarantineCannotBecomeTenantBinding(t *testing.T) {
+	sql := migration(t, "006_provider_project_quarantine.sql")
+	for _, required := range []string{"source.provider_project_quarantine", "candidate_repository_id", "external_identity_matched", "managed_label_present", "PRIMARY KEY (provider, provider_project_id)"} {
+		if !strings.Contains(sql, required) {
+			t.Fatalf("missing %s", required)
+		}
+	}
+	if strings.Contains(sql, "tenant_id") || strings.Contains(sql, "REFERENCES source.repositories") {
+		t.Fatal("quarantine must not become a tenant resource binding")
+	}
+}
