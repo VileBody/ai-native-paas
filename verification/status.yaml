@@ -1,22 +1,22 @@
 schema_version: 1
-baseline_commit: "440a195"
-generated_at: "2026-07-14T00:00:00Z"
+baseline_commit: "f2d3d12"
+generated_at: "2026-07-17T00:30:00+03:00"
 statuses:
   LOCAL_GREEN:
     state: GREEN
-    evidence: "go test ./... on the pre-pivot baseline"
+    evidence: "go test ./..., go test -race ./..., go vet ./..., architecture and system-E2E harness tests, 157/157 current pivot matrix with 1026 Go tests, OpenTofu validate for all four stacks, and zero-drift live plans for admin/network/Cozystack smoke"
   DB_GREEN:
     state: GREEN
-    evidence: "Iteration 5 CI plus user and managed PostgreSQL cloud gates"
+    evidence: "Iteration 5 regression plus isolated managed PostgreSQL integration and K14 gates in ai_native_paas_integration_test; the gate runner refuses the production database"
   PROVIDER_GREEN:
     state: PENDING
-    evidence: "OpenBao HA is deployed TLS-only but intentionally sealed/uninitialized; the partial Cozystack lab is intentionally destroyed in cost standby with encrypted recovery evidence; GitLab and capability live suites are not complete"
+    evidence: "The two preserved IPv4s, runtime/workspace VPCs, shared NAT, runtime LB and private Talos/Cozystack smoke cell are live; GitLab, disposable workspace VM and capability-provider live suites remain incomplete"
   K8S_GREEN:
     state: PENDING
-    evidence: "admin system workers, CSI, sealed OpenBao HA and a three-replica TLS JetStream quorum are live; the generic runtime cell is cost-guarded off until a scheduled live gate"
+    evidence: "Talos/Cozystack/Envoy/LINSTOR/Argo and 20 consecutive GitOps hello-go HTTP probes are green in the smoke profile; provider_gate PostgreSQL/Redis/S3 lifecycle and backup/restore gates remain pending"
   SECURITY_GREEN:
     state: PENDING
-    evidence: "pivot cross-surface and workspace compromise suites not complete"
+    evidence: "No runtime node has floating IPv4, Talos 50000 is not publicly exposed, provider firewalls default DROP, and tracked secret sentinel passes; the main Timeweb S3 credential was rendered in operator output and requires coordinated rotation before cross-surface sentinel and workspace compromise/isolation gates"
   OPS_GREEN:
     state: PENDING
-    evidence: "replicated JetStream live publish passed; service outbox/inbox recovery, backup/restore and chaos gates are not complete"
+    evidence: "State-service health/state reads recovered, OpenTofu locks/plans pass, earlier NATS/OpenBao backup evidence is retained, and Cozystack smoke evidence is recorded; Cozystack backups, live restore and full chaos gates remain incomplete"

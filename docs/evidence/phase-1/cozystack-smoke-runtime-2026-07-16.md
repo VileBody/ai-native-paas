@@ -13,15 +13,25 @@ Smoke runtime validation for the cheap Cozystack profile:
 ## Runtime status
 
 - Nodes:
-  - `talos-tqe-ag1` — `192.168.74.11`, Ready
-  - `talos-nz5-3qj` — `192.168.74.12`, Ready
-  - `talos-ywl-usi` — `192.168.74.13`, Ready
+  - `talos-tqe-ag1` — `192.168.74.11`, Ready, `EXTERNAL-IP <none>`
+  - `talos-nz5-3qj` — `192.168.74.12`, Ready, `EXTERNAL-IP <none>`
+  - `talos-ywl-usi` — `192.168.74.13`, Ready, `EXTERNAL-IP <none>`
 - Cozystack `Package` resources: all Ready.
 - HelmRelease resources: all Ready.
 - Envoy Gateway:
   - Gateway `envoy-gateway-system/runtime` Programmed=True;
   - service exposes NodePorts `30080` and `30443`;
   - Timeweb LB routes `80 -> 30080`, `443 -> 30443`, `6443 -> 6443`.
+
+Runtime edge port check from the Timeweb admin host-network source on
+2026-07-17:
+
+```text
+open=80
+open=443
+open=6443
+closed=50000
+```
 
 ## CoreDNS/LINSTOR fix
 
@@ -139,3 +149,52 @@ hello-go
 The same public IP remains unreachable from the local Mac environment during
 this run; the Timeweb-side probe is the authoritative network evidence for the
 runtime edge path.
+
+## 20× GitOps hello-go smoke — 2026-07-17
+
+The missing repeated-smoke gate was executed from the Timeweb admin cluster
+using host-network evidence Jobs. Each run performed:
+
+1. Argo `Application/hello-go-smoke` hard refresh;
+2. wait for `Synced`;
+3. wait for `Healthy`;
+4. HTTP probe through the public Envoy edge with
+   `Host: hello-go.5.42.126.95.nip.io`.
+
+Runtime state after the run:
+
+```text
+nodes: talos-tqe-ag1, talos-nz5-3qj, talos-ywl-usi Ready with EXTERNAL-IP <none>
+application: Synced
+health: Healthy
+revision: f2d3d127353d51abd2aff1d45a15dd74cf7a12df
+httproute: runtime Accepted=True Accepted;ResolvedRefs=True ResolvedRefs;
+```
+
+Sequential probe result:
+
+```text
+run=1 body=hello-go
+run=2 body=hello-go
+run=3 body=hello-go
+run=4 body=hello-go
+run=5 body=hello-go
+run=6 body=hello-go
+run=7 body=hello-go
+run=8 body=hello-go
+run=9 body=hello-go
+run=10 body=hello-go
+run=11 body=hello-go
+run=12 body=hello-go
+run=13 body=hello-go
+run=14 body=hello-go
+run=15 body=hello-go
+run=16 body=hello-go
+run=17 body=hello-go
+run=18 body=hello-go
+run=19 body=hello-go
+run=20 body=hello-go
+```
+
+The temporary admin Jobs and runtime kubeconfig Secret were removed after
+evidence collection.
