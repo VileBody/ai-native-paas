@@ -101,14 +101,14 @@ Git source:
 repoURL=https://github.com/VileBody/ai-native-paas.git
 targetRevision=codex/runtime-smoke-hello-go
 path=deploy/runtime/smoke/hello-go
-revision=8e9a2ebf059ca2556a25865d3004c0324534323b
+revision=c01389ba8fe2808cde31f78a367c0d12fd40aaf2
 ```
 
 Argo Application:
 
 ```text
 sync Synced
-revision 8e9a2ebf059ca2556a25865d3004c0324534323b
+revision c01389ba8fe2808cde31f78a367c0d12fd40aaf2
 health Healthy
 operationState Succeeded successfully synced (all tasks run)
 resource Namespace  hello-go-smoke Synced
