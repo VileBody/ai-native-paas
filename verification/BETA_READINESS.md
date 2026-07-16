@@ -42,11 +42,13 @@ Cozystack, Envoy Gateway, LINSTOR, Argo CD Core and 20 consecutive GitOps
 
 - Runtime VPC: `network-7ae8fa2881384d4db6046b4dd6854b4e`.
 - Workspace VPC: `network-687cddd36c3147b3bff75c79e9779498`.
-- Runtime load balancer: `135509`, public `5.42.126.95`, private `192.168.74.5`.
+- Runtime load balancer: `135541`, public `5.42.126.95`, private `192.168.74.6`.
 - Shared NAT router: `49de7bfa-90b5-4ca5-b94a-b7d6aa7a1de4`.
 - Smoke nodes: `8616377`, `8616381`, and `8616379`.
 - Talos bootstrap result: `.state-backend/cozystack-bootstrap-generation-9-result`.
 - Runtime smoke evidence: `docs/evidence/phase-1/cozystack-smoke-runtime-2026-07-16.md`.
+- OpenTofu zero-drift refreshed on 2026-07-17 for `network-foundation=live`
+  and `cozystack-lab=smoke` after rotating scoped HTTP state credentials.
 
 Timeweb also assigns provider IPv6 addresses to these nodes. Provider
 firewalls default to `DROP`; no IPv6 ingress rule is declared. `SECURITY_GREEN`

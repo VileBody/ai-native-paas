@@ -7,7 +7,7 @@
 - runtime VPC `network-7ae8fa2881384d4db6046b4dd6854b4e`;
 - shared router `49de7bfa-90b5-4ca5-b94a-b7d6aa7a1de4` with both runtime and
   workspace SNAT through preserved `72.56.234.22`;
-- runtime LB `135509`, private `192.168.74.5`, public `5.42.126.95`;
+- runtime LB `135541`, private `192.168.74.6`, public `5.42.126.95`;
 - only public LB ports `80`, `443`, and source-restricted `6443`.
 
 `cozystack_profile=smoke` currently owns three private-IPv4 nodes and their
@@ -99,7 +99,7 @@ export TF_VAR_transition_from_profile=off
 export TF_VAR_cost_guard_acknowledgement=CREATE-3X-4VCPU-8GIB-COZYSTACK-SMOKE
 export TF_VAR_runtime_vpc_id=network-7ae8fa2881384d4db6046b4dd6854b4e
 export TF_VAR_runtime_router_id=49de7bfa-90b5-4ca5-b94a-b7d6aa7a1de4
-export TF_VAR_runtime_edge_private_ip=192.168.74.5
+export TF_VAR_runtime_edge_private_ip=192.168.74.6
 export TF_VAR_runtime_ingress_ip=5.42.126.95
 export TF_VAR_node_bootstrap_ssh_key_ids='[599464]'
 export TF_VAR_bootstrap_runner_enabled=false

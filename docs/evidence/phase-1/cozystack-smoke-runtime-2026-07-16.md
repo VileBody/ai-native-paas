@@ -21,6 +21,8 @@ Smoke runtime validation for the cheap Cozystack profile:
 - Envoy Gateway:
   - Gateway `envoy-gateway-system/runtime` Programmed=True;
   - service exposes NodePorts `30080` and `30443`;
+  - Timeweb LB `135541` has private IP `192.168.74.6` and public IP
+    `5.42.126.95`;
   - Timeweb LB routes `80 -> 30080`, `443 -> 30443`, `6443 -> 6443`.
 
 Runtime edge port check from the Timeweb admin host-network source on
@@ -198,3 +200,33 @@ run=20 body=hello-go
 
 The temporary admin Jobs and runtime kubeconfig Secret were removed after
 evidence collection.
+
+## OpenTofu zero-drift — 2026-07-17
+
+The scoped HTTP state credentials had expired after the smoke window. They were
+rotated through `scripts/rotate-state-service-credentials.sh` with a four-hour
+TTL; no credential values were committed or rendered in this evidence.
+
+`network-foundation` was reconfigured against the platform HTTP state backend
+with username `network-bootstrap`, `network_mode=live` and no temporary
+Talos/SSH DNAT rules. Saved plan:
+
+```text
+.state-backend/network-foundation-live-zero-20260717.tfplan
+NETWORK_FOUNDATION_ZERO_DRIFT=PASS
+No changes. Your infrastructure matches the configuration.
+runtime_load_balancer_id=135541
+runtime_edge_private_ip=192.168.74.6
+runtime_ingress_ip=5.42.126.95
+shared_egress_ip=72.56.234.22
+```
+
+`cozystack-lab` was reconfigured against the platform HTTP state backend with
+username `cozystack-bootstrap`, `cozystack_profile=smoke`, no bootstrap runner,
+no temporary Talos DNAT, and no disk-repair SSH. Saved plan:
+
+```text
+.state-backend/cozystack-lab-smoke-zero-20260717.tfplan
+COZYSTACK_LAB_ZERO_DRIFT=PASS
+No changes. Your infrastructure matches the configuration.
+```
