@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-go
+  namespace: hello-go-smoke
+  labels:
+    app.kubernetes.io/name: hello-go
+    ai-native-paas.io/runtime-smoke: hello-go
+spec:
+  selector:
+    app.kubernetes.io/name: hello-go
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-go
+  namespace: hello-go-smoke
+  labels:
+    app.kubernetes.io/name: hello-go
+    ai-native-paas.io/runtime-smoke: hello-go
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hello-go
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hello-go
+        ai-native-paas.io/runtime-smoke: hello-go
+    spec:
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: hello-go
+          image: registry.k8s.io/e2e-test-images/agnhost@sha256:99c6b4bb4a1e1df3f0b3752168c89358794d02258ebebc26bf21c29399011a85
+          args:
+            - netexec
+            - --http-port=8080
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /hostname
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /hostname
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 5m
+              memory: 24Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
