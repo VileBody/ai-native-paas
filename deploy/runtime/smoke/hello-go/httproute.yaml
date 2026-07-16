@@ -8,7 +8,9 @@ metadata:
     ai-native-paas.io/runtime-smoke: hello-go
 spec:
   parentRefs:
-    - name: runtime
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: runtime
       namespace: envoy-gateway-system
       sectionName: http
   hostnames:
