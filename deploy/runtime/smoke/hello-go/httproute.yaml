@@ -19,5 +19,8 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: hello-go
+        - group: ""
+          kind: Service
+          name: hello-go
           port: 80
+          weight: 1
