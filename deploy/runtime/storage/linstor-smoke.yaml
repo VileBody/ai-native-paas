@@ -1,0 +1,34 @@
+apiVersion: piraeus.io/v1
+kind: LinstorSatelliteConfiguration
+metadata:
+  name: ai-native-paas-smoke-data-pool
+  labels:
+    ai-native-paas.io/runtime-profile: smoke
+    ai-native-paas.io/managed-by: ai-native-paas
+spec:
+  storagePools:
+    - name: data
+      lvmPool:
+        volumeGroup: linstor_data
+      source:
+        hostDevices:
+          - /dev/sdb
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: replicated
+  labels:
+    ai-native-paas.io/runtime-profile: smoke
+    ai-native-paas.io/managed-by: ai-native-paas
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: linstor.csi.linbit.com
+parameters:
+  linstor.csi.linbit.com/storagePool: data
+  linstor.csi.linbit.com/autoPlace: "3"
+  linstor.csi.linbit.com/layerList: drbd storage
+  linstor.csi.linbit.com/allowRemoteVolumeAccess: "true"
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
