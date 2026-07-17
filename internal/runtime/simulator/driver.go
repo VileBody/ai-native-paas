@@ -12,9 +12,16 @@ import (
 )
 
 const (
-	DriverName    = "runtime_sim_k8s"
-	EvidenceClass = "dev-product"
-	Namespace     = "paas-runtime-sim"
+	DriverName       = "runtime_sim_k8s"
+	EvidenceClass    = "dev-product"
+	Namespace        = "paas-runtime-sim"
+	CellID           = "runtime-sim-k8s"
+	Region           = "eu1"
+	GitOpsRepository = "https://git.example.invalid/platform/runtime-sim.git"
+	ClusterServer    = "https://kubernetes.default.svc"
+	ArgoProject      = "runtime-sim-k8s"
+	IngressDomain    = "sim.runtime.internal"
+	CapacityUnits    = 1000
 )
 
 type WorkloadSpec struct {

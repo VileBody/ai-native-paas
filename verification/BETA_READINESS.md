@@ -54,6 +54,10 @@ gates.
   for cheap executable product slices and is explicitly labeled
   `ai-native-paas.io/evidence-class: dev-product` and
   `ai-native-paas.io/not-cozystack-live: "true"`.
+- `runtime-api` now defaults its development cell to `runtime-sim-k8s`; the
+  process smoke proves application creation, GitOps commit under
+  `cells/runtime-sim-k8s`, generated hostnames under `sim.runtime.internal`,
+  status read and cross-tenant denial.
 
 ## Live checkpoint
 

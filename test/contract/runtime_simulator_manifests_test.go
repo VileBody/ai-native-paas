@@ -17,6 +17,10 @@ func TestRuntimeSimulator_IsExplicitlyDevelopmentOnly(t *testing.T) {
 		"ai-native-paas.io/evidence-class: dev-product",
 		"ai-native-paas.io/not-cozystack-live: \"true\"",
 		"cozystack_live: \"false\"",
+		"cell_id: runtime-sim-k8s",
+		"gitops_repository: https://git.example.invalid/platform/runtime-sim.git",
+		"argo_project: runtime-sim-k8s",
+		"ingress_domain: sim.runtime.internal",
 		"Development-only runtime simulator",
 	)
 	forbidAll(t, raw,

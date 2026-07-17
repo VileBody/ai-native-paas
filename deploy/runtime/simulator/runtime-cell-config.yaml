@@ -11,7 +11,13 @@ data:
   driver: runtime_sim_k8s
   evidence_class: dev-product
   cozystack_live: "false"
+  cell_id: runtime-sim-k8s
+  region: eu1
   namespace: paas-runtime-sim
+  gitops_repository: https://git.example.invalid/platform/runtime-sim.git
+  cluster_server: https://kubernetes.default.svc
+  argo_project: runtime-sim-k8s
   ingress_domain: sim.runtime.internal
+  capacity_units: "1000"
   managed_resources: sim_postgres,sim_redis,sim_s3
   notes: "Development product simulator only; does not close Cozystack live gates."

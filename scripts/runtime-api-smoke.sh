@@ -17,9 +17,18 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 cd "$ROOT"
-if [[ ! -x ./bin/runtime-api ]]; then
-  go build -trimpath -o ./bin/runtime-api ./cmd/runtime-api
+GO_BIN="${GO_BIN:-}"
+if [[ -z "$GO_BIN" ]]; then
+  GO_BIN="$(command -v go || true)"
 fi
+if [[ -z "$GO_BIN" && -x /opt/homebrew/bin/go ]]; then
+  GO_BIN=/opt/homebrew/bin/go
+fi
+if [[ -z "$GO_BIN" ]]; then
+  echo "go binary not found; set GO_BIN" >&2
+  exit 127
+fi
+"$GO_BIN" build -trimpath -o ./bin/runtime-api ./cmd/runtime-api
 port="$(python3 - <<'PY'
 import socket
 s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()
@@ -69,15 +78,28 @@ wrong_code="$(curl -sS -o "$OUT/cross-tenant.json" -w '%{http_code}' \
   -H 'X-Principal-ID: user-smoke' -H 'X-Tenant-ID: tenant-other' \
   "http://127.0.0.1:$port/v1/organizations/$tenant/deployments/$dep_id")"
 
-python3 - "$OUT/health.json" "$create" "$deploy" "$status" "$wrong_code" "$RESULT" <<'PY'
+python3 - "$OUT/health.json" "$create" "$deploy" "$status" "$wrong_code" "$repo" "$RESULT" <<'PY'
 import json, pathlib, sys
-health_path, create_raw, deploy_raw, status_raw, wrong_code, result_path = sys.argv[1:]
+health_path, create_raw, deploy_raw, status_raw, wrong_code, repo_path, result_path = sys.argv[1:]
 health=json.loads(pathlib.Path(health_path).read_text())
 create=json.loads(create_raw); deploy=json.loads(deploy_raw); status=json.loads(status_raw)
+repo=pathlib.Path(repo_path)
+release_indexes=list((repo/".platform"/"releases").glob("*.json"))
+runtime_sim_cell=False
+runtime_sim_hostname=False
+if release_indexes:
+    index=json.loads(release_indexes[0].read_text())
+    runtime_sim_cell=index.get("cell_id")=="runtime-sim-k8s" and str(index.get("path","")).startswith("cells/runtime-sim-k8s/")
+    paasapp=repo/index["path"]/ "paasapp.yaml"
+    if paasapp.exists():
+        manifest=json.loads(paasapp.read_text())
+        runtime_sim_hostname=str(manifest.get("spec",{}).get("route",{}).get("generatedHostname","")).endswith(".sim.runtime.internal")
 checks={
   "health": health.get("status")=="ok",
   "tenant-derived": create.get("application",{}).get("TenantID")=="tenant-smoke",
   "gitops-committed": deploy.get("phase")=="GIT_COMMITTED",
+  "runtime-sim-cell": runtime_sim_cell,
+  "runtime-sim-hostname": runtime_sim_hostname,
   "status-readable": status.get("deployment_id")==deploy.get("deployment_id"),
   "cross-tenant-denied": wrong_code=="403",
 }

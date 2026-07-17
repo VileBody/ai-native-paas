@@ -13,7 +13,7 @@ statuses:
     evidence: "The two preserved IPv4s, runtime/workspace VPCs, shared NAT, runtime LB and private Talos/Cozystack smoke cell are live; GitLab, disposable workspace VM and capability-provider live suites remain incomplete"
   DEV_PRODUCT_GREEN:
     state: PENDING
-    evidence: "runtime_sim_k8s is accepted as the default cheap development runtime path for executable product slices; ADR 0007 and bounded simulator manifests exist, but Create Project -> GitLab/MCP -> plan -> approval -> build -> GitOps -> probe -> usage/audit is not yet green end-to-end"
+    evidence: "runtime_sim_k8s is accepted as the default cheap development runtime path; runtime-api now defaults to runtime-sim-k8s and the development deploy smoke proves create application -> GitOps commit -> cells/runtime-sim-k8s path -> sim.runtime.internal hostname -> status/cross-tenant checks. Full Create Project -> GitLab/MCP -> plan -> approval -> build -> GitOps -> probe -> usage/audit remains pending"
   K8S_GREEN:
     state: PENDING
     evidence: "Talos/Cozystack/Envoy/LINSTOR/Argo and 20 consecutive GitOps hello-go HTTP probes are green in the smoke profile; runtime_sim_k8s manifests are ready for cheap dev product runs; live provider_gate PostgreSQL/Redis/S3 lifecycle and backup/restore gates remain pending"

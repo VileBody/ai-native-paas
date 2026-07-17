@@ -21,6 +21,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/runtime/httpapi"
 	"github.com/keir-research/ai-native-paas/internal/runtime/memory"
 	runtimepostgres "github.com/keir-research/ai-native-paas/internal/runtime/postgres"
+	"github.com/keir-research/ai-native-paas/internal/runtime/simulator"
 	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
 	runtimev1 "github.com/keir-research/ai-native-paas/pkg/contracts/runtime/v1"
 )
@@ -111,6 +112,8 @@ func main() {
 		adapters = []platformprofile.Adapter{
 			platformprofile.Dev("runtime-memory-store"),
 			platformprofile.Dev("local-gitops-repository"),
+			platformprofile.Dev(simulator.DriverName + "-runtime-driver"),
+			platformprofile.Dev("dev-product-evidence-only"),
 			platformprofile.Dev("development-identity-headers"),
 		}
 	}
@@ -124,13 +127,7 @@ func main() {
 		Clock: application.RealClock{}, IDs: &application.SequentialIDs{}, Scheduler: application.DeterministicScheduler{},
 	}
 	if profile != platformprofile.Production {
-		if _, err := service.RegisterCell(ctx, application.RegisterCellRequest{
-			ID: env("RUNTIME_CELL_ID", "cell-local"), Region: env("RUNTIME_REGION", "eu1"),
-			Isolation: []runtimev1.IsolationClass{runtimev1.IsolationSandboxed}, CapacityUnits: 1000,
-			GitOpsRepository: env("RUNTIME_GITOPS_REPOSITORY", "https://git.example.invalid/platform/runtime-local.git"),
-			ClusterServer:    env("RUNTIME_CLUSTER_SERVER", "https://kubernetes.default.svc"),
-			ArgoProject:      env("RUNTIME_ARGO_PROJECT", "runtime-cell"), IngressDomain: env("RUNTIME_INGRESS_DOMAIN", "apps.localhost"),
-		}); err != nil {
+		if _, err := service.RegisterCell(ctx, developmentRuntimeCellRequest()); err != nil {
 			log.Fatalf("register development runtime cell: %v", err)
 		}
 	}
@@ -154,5 +151,18 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("runtime-api shutdown: %v", err)
+	}
+}
+
+func developmentRuntimeCellRequest() application.RegisterCellRequest {
+	return application.RegisterCellRequest{
+		ID:               env("RUNTIME_CELL_ID", simulator.CellID),
+		Region:           env("RUNTIME_REGION", simulator.Region),
+		Isolation:        []runtimev1.IsolationClass{runtimev1.IsolationSandboxed},
+		CapacityUnits:    simulator.CapacityUnits,
+		GitOpsRepository: env("RUNTIME_GITOPS_REPOSITORY", simulator.GitOpsRepository),
+		ClusterServer:    env("RUNTIME_CLUSTER_SERVER", simulator.ClusterServer),
+		ArgoProject:      env("RUNTIME_ARGO_PROJECT", simulator.ArgoProject),
+		IngressDomain:    env("RUNTIME_INGRESS_DOMAIN", simulator.IngressDomain),
 	}
 }
