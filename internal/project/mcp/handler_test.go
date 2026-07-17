@@ -31,6 +31,7 @@ import (
 	agentv1 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v1"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
+	buildv2 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v2"
 	commercev2 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v2"
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
@@ -703,7 +704,7 @@ func TestProjectMCP_BuildExecuteQueuesGovernedWorkspaceBuild(t *testing.T) {
 	if workspaces.exec.Scope.TenantID != "tenant-1" || workspaces.exec.Scope.ProjectID != "project-1" || workspaces.exec.Scope.ActorID != "agent-1" {
 		t.Fatalf("build scope=%#v", workspaces.exec.Scope)
 	}
-	if workspaces.exec.WorkspaceID != "workspace-1" || workspaces.exec.Kind != "build_execute" || workspaces.exec.SerializationKey != "build:"+strings.Repeat("a", 40) || workspaces.exec.IdempotencyKey != "build-1" {
+	if workspaces.exec.WorkspaceID != "workspace-1" || workspaces.exec.Kind != "build_execute" || !strings.HasPrefix(workspaces.exec.SerializationKey, "build:"+strings.Repeat("a", 40)+":sha256:") || workspaces.exec.IdempotencyKey != "build-1" {
 		t.Fatalf("build request=%#v", workspaces.exec)
 	}
 	if workspaces.exec.Spec.WorkingDir != "app" || workspaces.exec.Spec.TimeoutSeconds != 600 || workspaces.exec.Spec.OutputLimitBytes != 8<<20 {
@@ -713,9 +714,13 @@ func TestProjectMCP_BuildExecuteQueuesGovernedWorkspaceBuild(t *testing.T) {
 	if len(argv) != 4 || argv[0] != "workspace-agent" || argv[1] != "verified-build" || argv[2] != strings.Repeat("a", 40) {
 		t.Fatalf("build argv=%#v", argv)
 	}
-	var payload buildExecuteSpec
-	if err := json.Unmarshal([]byte(argv[3]), &payload); err != nil || payload.SourceSHA != strings.Repeat("a", 40) || payload.Driver != "dockerfile" || payload.DefinitionPath != "Dockerfile" || len(payload.Platforms) != 1 || payload.Platforms[0] != "linux/amd64" || len(payload.SecretRefs) != 1 || payload.SecretRefs[0] != "secret-ref-1" {
+	var payload buildv2.BuildSpec
+	if err := json.Unmarshal([]byte(argv[3]), &payload); err != nil || payload.SourceSHA != strings.Repeat("a", 40) || payload.Driver != buildv2.DriverDockerfile || payload.DefinitionPath != "Dockerfile" || payload.NetworkProfile != "governed" || payload.CacheScope != "project:project-1" || payload.ResourceClass != "standard" || len(payload.Platforms) != 1 || payload.Platforms[0] != "linux/amd64" || len(payload.SecretRefs) != 1 || payload.SecretRefs[0] != "secret-ref-1" {
 		t.Fatalf("build payload=%#v err=%v", payload, err)
+	}
+	fingerprint, err := payload.Fingerprint()
+	if err != nil || workspaces.exec.SerializationKey != "build:"+strings.Repeat("a", 40)+":"+fingerprint {
+		t.Fatalf("build fingerprint=%q err=%v key=%q", fingerprint, err, workspaces.exec.SerializationKey)
 	}
 }
 

@@ -99,6 +99,10 @@ func TestWorkspaceAgentExecutor_SeparatesTaskUIDFromIdentityReader(t *testing.T)
 	if err != nil || !patch.AttachIdentity || patch.AttachCredentials {
 		t.Fatalf("patch identity=%#v err=%v", patch, err)
 	}
+	build, err := selectProcessIdentity(workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-build"}}, config)
+	if err != nil || build.UID != 1002 || build.GID != 1002 || !build.AttachIdentity || build.AttachCredentials {
+		t.Fatalf("build identity=%#v err=%v", build, err)
+	}
 	if _, err := selectProcessIdentity(workspacev1.CommandSpec{Argv: []string{"workspace-agent", "unknown"}}, config); err == nil {
 		t.Fatal("unknown workspace-agent subcommand received identity-reader UID")
 	}

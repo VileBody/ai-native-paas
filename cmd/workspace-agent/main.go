@@ -30,6 +30,8 @@ func main() {
 		}
 		var operationErr error
 		switch os.Args[1] {
+		case "verified-build":
+			operationErr = workspaceagent.ExecuteVerifiedBuild(os.Args[2:])
 		case "verified-git-apply-patch":
 			operationErr = workspaceagent.ExecuteVerifiedGitApplyPatch(os.Args[2:])
 		case "verified-git-checkout":

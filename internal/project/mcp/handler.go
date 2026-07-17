@@ -25,6 +25,7 @@ import (
 	agentv1 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v1"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
+	buildv2 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v2"
 	infrastructurev1 "github.com/keir-research/ai-native-paas/pkg/contracts/infrastructure/v1"
 	sourcev2 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v2"
 	workspacev1 "github.com/keir-research/ai-native-paas/pkg/contracts/workspace/v1"
@@ -701,17 +702,8 @@ type workspaceExecArguments struct {
 }
 
 type buildExecuteArguments struct {
-	WorkspaceID string           `json:"workspace_id"`
-	Spec        buildExecuteSpec `json:"spec"`
-}
-
-type buildExecuteSpec struct {
-	SourceSHA      string   `json:"source_sha"`
-	Driver         string   `json:"driver"`
-	Platforms      []string `json:"platforms"`
-	TimeoutSeconds int64    `json:"timeout_seconds"`
-	DefinitionPath string   `json:"definition_path,omitempty"`
-	SecretRefs     []string `json:"secret_refs,omitempty"`
+	WorkspaceID string            `json:"workspace_id"`
+	Spec        buildv2.BuildSpec `json:"spec"`
 }
 
 func (h Handler) invokeBuild(ctx context.Context, verified agentv2.VerifiedInvocationContext, request agentv2.InvocationRequest) (any, error) {
@@ -722,7 +714,7 @@ func (h Handler) invokeBuild(ctx context.Context, verified agentv2.VerifiedInvoc
 		return waitingDependency("workspace_nat", nil), nil
 	}
 	var arguments buildExecuteArguments
-	if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || !validBuildExecute(arguments) {
+	if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || !agentv1.ValidID(arguments.WorkspaceID) {
 		return nil, errInvalidWorkspaceArguments
 	}
 	scope := workspace.Scope{TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID}
@@ -730,65 +722,51 @@ func (h Handler) invokeBuild(ctx context.Context, verified agentv2.VerifiedInvoc
 	if err != nil {
 		return nil, err
 	}
-	if arguments.Spec.SourceSHA != revision.CommitSHA {
-		return nil, workspace.ErrPolicyDenied
-	}
-	payload, err := json.Marshal(arguments.Spec)
+	canonical, fingerprint, err := canonicalBuildExecuteSpec(verified.ProjectID, arguments.Spec)
 	if err != nil {
 		return nil, errInvalidWorkspaceArguments
 	}
-	timeout := arguments.Spec.TimeoutSeconds
-	if timeout == 0 {
-		timeout = 1800
+	if canonical.SourceSHA != revision.CommitSHA {
+		return nil, workspace.ErrPolicyDenied
+	}
+	payload, err := json.Marshal(canonical)
+	if err != nil {
+		return nil, errInvalidWorkspaceArguments
 	}
 	spec := workspacev1.CommandSpec{
 		Argv:             []string{"workspace-agent", "verified-build", revision.CommitSHA, string(payload)},
 		WorkingDir:       revision.SourceRoot,
-		TimeoutSeconds:   timeout,
+		TimeoutSeconds:   canonical.TimeoutSeconds,
 		OutputLimitBytes: 8 << 20,
 	}
 	return h.Workspaces.Exec(ctx, workspace.ExecRequest{
 		Scope: scope, WorkspaceID: arguments.WorkspaceID, IdempotencyKey: request.IdempotencyKey,
-		Kind: "build_execute", SerializationKey: "build:" + revision.CommitSHA, Spec: spec,
+		Kind: "build_execute", SerializationKey: "build:" + revision.CommitSHA + ":" + fingerprint, Spec: spec,
 	})
 }
 
-func validBuildExecute(arguments buildExecuteArguments) bool {
-	if !agentv1.ValidID(arguments.WorkspaceID) || !validCommitSHA(arguments.Spec.SourceSHA) || !validBuildDriver(arguments.Spec.Driver) || len(arguments.Spec.Platforms) == 0 || len(arguments.Spec.Platforms) > 8 || arguments.Spec.TimeoutSeconds < 0 || arguments.Spec.TimeoutSeconds > 86400 {
-		return false
+func canonicalBuildExecuteSpec(projectID string, spec buildv2.BuildSpec) (buildv2.BuildSpec, string, error) {
+	if spec.TimeoutSeconds == 0 {
+		spec.TimeoutSeconds = 1800
 	}
-	if arguments.Spec.DefinitionPath != "" && !validRelativeBuildPath(arguments.Spec.DefinitionPath) {
-		return false
+	if spec.NetworkProfile == "" && spec.NetworkPolicy == "" {
+		spec.NetworkProfile = "governed"
 	}
-	for _, platform := range arguments.Spec.Platforms {
-		if platform != "linux/amd64" && platform != "linux/arm64" {
-			return false
-		}
+	if spec.CacheScope == "" {
+		spec.CacheScope = "project:" + projectID
 	}
-	if len(arguments.Spec.SecretRefs) > 128 {
-		return false
+	canonical, err := spec.Canonical()
+	if err != nil {
+		return buildv2.BuildSpec{}, "", err
 	}
-	for _, ref := range arguments.Spec.SecretRefs {
-		if !agentv1.ValidID(ref) {
-			return false
-		}
+	if canonical.Driver != buildv2.DriverDockerfile {
+		return buildv2.BuildSpec{}, "", errors.New("only Dockerfile builds are executable in the workspace slice")
 	}
-	return true
-}
-
-func validBuildDriver(value string) bool {
-	switch value {
-	case "dockerfile", "buildpacks", "nix", "custom-approved":
-		return true
-	default:
-		return false
+	fingerprint, err := canonical.Fingerprint()
+	if err != nil {
+		return buildv2.BuildSpec{}, "", err
 	}
-}
-
-func validRelativeBuildPath(value string) bool {
-	value = strings.TrimSpace(value)
-	clean := filepath.Clean(value)
-	return clean != "" && clean == value && !filepath.IsAbs(clean) && clean != "." && clean != ".." && !strings.Contains(value, `\`) && !strings.HasPrefix(clean, ".."+string(filepath.Separator))
+	return canonical, fingerprint, nil
 }
 
 func (h Handler) invokeWorkspace(ctx context.Context, verified agentv2.VerifiedInvocationContext, request agentv2.InvocationRequest) (any, error) {

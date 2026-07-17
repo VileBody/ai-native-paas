@@ -252,7 +252,7 @@ func trustedAgentSubcommand(spec workspacev1.CommandSpec) bool {
 		return false
 	}
 	switch spec.Argv[1] {
-	case "verified-git-apply-patch", "verified-git-checkout", "verified-git-commit", "verified-git-push", "verified-tofu-apply", "verified-tofu-plan":
+	case "verified-build", "verified-git-apply-patch", "verified-git-checkout", "verified-git-commit", "verified-git-push", "verified-tofu-apply", "verified-tofu-plan":
 		return true
 	default:
 		return false

@@ -12,6 +12,29 @@
           "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
           "type": "string"
         },
+        "build_arguments": {
+          "additionalProperties": {
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "maxProperties": 128,
+          "propertyNames": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^\\S(?:.*\\S)?$"
+          },
+          "type": "object"
+        },
+        "cache_scope": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "context_root": {
+          "maxLength": 4096,
+          "pattern": "^(|(?!.*/\\.\\.(?:/|$))(?!/)(?!.*\\\\).+)$",
+          "type": "string"
+        },
         "driver": {
           "enum": [
             "dockerfile",
@@ -21,6 +44,20 @@
           ],
           "maxLength": 4096,
           "minLength": 1,
+          "type": "string"
+        },
+        "network_policy": {
+          "enum": [
+            "governed",
+            "deny-all"
+          ],
+          "type": "string"
+        },
+        "network_profile": {
+          "enum": [
+            "governed",
+            "deny-all"
+          ],
           "type": "string"
         },
         "platforms": {
@@ -47,10 +84,23 @@
           "maxItems": 128,
           "type": "array"
         },
+        "resource_class": {
+          "enum": [
+            "small",
+            "standard",
+            "large"
+          ],
+          "type": "string"
+        },
         "source_sha": {
           "maxLength": 64,
           "minLength": 40,
           "pattern": "^[0-9a-f]{40,64}$",
+          "type": "string"
+        },
+        "source_root": {
+          "maxLength": 4096,
+          "pattern": "^(|(?!.*/\\.\\.(?:/|$))(?!/)(?!.*\\\\).+)$",
           "type": "string"
         },
         "timeout_seconds": {

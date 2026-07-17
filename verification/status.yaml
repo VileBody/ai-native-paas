@@ -1,6 +1,6 @@
 schema_version: 1
 baseline_commit: "526423d"
-generated_at: "2026-07-17T01:34:00+03:00"
+generated_at: "2026-07-17T02:07:00+03:00"
 statuses:
   LOCAL_GREEN:
     state: GREEN
@@ -13,7 +13,7 @@ statuses:
     evidence: "The two preserved IPv4s, runtime/workspace VPCs, shared NAT, runtime LB and private Talos/Cozystack smoke cell are live; GitLab, disposable workspace VM and capability-provider live suites remain incomplete"
   DEV_PRODUCT_GREEN:
     state: PENDING
-    evidence: "runtime_sim_k8s is accepted as the default cheap development runtime path; runtime-api process smoke proves create application -> GitOps commit -> cells/runtime-sim-k8s path -> sim.runtime.internal hostname -> status/cross-tenant checks, acceptance tests now cover agent task -> project create -> repository patch -> build -> approval -> runtime_sim_k8s hostname -> probe evidence -> usage preview -> workspace destroy evidence -> redacted audit, and Project MCP build_execute queues only the governed workspace-agent verified-build command for the workspace-bound exact SHA. Live workspace VM, Harbor trust chain, GitLab MCP and Argo/Cozystack remain pending"
+    evidence: "runtime_sim_k8s is accepted as the default cheap development runtime path; runtime-api process smoke proves create application -> GitOps commit -> cells/runtime-sim-k8s path -> sim.runtime.internal hostname -> status/cross-tenant checks, acceptance tests now cover agent task -> project create -> repository patch -> build -> approval -> runtime_sim_k8s hostname -> probe evidence -> usage preview -> workspace destroy evidence -> redacted audit, Project MCP build_execute queues only the governed workspace-agent verified-build command for the workspace-bound exact SHA and BuildSpec fingerprint, and workspace-agent now plans/runs the verified rootless BuildKit Dockerfile path against an immutable metadata digest. Live workspace VM, Harbor trust chain, GitLab MCP and Argo/Cozystack remain pending"
   K8S_GREEN:
     state: PENDING
     evidence: "Talos/Cozystack/Envoy/LINSTOR/Argo and 20 consecutive GitOps hello-go HTTP probes are green in the smoke profile; runtime_sim_k8s manifests are ready for cheap dev product runs; live provider_gate PostgreSQL/Redis/S3 lifecycle and backup/restore gates remain pending"
@@ -28,4 +28,4 @@ statuses:
     evidence: "No runtime node has floating IPv4, Talos 50000 is not publicly exposed, provider firewalls default DROP, and tracked secret sentinel passes; the main Timeweb S3 credential was rendered in operator output and requires coordinated rotation before cross-surface sentinel and workspace compromise/isolation gates"
   OPS_GREEN:
     state: PENDING
-    evidence: "State-service scoped HTTP credentials were rotated after expiry, network-foundation=live and cozystack-lab=smoke zero-drift plans pass, earlier NATS/OpenBao backup evidence is retained, Cozystack smoke evidence is recorded, Project MCP production tools persist task evidence through agent PostgreSQL, Project MCP build_execute is bound to workspace source identity, and agent-api can use Commerce over a fail-closed COMMERCE_API_URL bridge; Cozystack backups, live restore and full chaos gates remain incomplete"
+    evidence: "State-service scoped HTTP credentials were rotated after expiry, network-foundation=live and cozystack-lab=smoke zero-drift plans pass, earlier NATS/OpenBao backup evidence is retained, Cozystack smoke evidence is recorded, Project MCP production tools persist task evidence through agent PostgreSQL, Project MCP build_execute is bound to workspace source identity and BuildSpec fingerprint, workspace-agent verified-build has an executable rootless BuildKit boundary, and agent-api can use Commerce over a fail-closed COMMERCE_API_URL bridge; Cozystack backups, live restore and full chaos gates remain incomplete"

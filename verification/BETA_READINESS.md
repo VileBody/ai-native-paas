@@ -72,6 +72,11 @@ gates.
   governed `workspace-agent verified-build` command bound to the workspace's
   exact source SHA; spoofed source revisions and generic command bypasses fail
   closed before creating a billable command.
+- `build_execute` now carries a canonical `build/v2` BuildSpec with server-side
+  defaults and a BuildSpec fingerprint in the command serialization key.
+  `workspace-agent verified-build` validates exact Git HEAD, a clean source
+  tree, immutable Dockerfile bases, the separate verified UID boundary and the
+  rootless BuildKit metadata digest path.
 
 ## Live checkpoint
 
@@ -119,9 +124,10 @@ reconciliation and old-key rejection evidence.
 - Pass the `DEV_PRODUCT_GREEN` simulator path:
   `Create Project -> GitLab/MCP -> plan -> approval -> build -> GitOps ->
   runtime_sim_k8s -> probe -> usage/audit -> destroy`.
-  The local acceptance slice covers the agent/runtime/audit half and Project
-  MCP now queues the governed build command; GitLab repository bootstrap,
-  disposable VM, Harbor trust chain and live Argo remain open.
+  The local acceptance slice covers the agent/runtime/audit half, Project MCP
+  now queues the governed build command, and workspace-agent has the verified
+  rootless BuildKit Dockerfile boundary; GitLab repository bootstrap,
+  disposable VM, Harbor receipt ingestion/trust chain and live Argo remain open.
 - Pass `COZYSTACK_LIVE_GREEN` and `PROVIDER_FULL_GREEN` in a funded
   `provider_gate_full` window; simulator evidence must not be substituted.
 - Complete GitLab, OpenBao holder, capability-provider, beta-domain/DNS, and
