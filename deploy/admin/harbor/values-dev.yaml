@@ -1,0 +1,153 @@
+# Internal, single-worker Harbor profile. It is deliberately not a beta/HA
+# profile: all traffic stays in the admin cluster and Trivy is enabled only for
+# the later scanner gate. OCI blobs live in the dedicated Timeweb S3 bucket;
+# Harbor metadata lives in the dedicated managed PostgreSQL database.
+expose:
+  type: clusterIP
+  tls:
+    enabled: true
+    certSource: auto
+    auto:
+      commonName: harbor.harbor-system.svc
+  clusterIP:
+    name: harbor
+
+externalURL: https://harbor.harbor-system.svc
+
+ipFamily:
+  ipv4:
+    enabled: true
+  ipv6:
+    enabled: false
+
+persistence:
+  enabled: true
+  resourcePolicy: keep
+  persistentVolumeClaim:
+    redis:
+      storageClass: nvme.network-drives.csi.timeweb.cloud
+      accessMode: ReadWriteOnce
+      size: 1Gi
+  imageChartStorage:
+    type: s3
+    disableredirect: true
+    s3:
+      existingSecret: harbor-storage
+      region: ru-1
+      regionendpoint: https://s3.twcstorage.ru
+      secure: true
+      v4auth: true
+      rootdirectory: registry
+
+database:
+  type: external
+  external:
+    username: harbor_admin
+    coreDatabase: harbor
+    existingSecret: harbor-database
+    sslmode: disable
+  maxIdleConns: 10
+  maxOpenConns: 40
+
+existingSecretAdminPassword: harbor-admin
+existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+existingSecretSecretKey: harbor-system-key
+
+trivy:
+  enabled: false
+
+exporter:
+  enabled: false
+
+metrics:
+  enabled: false
+
+updateStrategy:
+  type: Recreate
+
+nginx:
+  nodeSelector: &systemNode
+    ai-native-paas.io/pool: system
+  tolerations: &systemTolerations
+    - key: ai-native-paas.io/system
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+portal:
+  replicas: 1
+  nodeSelector: *systemNode
+  tolerations: *systemTolerations
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+core:
+  replicas: 1
+  existingSecret: harbor-core
+  existingXsrfSecret: harbor-core
+  nodeSelector: *systemNode
+  tolerations: *systemTolerations
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 768Mi
+
+jobservice:
+  replicas: 1
+  existingSecret: harbor-jobservice
+  existingSecretKey: JOBSERVICE_SECRET
+  jobLoggers:
+    - database
+  maxJobWorkers: 2
+  nodeSelector: *systemNode
+  tolerations: *systemTolerations
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+registry:
+  replicas: 1
+  existingSecret: harbor-registry
+  existingSecretKey: REGISTRY_HTTP_SECRET
+  relativeurls: true
+  nodeSelector: *systemNode
+  tolerations: *systemTolerations
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 768Mi
+
+redis:
+  type: internal
+  internal:
+    nodeSelector: *systemNode
+    tolerations: *systemTolerations
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi

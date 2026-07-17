@@ -100,6 +100,13 @@ gates.
   HTTPS OCI Distribution adapter resolves exact digests and writes OCI 1.1
   referrers; it remains unconfigured in production until a project-scoped
   robot lease, OpenBao signing material and live workspace receipt are ready.
+- The internal Harbor development profile has passed a live private OCI/S3
+  round trip: it created a project-scoped pull/push robot, uploaded and read an
+  OCI blob/manifest through the registry, revoked the robot and proved a fresh
+  post-revoke credential cannot read the artifact. The project, robot and
+  restricted test Job were deleted after the run. This validates the internal
+  storage/credential path only; it does not close the verified-build trust
+  chain or release gate.
 - Capability gateway admission now has an executable provider-neutral core:
   project-scoped binding admission, per-project rate-limit integration,
   fail-closed provider lease dependency handling, public output without master

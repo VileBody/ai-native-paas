@@ -89,3 +89,15 @@ variable "workspace_log_bucket_preset_id" {
   type        = number
   default     = 2669
 }
+
+variable "harbor_blob_bucket_name" {
+  description = "Dedicated private Timeweb S3 bucket for internal Harbor OCI blobs."
+  type        = string
+  default     = "ai-native-paas-harbor-blobs"
+}
+
+variable "harbor_blob_bucket_preset_id" {
+  description = "Timeweb S3 Hot 10 GiB preset for internal Harbor OCI blobs."
+  type        = number
+  default     = 2669
+}

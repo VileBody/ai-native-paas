@@ -1,6 +1,6 @@
 schema_version: 1
 baseline_commit: "526423d"
-generated_at: "2026-07-17T02:07:00+03:00"
+generated_at: "2026-07-17T23:13:30+03:00"
 statuses:
   LOCAL_GREEN:
     state: GREEN
@@ -13,7 +13,7 @@ statuses:
     evidence: "The two preserved IPv4s, runtime/workspace VPCs, shared NAT, runtime LB and private Talos/Cozystack smoke cell are live; capability gateway admission now fails closed on missing provider leases and maps provider usage into Commerce meters; GitLab, disposable workspace VM and capability-provider live suites remain incomplete"
   DEV_PRODUCT_GREEN:
     state: PENDING
-    evidence: "runtime_sim_k8s is accepted as the default cheap development runtime path; runtime-api process smoke proves create application -> GitOps commit -> cells/runtime-sim-k8s path -> sim.runtime.internal hostname -> status/cross-tenant checks, acceptance tests cover agent task -> project create -> repository patch -> build -> approval -> runtime_sim_k8s hostname -> probe evidence -> usage preview -> workspace destroy evidence -> redacted audit, Project MCP build_execute queues only the governed workspace-agent verified-build command for the workspace-bound exact SHA and BuildSpec fingerprint, workspace-agent plans/runs verified rootless BuildKit, and agent-api now has mTLS-bound Runtime and Attachments bridges. The Harbor OCI adapter now binds trust attachments to immutable artifact subjects but remains unconfigured until a scoped robot lease/OpenBao signing/live workspace receipt. Governed legacy source compatibility, live workspace VM, GitLab MCP and Argo/Cozystack remain pending"
+    evidence: "runtime_sim_k8s is accepted as the default cheap development runtime path; runtime-api process smoke proves create application -> GitOps commit -> cells/runtime-sim-k8s path -> sim.runtime.internal hostname -> status/cross-tenant checks, acceptance tests cover agent task -> project create -> repository patch -> build -> approval -> runtime_sim_k8s hostname -> probe evidence -> usage preview -> workspace destroy evidence -> redacted audit, Project MCP build_execute queues only the governed workspace-agent verified-build command for the workspace-bound exact SHA and BuildSpec fingerprint, workspace-agent plans/runs verified rootless BuildKit, and agent-api now has mTLS-bound Runtime and Attachments bridges. Internal Harbor now has a live private OCI/S3 round trip and post-revoke robot read-denial gate; the application adapter remains unconfigured until production robot-lease issuance, OpenBao signing and a live workspace receipt. Governed legacy source compatibility, live workspace VM, GitLab MCP and Argo/Cozystack remain pending"
   K8S_GREEN:
     state: PENDING
     evidence: "Talos/Cozystack/Envoy/LINSTOR/Argo and 20 consecutive GitOps hello-go HTTP probes are green in the smoke profile; runtime_sim_k8s manifests are ready for cheap dev product runs; live provider_gate PostgreSQL/Redis/S3 lifecycle and backup/restore gates remain pending"

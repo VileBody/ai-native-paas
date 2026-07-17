@@ -44,6 +44,11 @@ output "control_plane_database_networks" {
   value = twc_database_cluster.control_plane.networks
 }
 
+output "control_plane_database_host" {
+  description = "Private IPv4 address of the admin managed PostgreSQL cluster."
+  value       = twc_database_cluster.control_plane.networks[0].ips[0].ip
+}
+
 output "control_plane_database_login" {
   value = "platform_admin"
 }
@@ -76,5 +81,36 @@ output "workspace_log_s3_access_key" {
 
 output "workspace_log_s3_secret_key" {
   value     = twc_s3_bucket.workspace_logs.secret_key
+  sensitive = true
+}
+
+output "harbor_database_name" {
+  value = twc_database_instance.harbor.name
+}
+
+output "harbor_database_login" {
+  value = twc_database_user.harbor.login
+}
+
+output "harbor_database_password" {
+  value     = random_password.harbor.result
+  sensitive = true
+}
+
+output "harbor_blob_bucket_name" {
+  value = twc_s3_bucket.harbor_blobs.full_name
+}
+
+output "harbor_blob_s3_endpoint" {
+  value = "https://s3.twcstorage.ru"
+}
+
+output "harbor_blob_s3_access_key" {
+  value     = twc_s3_bucket.harbor_blobs.access_key
+  sensitive = true
+}
+
+output "harbor_blob_s3_secret_key" {
+  value     = twc_s3_bucket.harbor_blobs.secret_key
   sensitive = true
 }

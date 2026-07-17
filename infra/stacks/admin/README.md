@@ -8,10 +8,11 @@ Only platform APIs, MCP gateway, OpenBao, NATS, Harbor, state service and
 monitoring may tolerate `ai-native-paas.io/system=true:NoSchedule`. User
 workloads and user-requested databases belong to the Cozystack runtime cell.
 
-The stack also owns a dedicated private S3 bucket for client-encrypted
-workspace command logs. This bucket is separate from OpenTofu state, custom
-image staging, Harbor blobs and all user S3 resources; `prevent_destroy` is
-mandatory.
+The stack owns dedicated private S3 buckets for client-encrypted workspace
+command logs and Harbor OCI blobs. Both are separate from OpenTofu state,
+custom image staging and all user S3 resources; `prevent_destroy` is mandatory.
+Harbor metadata receives its own database and least-privilege user inside the
+admin managed PostgreSQL cluster.
 
 The Timeweb network-drive CSI is installed through the provider's managed addon
 surface once available in the API. The live gate requires
