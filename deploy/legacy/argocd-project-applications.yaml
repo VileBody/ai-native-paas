@@ -81,7 +81,7 @@ spec:
   project: legacy-quarantine
   source:
     repoURL: https://github.com/VileBody/vietnam-rent-miniapp.git
-    targetRevision: eb19e80905554639a28d16c9a1538578ae00cf7b
+    targetRevision: main
     path: k8s
   destination:
     server: https://kubernetes.default.svc
@@ -90,7 +90,6 @@ spec:
     - group: apps
       kind: Deployment
       jsonPointers:
-        - /spec/template/spec/containers/0/image
         - /spec/template/spec/imagePullSecrets
         - /spec/template/spec/nodeSelector
     - group: ""
