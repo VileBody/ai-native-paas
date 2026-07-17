@@ -15,58 +15,178 @@ import (
 	"time"
 
 	kernelv1 "github.com/keir-research/ai-native-paas/contracts/kernel/v1"
-	"github.com/keir-research/ai-native-paas/internal/agent/application"
+	agentapp "github.com/keir-research/ai-native-paas/internal/agent/application"
+	agentdomain "github.com/keir-research/ai-native-paas/internal/agent/domain"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
+	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
 	commercev1 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1"
 	runtimev1 "github.com/keir-research/ai-native-paas/pkg/contracts/runtime/v1"
 	sourcev1 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v1"
 )
 
 func unavailable(code string) error {
-	return &application.ProviderError{Message: code + " dependency is not installed", Retryable: true}
+	return &agentapp.ProviderError{Message: code + " dependency is not installed", Retryable: true}
 }
 
 type Source struct{}
 
-func (Source) CreateProject(context.Context, string, string, string, string) (application.ProjectRef, error) {
-	return application.ProjectRef{}, unavailable("project_mcp")
+func (Source) CreateProject(context.Context, string, string, string, string) (agentapp.ProjectRef, error) {
+	return agentapp.ProjectRef{}, unavailable("project_mcp")
 }
-func (Source) GetProject(context.Context, string, string) (application.ProjectRef, error) {
-	return application.ProjectRef{}, unavailable("project_mcp")
+func (Source) GetProject(context.Context, string, string) (agentapp.ProjectRef, error) {
+	return agentapp.ProjectRef{}, unavailable("project_mcp")
 }
-func (Source) ApplyPatch(context.Context, string, string, application.ApplyPatchArguments, string) (application.CommitRef, error) {
-	return application.CommitRef{}, unavailable("project_mcp")
+func (Source) ApplyPatch(context.Context, string, string, agentapp.ApplyPatchArguments, string) (agentapp.CommitRef, error) {
+	return agentapp.CommitRef{}, unavailable("project_mcp")
 }
-func (Source) CreateBranch(context.Context, string, string, application.CreateBranchArguments, string) (application.CommitRef, error) {
-	return application.CommitRef{}, unavailable("project_mcp")
+func (Source) CreateBranch(context.Context, string, string, agentapp.CreateBranchArguments, string) (agentapp.CommitRef, error) {
+	return agentapp.CommitRef{}, unavailable("project_mcp")
 }
-func (Source) CreateMergeRequest(context.Context, string, string, application.CreateMergeRequestArguments, string) (application.MergeRequestRef, error) {
-	return application.MergeRequestRef{}, unavailable("project_mcp")
+func (Source) CreateMergeRequest(context.Context, string, string, agentapp.CreateMergeRequestArguments, string) (agentapp.MergeRequestRef, error) {
+	return agentapp.MergeRequestRef{}, unavailable("project_mcp")
 }
 func (Source) Reconcile(context.Context, string, string) error { return unavailable("project_mcp") }
 
 type Builds struct{}
 
-func (Builds) Request(context.Context, string, sourcev1.SourceRevision, int64, string, string) (application.BuildResult, error) {
-	return application.BuildResult{}, unavailable("workspace_nat")
+func (Builds) Request(context.Context, string, sourcev1.SourceRevision, int64, string, string) (agentapp.BuildResult, error) {
+	return agentapp.BuildResult{}, unavailable("workspace_nat")
 }
-func (Builds) Get(context.Context, string, string) (application.BuildResult, error) {
-	return application.BuildResult{}, unavailable("workspace_nat")
+func (Builds) Get(context.Context, string, string) (agentapp.BuildResult, error) {
+	return agentapp.BuildResult{}, unavailable("workspace_nat")
 }
-func (Builds) Resume(context.Context, string, string) (application.BuildResult, error) {
-	return application.BuildResult{}, unavailable("workspace_nat")
+func (Builds) Resume(context.Context, string, string) (agentapp.BuildResult, error) {
+	return agentapp.BuildResult{}, unavailable("workspace_nat")
+}
+
+// HTTPBuilds bridges the Agent MCP façade to build-api. It only becomes active
+// when the API URL and immutable build material settings are present; otherwise
+// the legacy fail-closed build dependency remains in effect.
+type HTTPBuilds struct {
+	BaseURL         string
+	PrincipalID     string
+	BuilderDigest   string
+	RunImageDigest  string
+	PlatformVersion string
+	HTTPClient      *http.Client
+}
+
+func NewHTTPBuilds(baseURL, principalID, builderDigest, runImageDigest, platformVersion string) *HTTPBuilds {
+	return &HTTPBuilds{
+		BaseURL: baseURL, PrincipalID: principalID, BuilderDigest: builderDigest,
+		RunImageDigest: runImageDigest, PlatformVersion: platformVersion,
+		HTTPClient: &http.Client{Timeout: 15 * time.Second},
+	}
+}
+
+func (b *HTTPBuilds) Request(ctx context.Context, tenant string, revision sourcev1.SourceRevision, _ int64, idempotencyKey, correlationID string) (agentapp.BuildResult, error) {
+	if !b.configured() {
+		return (Builds{}).Request(ctx, tenant, revision, 0, idempotencyKey, correlationID)
+	}
+	tenant, idempotencyKey, correlationID = strings.TrimSpace(tenant), strings.TrimSpace(idempotencyKey), strings.TrimSpace(correlationID)
+	if tenant == "" || idempotencyKey == "" || correlationID == "" || revision.Validate() != nil {
+		return agentapp.BuildResult{}, agentdomain.NewError(agentdomain.CodeInvalidArgument, "invalid build request")
+	}
+	if !buildv1.ValidDigest(b.BuilderDigest) || !buildv1.ValidDigest(b.RunImageDigest) || strings.TrimSpace(b.PlatformVersion) == "" {
+		return agentapp.BuildResult{}, unavailable("build_gateway")
+	}
+	body := struct {
+		Source sourcev1.SourceRevision `json:"source"`
+		Config struct {
+			Type string `json:"type"`
+		} `json:"config"`
+		BuilderDigest   string `json:"builder_digest"`
+		RunImageDigest  string `json:"run_image_digest"`
+		PlatformVersion string `json:"platform_version"`
+	}{
+		Source: revision, Config: struct {
+			Type string `json:"type"`
+		}{Type: "auto"},
+		BuilderDigest: b.BuilderDigest, RunImageDigest: b.RunImageDigest, PlatformVersion: b.PlatformVersion,
+	}
+	var out buildGatewayResult
+	if err := b.do(ctx, http.MethodPost, "/v1/organizations/"+url.PathEscape(tenant)+"/builds", tenant, idempotencyKey, correlationID, body, &out); err != nil {
+		return agentapp.BuildResult{}, err
+	}
+	return buildResult(out), nil
+}
+
+func (b *HTTPBuilds) Get(ctx context.Context, tenant, buildID string) (agentapp.BuildResult, error) {
+	if !b.configured() {
+		return (Builds{}).Get(ctx, tenant, buildID)
+	}
+	tenant, buildID = strings.TrimSpace(tenant), strings.TrimSpace(buildID)
+	if tenant == "" || buildID == "" {
+		return agentapp.BuildResult{}, agentdomain.NewError(agentdomain.CodeInvalidArgument, "invalid build lookup")
+	}
+	var out buildGatewayResult
+	if err := b.do(ctx, http.MethodGet, "/v1/organizations/"+url.PathEscape(tenant)+"/builds/"+url.PathEscape(buildID), tenant, "", "agent-api-build-"+buildID, nil, &out); err != nil {
+		return agentapp.BuildResult{}, err
+	}
+	return buildResult(out), nil
+}
+
+func (b *HTTPBuilds) Resume(ctx context.Context, tenant, operationID string) (agentapp.BuildResult, error) {
+	if !b.configured() {
+		return (Builds{}).Resume(ctx, tenant, operationID)
+	}
+	return b.Get(ctx, tenant, operationID)
+}
+
+type buildGatewayResult struct {
+	Build    buildGatewayBuild     `json:"Build"`
+	Artifact *buildGatewayArtifact `json:"Artifact,omitempty"`
+	Reused   bool                  `json:"Reused,omitempty"`
+}
+
+type buildGatewayBuild struct {
+	ID            string             `json:"ID"`
+	TenantID      string             `json:"TenantID"`
+	Identity      string             `json:"Identity"`
+	State         buildv1.BuildState `json:"State"`
+	CorrelationID string             `json:"CorrelationID"`
+	ArtifactID    string             `json:"ArtifactID"`
+	FailureCode   string             `json:"FailureCode"`
+	Retryable     bool               `json:"Retryable"`
+	CreatedAt     time.Time          `json:"CreatedAt"`
+	UpdatedAt     time.Time          `json:"UpdatedAt"`
+}
+
+type buildGatewayArtifact struct {
+	ID         string `json:"ID"`
+	Repository string `json:"Repository"`
+	Digest     string `json:"Digest"`
+	MediaType  string `json:"MediaType"`
+	State      string `json:"State"`
+}
+
+func buildResult(result buildGatewayResult) agentapp.BuildResult {
+	view := buildv1.BuildView{
+		BuildID: result.Build.ID, TenantID: result.Build.TenantID, Identity: result.Build.Identity,
+		State: result.Build.State, CorrelationID: result.Build.CorrelationID,
+		FailureCode: result.Build.FailureCode, Retryable: result.Build.Retryable,
+		CreatedAt: result.Build.CreatedAt, UpdatedAt: result.Build.UpdatedAt,
+	}
+	if result.Artifact != nil && result.Artifact.State == "RELEASABLE" {
+		artifact := buildv1.ArtifactRef{
+			ArtifactID: result.Artifact.ID, Repository: result.Artifact.Repository,
+			Digest: result.Artifact.Digest, MediaType: result.Artifact.MediaType,
+		}
+		view.Artifact = &artifact
+	}
+	return agentapp.BuildResult{Build: view}
 }
 
 type Runtime struct{}
 
-func (Runtime) Deploy(context.Context, runtimev1.DeployRequest, int64) (application.RuntimeResult, error) {
-	return application.RuntimeResult{}, unavailable("runtime_cell")
+func (Runtime) Deploy(context.Context, runtimev1.DeployRequest, int64) (agentapp.RuntimeResult, error) {
+	return agentapp.RuntimeResult{}, unavailable("runtime_cell")
 }
-func (Runtime) Get(context.Context, string, string) (application.RuntimeResult, error) {
-	return application.RuntimeResult{}, unavailable("runtime_cell")
+func (Runtime) Get(context.Context, string, string) (agentapp.RuntimeResult, error) {
+	return agentapp.RuntimeResult{}, unavailable("runtime_cell")
 }
-func (Runtime) Rollback(context.Context, string, string, string, int64, string) (application.RuntimeResult, error) {
-	return application.RuntimeResult{}, unavailable("runtime_cell")
+func (Runtime) Rollback(context.Context, string, string, string, int64, string) (agentapp.RuntimeResult, error) {
+	return agentapp.RuntimeResult{}, unavailable("runtime_cell")
 }
 func (Runtime) Reconcile(context.Context, string, string) error { return unavailable("runtime_cell") }
 
@@ -210,6 +330,108 @@ func (c *HTTPCommerce) configured() bool {
 	return c != nil && strings.TrimSpace(c.BaseURL) != ""
 }
 
+func (b *HTTPBuilds) configured() bool {
+	return b != nil && strings.TrimSpace(b.BaseURL) != ""
+}
+
+func (b *HTTPBuilds) do(ctx context.Context, method, path, tenant, idempotencyKey, correlationID string, body, out any) error {
+	endpoint, err := b.endpoint(path)
+	if err != nil {
+		return unavailable("build_gateway")
+	}
+	var reader io.Reader
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			return unavailable("build_gateway")
+		}
+		reader = bytes.NewReader(raw)
+	}
+	request, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
+	if err != nil {
+		return unavailable("build_gateway")
+	}
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("X-Tenant-ID", tenant)
+	request.Header.Set("X-Principal-ID", b.principal())
+	request.Header.Set("X-Principal-Kind", "service")
+	if strings.TrimSpace(correlationID) != "" {
+		request.Header.Set("X-Correlation-ID", strings.TrimSpace(correlationID))
+	}
+	if method != http.MethodGet && strings.TrimSpace(idempotencyKey) != "" {
+		request.Header.Set("Idempotency-Key", strings.TrimSpace(idempotencyKey))
+	}
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	client := b.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: 15 * time.Second}
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return unavailable("build_gateway")
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return buildGatewayStatusError(response.StatusCode, response.Body)
+	}
+	if out == nil {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
+		return nil
+	}
+	decoder := json.NewDecoder(io.LimitReader(response.Body, 2<<20))
+	if err := decoder.Decode(out); err != nil {
+		return unavailable("build_gateway")
+	}
+	return nil
+}
+
+func (b *HTTPBuilds) endpoint(path string) (string, error) {
+	raw := strings.TrimSpace(b.BaseURL)
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return "", fmt.Errorf("invalid build base url")
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + path
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String(), nil
+}
+
+func (b *HTTPBuilds) principal() string {
+	if b != nil && strings.TrimSpace(b.PrincipalID) != "" {
+		return strings.TrimSpace(b.PrincipalID)
+	}
+	return "agent-api"
+}
+
+func buildGatewayStatusError(status int, body io.Reader) error {
+	message := "build gateway returned non-success"
+	var payload struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	_ = json.NewDecoder(io.LimitReader(body, 1<<20)).Decode(&payload)
+	if strings.TrimSpace(payload.Error.Message) != "" && status < 500 {
+		message = strings.TrimSpace(payload.Error.Message)
+	}
+	switch status {
+	case http.StatusBadRequest:
+		return agentdomain.NewError(agentdomain.CodeInvalidArgument, message)
+	case http.StatusForbidden:
+		return agentdomain.NewError(agentdomain.CodePermissionDenied, message)
+	case http.StatusNotFound:
+		return agentdomain.NewError(agentdomain.CodeNotFound, message)
+	case http.StatusConflict:
+		return agentdomain.NewError(agentdomain.CodeConflict, message)
+	default:
+		return &agentapp.ProviderError{Message: "build gateway returned non-success", Retryable: status >= 500 || status == http.StatusTooManyRequests}
+	}
+}
+
 func (c *HTTPCommerce) do(ctx context.Context, method, path, tenant string, body, out any) error {
 	endpoint, err := c.endpoint(path)
 	if err != nil {
@@ -244,7 +466,7 @@ func (c *HTTPCommerce) do(ctx context.Context, method, path, tenant string, body
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return &application.ProviderError{Message: "commerce gateway returned non-success", Retryable: response.StatusCode >= 500 || response.StatusCode == http.StatusTooManyRequests}
+		return &agentapp.ProviderError{Message: "commerce gateway returned non-success", Retryable: response.StatusCode >= 500 || response.StatusCode == http.StatusTooManyRequests}
 	}
 	if out == nil {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
@@ -319,7 +541,7 @@ func (o *HTTPOperations) do(ctx context.Context, method, path, tenant, operation
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return &application.ProviderError{Message: "kernel gateway returned non-success", Retryable: response.StatusCode >= 500 || response.StatusCode == http.StatusTooManyRequests}
+		return &agentapp.ProviderError{Message: "kernel gateway returned non-success", Retryable: response.StatusCode >= 500 || response.StatusCode == http.StatusTooManyRequests}
 	}
 	if out == nil {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))

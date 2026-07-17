@@ -72,6 +72,11 @@ gates.
   for operation reads and cancellation when `KERNEL_API_URL` is configured; it
   sends service-principal scopes, idempotent cancellation keys and rejects
   cross-tenant Kernel responses before exposing them through the agent facade.
+- Production `agent-api` now has a tenant-scoped Build API bridge for legacy
+  MCP v1 build request/get/resume when `BUILD_API_URL` and immutable build
+  material settings are configured; it maps build-api 4xx responses to
+  non-retryable agent errors and exposes artifacts only when build-api reports
+  them as `RELEASABLE`.
 - Project MCP v2 now wires `build_execute` into the workspace service as a
   governed `workspace-agent verified-build` command bound to the workspace's
   exact source SHA; spoofed source revisions and generic command bypasses fail

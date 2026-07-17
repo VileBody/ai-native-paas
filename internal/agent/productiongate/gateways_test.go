@@ -3,15 +3,32 @@ package productiongate_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	kernelv1 "github.com/keir-research/ai-native-paas/contracts/kernel/v1"
+	agentapp "github.com/keir-research/ai-native-paas/internal/agent/application"
+	agentdomain "github.com/keir-research/ai-native-paas/internal/agent/domain"
 	"github.com/keir-research/ai-native-paas/internal/agent/productiongate"
+	buildapp "github.com/keir-research/ai-native-paas/internal/build/application"
+	builddomain "github.com/keir-research/ai-native-paas/internal/build/domain"
+	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
 	commercev1 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1"
+	sourcev1 "github.com/keir-research/ai-native-paas/pkg/contracts/source/v1"
 )
+
+func digest(ch string) string { return "sha256:" + strings.Repeat(ch, 64) }
+
+func revision() sourcev1.SourceRevision {
+	return sourcev1.SourceRevision{
+		ProjectID: "project-1", RepositoryID: "repo-1", Branch: "main",
+		CommitSHA: strings.Repeat("a", 40), SourceRoot: "cmd/api",
+	}
+}
 
 func TestHTTPCommerce_EmptyBaseURLFailsClosed(t *testing.T) {
 	gateway := productiongate.NewHTTPCommerce("", "agent-api")
@@ -24,6 +41,112 @@ func TestHTTPCommerce_EmptyBaseURLFailsClosed(t *testing.T) {
 	}
 	if _, err := gateway.GetUsage(context.Background(), "tenant-1", "period-1"); err == nil {
 		t.Fatal("usage preview should remain unavailable without commerce URL")
+	}
+}
+
+func TestHTTPBuilds_EmptyBaseURLFailsClosed(t *testing.T) {
+	gateway := productiongate.NewHTTPBuilds("", "agent-api", digest("b"), digest("c"), "platform-v1")
+	if _, err := gateway.Request(context.Background(), "tenant-1", revision(), 5, "idem-1", "corr-1"); err == nil {
+		t.Fatal("build request should remain unavailable without build URL")
+	}
+}
+
+func TestHTTPBuilds_RequestUsesTenantScopedBuildAPI(t *testing.T) {
+	now := time.Date(2026, 7, 17, 10, 0, 0, 0, time.UTC)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/organizations/tenant-1/builds" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("X-Tenant-ID") != "tenant-1" || r.Header.Get("X-Principal-ID") != "agent-api" || r.Header.Get("X-Principal-Kind") != "service" ||
+			r.Header.Get("Idempotency-Key") != "idem-1" || r.Header.Get("X-Correlation-ID") != "corr-1" {
+			t.Fatalf("headers=%v", r.Header)
+		}
+		var body struct {
+			Source          sourcev1.SourceRevision `json:"source"`
+			Config          builddomain.BuildConfig `json:"config"`
+			BuilderDigest   string                  `json:"builder_digest"`
+			RunImageDigest  string                  `json:"run_image_digest"`
+			PlatformVersion string                  `json:"platform_version"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.Source != revision() || body.Config.Type != builddomain.BuildTypeAuto || body.BuilderDigest != digest("b") || body.RunImageDigest != digest("c") || body.PlatformVersion != "platform-v1" {
+			t.Fatalf("body=%+v", body)
+		}
+		_ = json.NewEncoder(w).Encode(buildapp.RequestBuildResult{Build: builddomain.Build{
+			ID: "bld-1", TenantID: "tenant-1", Identity: "identity-1", State: buildv1.BuildQueued,
+			CorrelationID: "corr-1", CreatedAt: now, UpdatedAt: now,
+		}})
+	}))
+	defer server.Close()
+
+	gateway := productiongate.NewHTTPBuilds(server.URL, "agent-api", digest("b"), digest("c"), "platform-v1")
+	result, err := gateway.Request(context.Background(), "tenant-1", revision(), 5, "idem-1", "corr-1")
+	if err != nil {
+		t.Fatalf("request build: %v", err)
+	}
+	if result.Build.BuildID != "bld-1" || result.Build.TenantID != "tenant-1" || result.Build.State != buildv1.BuildQueued {
+		t.Fatalf("result=%+v", result)
+	}
+}
+
+func TestHTTPBuilds_GetMapsReleasableArtifact(t *testing.T) {
+	now := time.Date(2026, 7, 17, 10, 0, 0, 0, time.UTC)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/organizations/tenant-1/builds/bld-1" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(buildapp.RequestBuildResult{
+			Build: builddomain.Build{
+				ID: "bld-1", TenantID: "tenant-1", Identity: "identity-1", State: buildv1.BuildSucceeded,
+				ArtifactID: "art-1", CorrelationID: "corr-1", CreatedAt: now, UpdatedAt: now,
+			},
+			Artifact: &builddomain.Artifact{
+				ID: "art-1", TenantID: "tenant-1", BuildID: "bld-1", Repository: "registry.test/tenant-1/app",
+				Digest: digest("d"), MediaType: "application/vnd.oci.image.manifest.v1+json", State: builddomain.ArtifactReleasable,
+			},
+		})
+	}))
+	defer server.Close()
+
+	gateway := productiongate.NewHTTPBuilds(server.URL, "agent-api", digest("b"), digest("c"), "platform-v1")
+	result, err := gateway.Get(context.Background(), "tenant-1", "bld-1")
+	if err != nil {
+		t.Fatalf("get build: %v", err)
+	}
+	if result.Build.Artifact == nil || result.Build.Artifact.ArtifactID != "art-1" || result.Build.Artifact.Digest != digest("d") {
+		t.Fatalf("artifact not mapped: %+v", result.Build)
+	}
+}
+
+func TestHTTPBuilds_MapsClientErrorsToAgentDomain(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": "NOT_FOUND", "message": "build not found"}})
+	}))
+	defer server.Close()
+
+	gateway := productiongate.NewHTTPBuilds(server.URL, "agent-api", digest("b"), digest("c"), "platform-v1")
+	_, err := gateway.Get(context.Background(), "tenant-1", "bld-missing")
+	var domainErr *agentdomain.Error
+	if !errors.As(err, &domainErr) || domainErr.Code != agentdomain.CodeNotFound || domainErr.Retryable {
+		t.Fatalf("err=%#v", err)
+	}
+}
+
+func TestHTTPBuilds_MapsServerErrorsToRetryableProviderError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"code":"UNAVAILABLE","message":"db down"}}`))
+	}))
+	defer server.Close()
+
+	gateway := productiongate.NewHTTPBuilds(server.URL, "agent-api", digest("b"), digest("c"), "platform-v1")
+	_, err := gateway.Get(context.Background(), "tenant-1", "bld-1")
+	var providerErr *agentapp.ProviderError
+	if !errors.As(err, &providerErr) || !providerErr.Retryable {
+		t.Fatalf("err=%#v", err)
 	}
 }
 

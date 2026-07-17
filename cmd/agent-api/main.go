@@ -42,6 +42,7 @@ func main() {
 			platformprofile.Prod("verified-identity-middleware"),
 			platformprofile.Prod("commerce-http-gateway-or-fail-closed"),
 			platformprofile.Prod("kernel-http-operation-gateway-or-fail-closed"),
+			platformprofile.Prod("build-http-gateway-or-fail-closed"),
 			platformprofile.Prod("fail-closed-mcp-v1-until-agent-mtls"),
 			platformprofile.Prod("fail-closed-service-gateways-until-internal-mtls"),
 		}
@@ -99,8 +100,12 @@ func main() {
 		usageGateway      application.UsageGateway
 	)
 	if profile == platformprofile.Production {
-		sourceGateway, buildGateway, runtimeGateway = productiongate.Source{}, productiongate.Builds{}, productiongate.Runtime{}
+		sourceGateway, runtimeGateway = productiongate.Source{}, productiongate.Runtime{}
 		commerceClient := productiongate.NewHTTPCommerce(os.Getenv("COMMERCE_API_URL"), env("AGENT_API_SERVICE_PRINCIPAL", "agent-api"))
+		buildGateway = productiongate.NewHTTPBuilds(
+			os.Getenv("BUILD_API_URL"), env("AGENT_API_SERVICE_PRINCIPAL", "agent-api"),
+			os.Getenv("AGENT_BUILD_BUILDER_DIGEST"), os.Getenv("AGENT_BUILD_RUN_IMAGE_DIGEST"), os.Getenv("AGENT_BUILD_PLATFORM_VERSION"),
+		)
 		attachmentGateway, commerceGateway = productiongate.Attachments{}, commerceClient
 		operationGateway = productiongate.NewHTTPOperations(os.Getenv("KERNEL_API_URL"), env("AGENT_API_SERVICE_PRINCIPAL", "agent-api"))
 		logGateway, usageGateway = productiongate.Logs{}, commerceClient
