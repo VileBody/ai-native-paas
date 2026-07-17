@@ -8,6 +8,19 @@ Cozystack, Envoy Gateway, LINSTOR, Argo CD Core and 20 consecutive GitOps
 `hello-go` HTTP probes are in place. The release remains blocked by
 `provider_gate`, workspace, provider, security, DR and signed-release gates.
 
+ADR 0007 adds an explicit split between the cheap development runtime simulator
+and real Cozystack live certification:
+
+```text
+DEV_PRODUCT_GREEN       runtime_sim_k8s executable product slice
+COZYSTACK_LIVE_GREEN    real Talos/Cozystack runtime cell evidence
+PROVIDER_FULL_GREEN     real apps.cozystack.io Redis/Bucket/S3 evidence
+```
+
+Simulator evidence is allowed to unblock product development, but it is not
+Cozystack live evidence and cannot close release-window provider/security/DR
+gates.
+
 ## Green evidence
 
 - All 157 pivot requirements are mapped to executable or explicitly
@@ -37,6 +50,10 @@ Cozystack, Envoy Gateway, LINSTOR, Argo CD Core and 20 consecutive GitOps
 - Production entrypoints fail closed when PostgreSQL, OIDC, or production
   adapters are missing; admin and workspace services use internal
   `ClusterIP` exposure where required by the architecture.
+- `runtime_sim_k8s` has a bounded admin-cluster namespace/AppProject manifest
+  for cheap executable product slices and is explicitly labeled
+  `ai-native-paas.io/evidence-class: dev-product` and
+  `ai-native-paas.io/not-cozystack-live: "true"`.
 
 ## Live checkpoint
 
@@ -81,11 +98,18 @@ reconciliation and old-key rejection evidence.
   DNS domain converges to `cozy.local` before LINSTOR gates run.
 - Pass the `provider_gate` PostgreSQL/Redis/S3 lifecycle, backup/restore,
   isolation, security, and `E2E-1` through `E2E-12` live gates.
+- Pass the `DEV_PRODUCT_GREEN` simulator path:
+  `Create Project -> GitLab/MCP -> plan -> approval -> build -> GitOps ->
+  runtime_sim_k8s -> probe -> usage/audit -> destroy`.
+- Pass `COZYSTACK_LIVE_GREEN` and `PROVIDER_FULL_GREEN` in a funded
+  `provider_gate_full` window; simulator evidence must not be substituted.
 - Complete GitLab, OpenBao holder, capability-provider, beta-domain/DNS, and
   final HA inputs and gates.
 - Rotate the Timeweb main S3 secret and reconcile state-service, backend,
   workspace-log and image-staging consumers; prove the previous secret fails.
 - Produce signed immutable release artifacts and the final restore drill.
 
-Until those items pass, `PROVIDER_GREEN`, `K8S_GREEN`, `SECURITY_GREEN`, and
-`OPS_GREEN` remain pending. The smoke cell is live evidence, not a beta release.
+Until those items pass, `DEV_PRODUCT_GREEN`, `PROVIDER_GREEN`, `K8S_GREEN`,
+`COZYSTACK_LIVE_GREEN`, `PROVIDER_FULL_GREEN`, `SECURITY_GREEN`, and
+`OPS_GREEN` remain pending. The smoke cell and simulator are evidence inputs,
+not a beta release.

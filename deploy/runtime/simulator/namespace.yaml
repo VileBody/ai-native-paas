@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: paas-runtime-sim
+  labels:
+    ai-native-paas.io/runtime-driver: runtime_sim_k8s
+    ai-native-paas.io/evidence-class: dev-product
+    ai-native-paas.io/not-cozystack-live: "true"
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: runtime-sim-k8s
+  namespace: argocd
+  labels:
+    ai-native-paas.io/runtime-driver: runtime_sim_k8s
+    ai-native-paas.io/evidence-class: dev-product
+    ai-native-paas.io/not-cozystack-live: "true"
+spec:
+  description: Development-only runtime simulator for executable product slices.
+  sourceRepos:
+    - https://git.example.invalid/platform/runtime-sim.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: paas-runtime-sim
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Service
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: StatefulSet
+    - group: batch
+      kind: Job
+    - group: networking.k8s.io
+      kind: NetworkPolicy

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: runtime-sim-k8s-cell
+  namespace: paas-runtime-sim
+  labels:
+    ai-native-paas.io/runtime-driver: runtime_sim_k8s
+    ai-native-paas.io/evidence-class: dev-product
+    ai-native-paas.io/not-cozystack-live: "true"
+data:
+  driver: runtime_sim_k8s
+  evidence_class: dev-product
+  cozystack_live: "false"
+  namespace: paas-runtime-sim
+  ingress_domain: sim.runtime.internal
+  managed_resources: sim_postgres,sim_redis,sim_s3
+  notes: "Development product simulator only; does not close Cozystack live gates."
