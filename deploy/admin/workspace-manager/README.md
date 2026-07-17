@@ -10,7 +10,8 @@ The manifest is intentionally not self-bootstrapping. Apply it only after:
 
 1. the OpenBao Shamir ceremony, Kubernetes auth role `workspace-manager`,
    workspace PKI and policy are configured;
-2. public CA material is copied to `openbao-client-ca`, and
+2. public CA material is copied with `./scripts/sync-openbao-client-ca.sh` to
+   `openbao-client-ca`, and
    `workspace-manager-tls` contains the final server certificate/key plus the
    workspace client CA;
 3. the current signed workspace VM artifact is imported and locked in the
@@ -26,3 +27,18 @@ provider before changing them.
 
 The deployment must not be applied while any release input is a placeholder.
 The manifest never creates a LoadBalancer or IPv4 of its own.
+
+Before applying the workload, run
+`./scripts/verify-openbao-workspace-manager-auth.sh`. It performs a disposable
+Kubernetes-auth login using the `workspace-manager` ServiceAccount, proves the
+expected PKI and credential-envelope capabilities, proves Transit signing is
+denied, revokes its token, and deletes the test Job.
+
+Then run `./scripts/verify-openbao-workspace-manager-injector.sh`. This uses
+the same injector annotations and named projected-token volume as the
+deployment and verifies only the injected token file's presence and mode.
+
+The role requires `audience=openbao`. The manifest therefore replaces the
+default ServiceAccount projection with a 15-minute `openbao`-audience projected
+token at the standard path and names that volume for the OpenBao Agent Injector.
+Do not restore `automountServiceAccountToken: true` or add a second token mount.

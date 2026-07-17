@@ -34,6 +34,7 @@ spec:
         vault.hashicorp.com/agent-inject: "true"
         vault.hashicorp.com/agent-inject-token: "true"
         vault.hashicorp.com/role: workspace-manager
+        vault.hashicorp.com/agent-service-account-token-volume-name: openbao-service-account-token
         vault.hashicorp.com/service: https://openbao-active.openbao.svc:8200
         vault.hashicorp.com/tls-secret: openbao-client-ca
         vault.hashicorp.com/ca-cert: /vault/tls/ca.crt
@@ -42,7 +43,9 @@ spec:
         vault.hashicorp.com/agent-set-security-context: "true"
     spec:
       serviceAccountName: workspace-manager
-      automountServiceAccountToken: true
+      # The OpenBao role binds audience=openbao. Do not let the default
+      # Kubernetes-audience token appear beside the short-lived projected token.
+      automountServiceAccountToken: false
       imagePullSecrets:
         - name: craas-ai-native-paas-registry
       securityContext:
@@ -190,6 +193,9 @@ spec:
             - name: WORKSPACE_LOG_ENCRYPTION_KEY_FILE
               value: /var/run/secrets/workspace-manager/log-encryption-key
           volumeMounts:
+            - name: openbao-service-account-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
             - name: manager-secrets
               mountPath: /var/run/secrets/workspace-manager
               readOnly: true
@@ -230,6 +236,28 @@ spec:
               drop: [ALL]
             readOnlyRootFilesystem: true
       volumes:
+        # This mirrors the standard service-account projection while requesting
+        # the exact audience verified by auth/kubernetes/role/workspace-manager.
+        # The injector receives the same named volume through its annotation.
+        - name: openbao-service-account-token
+          projected:
+            defaultMode: 288
+            sources:
+              - serviceAccountToken:
+                  audience: openbao
+                  expirationSeconds: 900
+                  path: token
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
         - name: manager-secrets
           secret:
             secretName: workspace-manager-secrets

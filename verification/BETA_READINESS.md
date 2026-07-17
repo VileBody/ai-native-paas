@@ -86,6 +86,11 @@ gates.
   certificate-only listeners, clients cannot forge principal/scope headers,
   and a real ephemeral-CA handshake test proves clients without a certificate
   are rejected.
+- The live OpenBao `workspace-manager` Kubernetes role is bound only to its
+  ServiceAccount and namespace, uses a 15-minute `openbao`-audience projected
+  JWT, and has only workspace PKI/envelope capabilities. A restricted direct
+  auth gate and a separate Agent Injector gate both passed; Transit signing is
+  denied to this role and neither gate reads or prints a secret.
 - Project MCP v2 now wires `build_execute` into the workspace service as a
   governed `workspace-agent verified-build` command bound to the workspace's
   exact source SHA; spoofed source revisions and generic command bypasses fail
