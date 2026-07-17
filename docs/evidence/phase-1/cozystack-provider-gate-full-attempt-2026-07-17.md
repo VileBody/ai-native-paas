@@ -112,3 +112,39 @@ the live Redis/Bucket/backup lifecycle remains blocked by Timeweb account
 balance. Keep the cheap `provider_gate` for frequent checks. Re-run
 `provider_gate_full` only during a funded release-window, and immediately return
 through `off` after collecting evidence.
+
+## Authorized rerun
+
+A second user-authorized rerun was attempted on 2026-07-17 with a fresh plan:
+
+```text
+.state-backend/cozystack-provider-gate-full-create-rerun-20260717.tfplan
+COZYSTACK_PROVIDER_GATE_FULL_RERUN_CREATE_PLAN=PASS
+create_count=19
+```
+
+The apply was again blocked before any node became usable:
+
+```text
+not enough money on account balance for create new server
+```
+
+No Talos bootstrap transport was opened, and Talos port `50000` was not exposed.
+The failed apply left only `talos_machine_secrets.cluster[0]` in state. Cleanup
+returned the stack to `off`:
+
+```text
+.state-backend/cozystack-provider-gate-full-rerun-cleanup-20260717.tfplan
+Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
+cozystack_profile = "off"
+node_ids = {}
+node_private_ips = {}
+profile_resources.public_ipv4s = 0
+```
+
+Post-rerun zero drift:
+
+```text
+.state-backend/cozystack-off-after-provider-gate-full-rerun-zero-20260717.tfplan
+COZYSTACK_OFF_AFTER_PROVIDER_GATE_FULL_RERUN_ZERO_DRIFT=PASS
+```
