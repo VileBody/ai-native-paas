@@ -78,6 +78,31 @@ func TestHTTP_RequestV2PersistsExplicitBuildSpec(t *testing.T) {
 		t.Fatalf("build=%+v", result.Build)
 	}
 }
+
+func TestHTTP_VerifiedReceiptRouteFailsClosedWhenPipelineMissing(t *testing.T) {
+	handler := buildAPI()
+	request := httptest.NewRequest(http.MethodPost, "/v2/organizations/tenant-1/builds", strings.NewReader(requestV2Body()))
+	buildAuth(request, "tenant-1")
+	request.Header.Set("Idempotency-Key", "request-v2-receipt")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("request status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var result application.RequestBuildResult
+	if err := json.Unmarshal(recorder.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	receipt := `{"source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","spec_digest":"` + result.Build.BuildSpecDigest + `","repository":"registry.test/tenants/tenant-1/apps/project-1","digest":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","media_type":"application/vnd.oci.image.manifest.v1+json","captured_at":"2026-07-12T12:00:00Z","builder":"rootless-buildkit"}`
+	ingest := httptest.NewRequest(http.MethodPost, "/v2/organizations/tenant-1/builds/"+result.Build.ID+"/verified-receipt", strings.NewReader(receipt))
+	buildAuth(ingest, "tenant-1")
+	ingest.Header.Set("Idempotency-Key", "receipt-v2")
+	out := httptest.NewRecorder()
+	handler.ServeHTTP(out, ingest)
+	if out.Code != http.StatusServiceUnavailable || !strings.Contains(out.Body.String(), "verified build receipt pipeline is not configured") {
+		t.Fatalf("status=%d body=%s", out.Code, out.Body.String())
+	}
+}
 func TestHTTP_BuildTenantIsDerivedFromPath(t *testing.T) {
 	handler := buildAPI()
 	request := httptest.NewRequest(http.MethodPost, "/v1/organizations/tenant-1/builds", strings.NewReader(requestBody()))

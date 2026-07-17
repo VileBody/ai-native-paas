@@ -22,17 +22,6 @@ import (
 
 const maxVerifiedBuildSpecBytes = 64 << 10
 
-type verifiedBuildResult struct {
-	SourceSHA   string    `json:"source_sha"`
-	SpecDigest  string    `json:"spec_digest"`
-	Repository  string    `json:"repository"`
-	Digest      string    `json:"digest"`
-	MediaType   string    `json:"media_type"`
-	CapturedAt  time.Time `json:"captured_at"`
-	Builder     string    `json:"builder"`
-	BuilderAddr string    `json:"builder_addr,omitempty"`
-}
-
 func ExecuteVerifiedBuild(arguments []string) error {
 	spec, specDigest, err := validateVerifiedBuildArguments(arguments)
 	if err != nil {
@@ -85,7 +74,7 @@ func ExecuteVerifiedBuild(arguments []string) error {
 	if err != nil {
 		return err
 	}
-	result := verifiedBuildResult{
+	result := buildv2.VerifiedBuildReceipt{
 		SourceSHA: spec.SourceSHA, SpecDigest: specDigest, Repository: repository, Digest: digest,
 		MediaType: "application/vnd.oci.image.manifest.v1+json", CapturedAt: time.Now().UTC(),
 		Builder: "rootless-buildkit", BuilderAddr: buildkitAddress(),

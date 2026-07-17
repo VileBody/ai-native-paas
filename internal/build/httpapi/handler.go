@@ -49,6 +49,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.getBuild(w, r, tenantID, parts[4])
 	case len(parts) == 6 && parts[5] == "run" && r.Method == http.MethodPost:
 		h.runBuild(w, r, tenantID, actorID, parts[4])
+	case len(parts) == 6 && parts[5] == "verified-receipt" && r.Method == http.MethodPost && parts[0] == "v2":
+		h.ingestVerifiedReceipt(w, r, tenantID, actorID, parts[4])
 	case len(parts) == 6 && parts[5] == "cancel" && r.Method == http.MethodPost:
 		h.cancelBuild(w, r, tenantID, parts[4])
 	case len(parts) == 6 && parts[5] == "retry" && r.Method == http.MethodPost:
@@ -126,6 +128,22 @@ func (h Handler) runBuild(w http.ResponseWriter, r *http.Request, tenantID, acto
 		return
 	}
 	writeJSON(w, http.StatusOK, application.RequestBuildResult{Build: build, Artifact: artifact})
+}
+func (h Handler) ingestVerifiedReceipt(w http.ResponseWriter, r *http.Request, tenantID, actorID, buildID string) {
+	var receipt buildv2.VerifiedBuildReceipt
+	if err := decode(r, h.limit(), &receipt); err != nil {
+		writeError(w, domain.Wrap(domain.CodeInvalidArgument, "invalid json", err))
+		return
+	}
+	result, err := h.Build.IngestVerifiedBuildReceipt(r.Context(), application.IngestVerifiedBuildReceiptCommand{
+		TenantID: tenantID, ActorID: actorID, IdempotencyKey: strings.TrimSpace(r.Header.Get("Idempotency-Key")),
+		BuildID: buildID, Receipt: receipt,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 func (h Handler) cancelBuild(w http.ResponseWriter, r *http.Request, tenantID, buildID string) {
 	build, err := h.Build.CancelBuild(r.Context(), tenantID, buildID)

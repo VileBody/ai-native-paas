@@ -288,13 +288,13 @@ func (a *txAdapter) ListBuildsByProject(tenantID, projectID string) []domain.Bui
 	return out
 }
 
-const artifactColumns = `id,tenant_id,build_id,repository,digest,media_type,state,sbom_digest,sbom_media_type,rejection_code,rejection_notes,version,created_at,updated_at`
+const artifactColumns = `id,tenant_id,build_id,repository,digest,media_type,state,sbom_digest,sbom_media_type,provenance_digest,provenance_media_type,rejection_code,rejection_notes,version,created_at,updated_at`
 
 func scanArtifactBase(row interface{ Scan(...any) error }) (domain.Artifact, error) {
 	var value domain.Artifact
 	var state string
 	var notes []byte
-	err := row.Scan(&value.ID, &value.TenantID, &value.BuildID, &value.Repository, &value.Digest, &value.MediaType, &state, &value.SBOMDigest, &value.SBOMMediaType, &value.RejectionCode, &notes, &value.Version, &value.CreatedAt, &value.UpdatedAt)
+	err := row.Scan(&value.ID, &value.TenantID, &value.BuildID, &value.Repository, &value.Digest, &value.MediaType, &state, &value.SBOMDigest, &value.SBOMMediaType, &value.ProvenanceDigest, &value.ProvenanceMediaType, &value.RejectionCode, &notes, &value.Version, &value.CreatedAt, &value.UpdatedAt)
 	if err != nil {
 		return value, err
 	}
@@ -352,7 +352,7 @@ func (a *txAdapter) InsertArtifact(value domain.Artifact) error {
 	if err != nil {
 		return err
 	}
-	_, err = a.tx.Exec(`INSERT INTO build.artifacts(`+artifactColumns+`) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, value.ID, value.TenantID, value.BuildID, value.Repository, value.Digest, value.MediaType, string(value.State), value.SBOMDigest, value.SBOMMediaType, value.RejectionCode, notes, value.Version, value.CreatedAt, value.UpdatedAt)
+	_, err = a.tx.Exec(`INSERT INTO build.artifacts(`+artifactColumns+`) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`, value.ID, value.TenantID, value.BuildID, value.Repository, value.Digest, value.MediaType, string(value.State), value.SBOMDigest, value.SBOMMediaType, value.ProvenanceDigest, value.ProvenanceMediaType, value.RejectionCode, notes, value.Version, value.CreatedAt, value.UpdatedAt)
 	if err != nil {
 		return mapDB(err)
 	}
@@ -370,7 +370,7 @@ func (a *txAdapter) UpdateArtifact(value domain.Artifact, expected int64) error 
 	if err := a.upsertArtifactChildren(value); err != nil {
 		return err
 	}
-	result, err := a.tx.Exec(`UPDATE build.artifacts SET tenant_id=$1,build_id=$2,repository=$3,digest=$4,media_type=$5,state=$6,sbom_digest=$7,sbom_media_type=$8,rejection_code=$9,rejection_notes=$10,version=$11,updated_at=$12 WHERE id=$13 AND version=$14`, value.TenantID, value.BuildID, value.Repository, value.Digest, value.MediaType, string(value.State), value.SBOMDigest, value.SBOMMediaType, value.RejectionCode, notes, value.Version, value.UpdatedAt, value.ID, expected)
+	result, err := a.tx.Exec(`UPDATE build.artifacts SET tenant_id=$1,build_id=$2,repository=$3,digest=$4,media_type=$5,state=$6,sbom_digest=$7,sbom_media_type=$8,provenance_digest=$9,provenance_media_type=$10,rejection_code=$11,rejection_notes=$12,version=$13,updated_at=$14 WHERE id=$15 AND version=$16`, value.TenantID, value.BuildID, value.Repository, value.Digest, value.MediaType, string(value.State), value.SBOMDigest, value.SBOMMediaType, value.ProvenanceDigest, value.ProvenanceMediaType, value.RejectionCode, notes, value.Version, value.UpdatedAt, value.ID, expected)
 	return affected(result, err, "artifact")
 }
 

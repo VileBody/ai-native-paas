@@ -18,22 +18,24 @@ import (
 )
 
 type Service struct {
-	Store          Store
-	Fetcher        SourceFetcher
-	Detector       Detector
-	Buildpacks     Builder
-	Dockerfile     Builder
-	Registry       Registry
-	SBOM           SBOMGenerator
-	Scanner        Scanner
-	Signer         Signer
-	Verifier       SignatureVerifier
-	SecretProvider BuildSecretProvider
-	Logs           LogStore
-	Clock          Clock
-	IDs            IDGenerator
-	SourceLimits   SourceLimits
-	RepositoryBase string
+	Store              Store
+	Fetcher            SourceFetcher
+	Detector           Detector
+	Buildpacks         Builder
+	Dockerfile         Builder
+	Registry           Registry
+	SBOM               SBOMGenerator
+	Scanner            Scanner
+	Signer             Signer
+	Verifier           SignatureVerifier
+	Provenance         ProvenanceAttestor
+	ProvenanceVerifier ProvenanceVerifier
+	SecretProvider     BuildSecretProvider
+	Logs               LogStore
+	Clock              Clock
+	IDs                IDGenerator
+	SourceLimits       SourceLimits
+	RepositoryBase     string
 }
 
 type RequestBuildCommand struct {

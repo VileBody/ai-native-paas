@@ -38,22 +38,24 @@ type SignatureRecord struct {
 }
 
 type Artifact struct {
-	ID             string
-	TenantID       string
-	BuildID        string
-	Repository     string
-	Digest         string
-	MediaType      string
-	State          ArtifactState
-	SBOMDigest     string
-	SBOMMediaType  string
-	Scan           *ScanResult
-	Signature      *SignatureRecord
-	RejectionCode  string
-	RejectionNotes []string
-	Version        int64
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID                  string
+	TenantID            string
+	BuildID             string
+	Repository          string
+	Digest              string
+	MediaType           string
+	State               ArtifactState
+	SBOMDigest          string
+	SBOMMediaType       string
+	ProvenanceDigest    string
+	ProvenanceMediaType string
+	Scan                *ScanResult
+	Signature           *SignatureRecord
+	RejectionCode       string
+	RejectionNotes      []string
+	Version             int64
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 func NewArtifact(id, tenantID, buildID, repository, digest, mediaType string, now time.Time) (Artifact, error) {
@@ -131,6 +133,25 @@ func (a *Artifact) AttachSignature(signature SignatureRecord, now time.Time) err
 	copySignature.SignedAt = signature.SignedAt.UTC().Truncate(time.Microsecond)
 	a.Signature = &copySignature
 	a.State = ArtifactSigned
+	a.bump(now)
+	return nil
+}
+func (a *Artifact) AttachProvenance(digest, mediaType string, now time.Time) error {
+	if a.State != ArtifactSigned {
+		return NewError(CodeConflict, "provenance can only attach after signature")
+	}
+	mediaType = strings.TrimSpace(mediaType)
+	if !validDigest(digest) || mediaType == "" {
+		return NewError(CodeInvalidArgument, "invalid provenance reference")
+	}
+	if a.ProvenanceDigest != "" {
+		if a.ProvenanceDigest == digest && a.ProvenanceMediaType == mediaType {
+			return nil
+		}
+		return NewError(CodeConflict, "artifact provenance reference is immutable")
+	}
+	a.ProvenanceDigest = digest
+	a.ProvenanceMediaType = mediaType
 	a.bump(now)
 	return nil
 }

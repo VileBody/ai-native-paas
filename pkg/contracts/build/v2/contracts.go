@@ -221,6 +221,29 @@ func (r ArtifactRef) Validate() error {
 	return nil
 }
 
+type VerifiedBuildReceipt struct {
+	SourceSHA   string    `json:"source_sha"`
+	SpecDigest  string    `json:"spec_digest"`
+	Repository  string    `json:"repository"`
+	Digest      string    `json:"digest"`
+	MediaType   string    `json:"media_type"`
+	CapturedAt  time.Time `json:"captured_at"`
+	Builder     string    `json:"builder"`
+	BuilderAddr string    `json:"builder_addr,omitempty"`
+}
+
+func (r VerifiedBuildReceipt) Validate() error {
+	sourceSHA := strings.ToLower(strings.TrimSpace(r.SourceSHA))
+	if !fullSHA.MatchString(sourceSHA) || !digest.MatchString(strings.TrimSpace(r.SpecDigest)) ||
+		strings.TrimSpace(r.Repository) == "" || strings.ContainsAny(r.Repository, "\x00\r\n\t @") ||
+		!digest.MatchString(strings.TrimSpace(r.Digest)) || strings.TrimSpace(r.MediaType) == "" ||
+		r.CapturedAt.IsZero() || strings.TrimSpace(r.Builder) != "rootless-buildkit" ||
+		strings.ContainsAny(r.BuilderAddr, "\x00\r\n") {
+		return errors.New("invalid verified build receipt")
+	}
+	return nil
+}
+
 type BuildView struct {
 	BuildID     string       `json:"build_id"`
 	ProjectID   string       `json:"project_id"`

@@ -171,6 +171,21 @@ type Signer interface {
 type SignatureVerifier interface {
 	Verify(context.Context, string, domain.SignatureRecord) error
 }
+type ProvenanceMaterials struct {
+	BuildID, Repository, SourceSHA, BuildSpecDigest, BuilderDigest, OutputDigest string
+	StartedAt, FinishedAt                                                        time.Time
+}
+type ProvenanceResult struct {
+	Digest    string
+	MediaType string
+	Document  []byte
+}
+type ProvenanceAttestor interface {
+	Attest(context.Context, ProvenanceMaterials) (ProvenanceResult, error)
+}
+type ProvenanceVerifier interface {
+	Verify(context.Context, []byte) (ProvenanceResult, error)
+}
 type LogStore interface {
 	Writer(buildID string, secrets []string) io.Writer
 	Read(context.Context, string) ([]byte, error)

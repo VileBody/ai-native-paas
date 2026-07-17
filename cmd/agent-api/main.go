@@ -41,6 +41,7 @@ func main() {
 			platformprofile.Prod("postgres-membership-resolver"),
 			platformprofile.Prod("verified-identity-middleware"),
 			platformprofile.Prod("commerce-http-gateway-or-fail-closed"),
+			platformprofile.Prod("kernel-http-operation-gateway-or-fail-closed"),
 			platformprofile.Prod("fail-closed-mcp-v1-until-agent-mtls"),
 			platformprofile.Prod("fail-closed-service-gateways-until-internal-mtls"),
 		}
@@ -101,7 +102,8 @@ func main() {
 		sourceGateway, buildGateway, runtimeGateway = productiongate.Source{}, productiongate.Builds{}, productiongate.Runtime{}
 		commerceClient := productiongate.NewHTTPCommerce(os.Getenv("COMMERCE_API_URL"), env("AGENT_API_SERVICE_PRINCIPAL", "agent-api"))
 		attachmentGateway, commerceGateway = productiongate.Attachments{}, commerceClient
-		operationGateway, logGateway, usageGateway = productiongate.Operations{}, productiongate.Logs{}, commerceClient
+		operationGateway = productiongate.NewHTTPOperations(os.Getenv("KERNEL_API_URL"), env("AGENT_API_SERVICE_PRINCIPAL", "agent-api"))
+		logGateway, usageGateway = productiongate.Logs{}, commerceClient
 	} else {
 		commerce := &devadapter.Commerce{Allowed: true}
 		sourceGateway, buildGateway, runtimeGateway = devadapter.NewSource(), devadapter.NewBuilds(), devadapter.NewRuntime()

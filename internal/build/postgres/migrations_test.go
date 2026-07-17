@@ -96,3 +96,27 @@ func TestMigrations_BuildExecutionAndTrustGuardsArePresent(t *testing.T) {
 		}
 	}
 }
+
+func TestMigrations_BuildArtifactsRequireProvenanceForRelease(t *testing.T) {
+	create := buildMigration(t, "001_build.sql")
+	provenance := buildMigration(t, "006_artifact_provenance.sql")
+	for _, fragment := range []string{
+		"provenance_digest text NOT NULL DEFAULT ''",
+		"provenance_media_type text NOT NULL DEFAULT ''",
+	} {
+		if !strings.Contains(create, fragment) || !strings.Contains(provenance, fragment) {
+			t.Errorf("missing provenance artifact column %q", fragment)
+		}
+	}
+	for _, fragment := range []string{
+		"artifact provenance reference is immutable",
+		"provenance can only attach after signature",
+		"NEW.provenance_digest = ''",
+		"NEW.provenance_media_type = ''",
+		"releasable artifact trust chain is incomplete",
+	} {
+		if !strings.Contains(provenance, fragment) {
+			t.Errorf("missing provenance trust guard %q", fragment)
+		}
+	}
+}

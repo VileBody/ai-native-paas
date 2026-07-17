@@ -201,6 +201,34 @@ func (v *Verifier) Verify(_ context.Context, _ string, record domain.SignatureRe
 	return v.Err
 }
 
+type ProvenanceAttestor struct {
+	Result    application.ProvenanceResult
+	Err       error
+	Materials []application.ProvenanceMaterials
+	mu        sync.Mutex
+}
+
+func (a *ProvenanceAttestor) Attest(_ context.Context, materials application.ProvenanceMaterials) (application.ProvenanceResult, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.Materials = append(a.Materials, materials)
+	return cloneProvenanceResult(a.Result), a.Err
+}
+
+type ProvenanceVerifier struct {
+	Result    application.ProvenanceResult
+	Err       error
+	Documents [][]byte
+	mu        sync.Mutex
+}
+
+func (v *ProvenanceVerifier) Verify(_ context.Context, document []byte) (application.ProvenanceResult, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.Documents = append(v.Documents, append([]byte(nil), document...))
+	return cloneProvenanceResult(v.Result), v.Err
+}
+
 type SecretProvider struct {
 	BuildSecrets  []application.BuildSecret
 	RuntimeSecret string
@@ -216,4 +244,8 @@ func cloneMap(in map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+func cloneProvenanceResult(in application.ProvenanceResult) application.ProvenanceResult {
+	return application.ProvenanceResult{Digest: in.Digest, MediaType: in.MediaType, Document: append([]byte(nil), in.Document...)}
 }

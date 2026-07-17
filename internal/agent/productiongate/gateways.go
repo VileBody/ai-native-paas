@@ -129,6 +129,56 @@ func (Operations) Get(context.Context, string, string) (kernelv1.OperationSnapsh
 }
 func (Operations) Cancel(context.Context, string, string) error { return unavailable("kernel_gateway") }
 
+// HTTPOperations is the production bridge from the Agent MCP façade to the
+// Kernel operation API. It remains fail-closed until KERNEL_API_URL is wired.
+type HTTPOperations struct {
+	BaseURL     string
+	PrincipalID string
+	HTTPClient  *http.Client
+}
+
+func NewHTTPOperations(baseURL, principalID string) *HTTPOperations {
+	return &HTTPOperations{BaseURL: baseURL, PrincipalID: principalID, HTTPClient: &http.Client{Timeout: 10 * time.Second}}
+}
+
+func (o *HTTPOperations) Get(ctx context.Context, tenant, operationID string) (kernelv1.OperationSnapshot, error) {
+	if !o.configured() {
+		return (Operations{}).Get(ctx, tenant, operationID)
+	}
+	tenant, operationID = strings.TrimSpace(tenant), strings.TrimSpace(operationID)
+	if tenant == "" || operationID == "" {
+		return kernelv1.OperationSnapshot{}, unavailable("kernel_gateway")
+	}
+	var out kernelv1.OperationSnapshot
+	if err := o.do(ctx, http.MethodGet, "/v1/operations/"+url.PathEscape(operationID), tenant, operationID, nil, &out); err != nil {
+		return kernelv1.OperationSnapshot{}, err
+	}
+	if string(out.TenantID) != tenant || string(out.OperationID) != operationID {
+		return kernelv1.OperationSnapshot{}, unavailable("kernel_gateway")
+	}
+	return out, nil
+}
+
+func (o *HTTPOperations) Cancel(ctx context.Context, tenant, operationID string) error {
+	if !o.configured() {
+		return (Operations{}).Cancel(ctx, tenant, operationID)
+	}
+	tenant, operationID = strings.TrimSpace(tenant), strings.TrimSpace(operationID)
+	if tenant == "" || operationID == "" {
+		return unavailable("kernel_gateway")
+	}
+	var out struct {
+		Operation kernelv1.OperationRef `json:"operation"`
+	}
+	if err := o.do(ctx, http.MethodPost, "/v1/operations/"+url.PathEscape(operationID)+"/cancel", tenant, operationID, nil, &out); err != nil {
+		return err
+	}
+	if string(out.Operation.TenantID) != tenant || string(out.Operation.OperationID) != operationID {
+		return unavailable("kernel_gateway")
+	}
+	return nil
+}
+
 type Logs struct{}
 
 func (Logs) GetLogs(context.Context, string, string, int) ([]string, error) {
@@ -222,6 +272,81 @@ func (c *HTTPCommerce) endpoint(path string) (string, error) {
 func (c *HTTPCommerce) principal() string {
 	if c != nil && strings.TrimSpace(c.PrincipalID) != "" {
 		return strings.TrimSpace(c.PrincipalID)
+	}
+	return "agent-api"
+}
+
+func (o *HTTPOperations) configured() bool {
+	return o != nil && strings.TrimSpace(o.BaseURL) != ""
+}
+
+func (o *HTTPOperations) do(ctx context.Context, method, path, tenant, operationID string, body, out any) error {
+	endpoint, err := o.endpoint(path)
+	if err != nil {
+		return unavailable("kernel_gateway")
+	}
+	var reader io.Reader
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			return unavailable("kernel_gateway")
+		}
+		reader = bytes.NewReader(raw)
+	}
+	request, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
+	if err != nil {
+		return unavailable("kernel_gateway")
+	}
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("X-Tenant-ID", tenant)
+	request.Header.Set("X-Principal-ID", o.principal())
+	request.Header.Set("X-Principal-Kind", "service")
+	request.Header.Set("X-Scopes", "kernel.operation.read kernel.operation.cancel")
+	request.Header.Set("X-Correlation-ID", "agent-api-operation-"+operationID)
+	if method != http.MethodGet {
+		request.Header.Set("Idempotency-Key", "agent-api-"+strings.ToLower(method)+"-"+operationID)
+	}
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	client := o.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return unavailable("kernel_gateway")
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return &application.ProviderError{Message: "kernel gateway returned non-success", Retryable: response.StatusCode >= 500 || response.StatusCode == http.StatusTooManyRequests}
+	}
+	if out == nil {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
+		return nil
+	}
+	decoder := json.NewDecoder(io.LimitReader(response.Body, 2<<20))
+	if err := decoder.Decode(out); err != nil {
+		return unavailable("kernel_gateway")
+	}
+	return nil
+}
+
+func (o *HTTPOperations) endpoint(path string) (string, error) {
+	raw := strings.TrimSpace(o.BaseURL)
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return "", fmt.Errorf("invalid kernel base url")
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + path
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String(), nil
+}
+
+func (o *HTTPOperations) principal() string {
+	if o != nil && strings.TrimSpace(o.PrincipalID) != "" {
+		return strings.TrimSpace(o.PrincipalID)
 	}
 	return "agent-api"
 }

@@ -134,6 +134,29 @@ func TestAgentAPIProductionUsesCommerceGatewayWhenConfigured(t *testing.T) {
 	}
 }
 
+func TestAgentAPIProductionUsesKernelOperationGatewayWhenConfigured(t *testing.T) {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve repository root")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, "cmd", "agent-api", "main.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(raw)
+	for _, required := range []string{
+		"productiongate.NewHTTPOperations(os.Getenv(\"KERNEL_API_URL\")",
+		"AGENT_API_SERVICE_PRINCIPAL",
+		"kernel-http-operation-gateway-or-fail-closed",
+		"operationGateway =",
+	} {
+		if !strings.Contains(source, required) {
+			t.Errorf("agent-api does not wire production kernel operation gateway component %q", required)
+		}
+	}
+}
+
 func TestProductionKernelRequiresJetStreamOutboxPublisher(t *testing.T) {
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {

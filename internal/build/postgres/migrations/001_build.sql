@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS build.artifacts (
     state text NOT NULL CHECK (state IN ('DISCOVERED','QUARANTINED','SCANNED','SIGNED','RELEASABLE','REJECTED')),
     sbom_digest text NOT NULL DEFAULT '' CHECK (sbom_digest = '' OR sbom_digest ~ '^sha256:[0-9a-f]{64}$'),
     sbom_media_type text NOT NULL DEFAULT '',
+    provenance_digest text NOT NULL DEFAULT '' CHECK (provenance_digest = '' OR provenance_digest ~ '^sha256:[0-9a-f]{64}$'),
+    provenance_media_type text NOT NULL DEFAULT '',
     rejection_code text NOT NULL DEFAULT '',
     rejection_notes jsonb NOT NULL DEFAULT '[]'::jsonb,
     version bigint NOT NULL CHECK (version > 0),

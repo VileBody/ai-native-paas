@@ -68,6 +68,10 @@ gates.
 - Production `agent-api` now has a tenant-scoped Commerce HTTP bridge for
   entitlement checks and usage preview when `COMMERCE_API_URL` is configured;
   without it, mutations remain fail-closed.
+- Production `agent-api` now has a tenant-scoped Kernel operation HTTP bridge
+  for operation reads and cancellation when `KERNEL_API_URL` is configured; it
+  sends service-principal scopes, idempotent cancellation keys and rejects
+  cross-tenant Kernel responses before exposing them through the agent facade.
 - Project MCP v2 now wires `build_execute` into the workspace service as a
   governed `workspace-agent verified-build` command bound to the workspace's
   exact source SHA; spoofed source revisions and generic command bypasses fail
@@ -77,6 +81,10 @@ gates.
   `workspace-agent verified-build` validates exact Git HEAD, a clean source
   tree, immutable Dockerfile bases, the separate verified UID boundary and the
   rootless BuildKit metadata digest path.
+- Capability gateway admission now has an executable provider-neutral core:
+  project-scoped binding admission, per-project rate-limit integration,
+  fail-closed provider lease dependency handling, public output without master
+  credentials, and provider usage translation into stable Commerce meters.
 
 ## Live checkpoint
 
@@ -132,6 +140,9 @@ reconciliation and old-key rejection evidence.
   `provider_gate_full` window; simulator evidence must not be substituted.
 - Complete GitLab, OpenBao holder, capability-provider, beta-domain/DNS, and
   final HA inputs and gates.
+- Wire the capability gateway core to real OpenBao/provider leases, live
+  OpenRouter/Apify/Bright Data calls, usage replay and provider substitution
+  evidence.
 - Rotate the Timeweb main S3 secret and reconcile state-service, backend,
   workspace-log and image-staging consumers; prove the previous secret fails.
 - Produce signed immutable release artifacts and the final restore drill.

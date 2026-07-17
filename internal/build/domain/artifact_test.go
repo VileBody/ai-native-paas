@@ -77,6 +77,28 @@ func TestArtifact_SBOMStoredByDigest(t *testing.T) {
 	}
 }
 
+func TestArtifact_ProvenanceAttachesOnlyAfterSignatureAndIsImmutable(t *testing.T) {
+	a := newArtifact(t)
+	now := time.Now()
+	_ = a.Quarantine(now)
+	_ = a.AttachSBOM(digest("e"), "application/spdx+json", now)
+	_ = a.ApplyScan(domain.ScanResult{Scanner: "s", PolicyVersion: "v1", Passed: true, FindingsDigest: digest("f"), ScannedAt: now}, now)
+	if err := a.AttachProvenance(digest("0"), "application/vnd.dsse.envelope.v1+json", now); !domain.HasCode(err, domain.CodeConflict) {
+		t.Fatalf("pre-signature provenance err=%v", err)
+	}
+	_ = a.AttachSignature(domain.SignatureRecord{Issuer: "platform", Algorithm: "ed25519", Digest: a.Digest, Signature: "x", AttachmentDigest: digest("a"), SignedAt: now}, now)
+	if err := a.AttachProvenance(digest("0"), "application/vnd.dsse.envelope.v1+json", now); err != nil || a.ProvenanceDigest != digest("0") {
+		t.Fatalf("provenance=%q err=%v", a.ProvenanceDigest, err)
+	}
+	version := a.Version
+	if err := a.AttachProvenance(digest("0"), "application/vnd.dsse.envelope.v1+json", now); err != nil || a.Version != version {
+		t.Fatalf("same provenance must be idempotent: version=%d err=%v", a.Version, err)
+	}
+	if err := a.AttachProvenance(digest("1"), "application/vnd.dsse.envelope.v1+json", now); !domain.HasCode(err, domain.CodeConflict) {
+		t.Fatalf("replacement err=%v", err)
+	}
+}
+
 func TestArtifact_SBOMCannotChangeAfterAttachmentOrScan(t *testing.T) {
 	a := newArtifact(t)
 	now := time.Now()

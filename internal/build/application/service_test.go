@@ -183,6 +183,103 @@ func TestBuildV2_MutableDockerfileIsRejectedBeforeDisposableVM(t *testing.T) {
 		t.Fatalf("mutable Dockerfile reached VM backend: %+v", dockerfile.Requests)
 	}
 }
+
+func TestBuildReceipt_IngestsWorkspaceDigestAndPersistsFullTrustChain(t *testing.T) {
+	s, builder, registry, _, clock := setup(t)
+	provenanceDocument := []byte(`{"payload":"signed-provenance"}`)
+	provenanceResult := application.ProvenanceResult{Digest: rawDigest(provenanceDocument), MediaType: "application/vnd.dsse.envelope.v1+json", Document: provenanceDocument}
+	attestor := &testkit.ProvenanceAttestor{Result: provenanceResult}
+	verifier := &testkit.ProvenanceVerifier{Result: provenanceResult}
+	s.Provenance = attestor
+	s.ProvenanceVerifier = verifier
+
+	requested, err := s.RequestBuildV2(context.Background(), explicitDockerfileCommand("receipt-success"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt := buildv2.VerifiedBuildReceipt{
+		SourceSHA: requested.Build.Source.CommitSHA, SpecDigest: requested.Build.BuildSpecDigest,
+		Repository: "registry.test/tenants/t1/apps/p1", Digest: dg("a"),
+		MediaType: "application/vnd.oci.image.manifest.v1+json", CapturedAt: clock.Now(),
+		Builder: "rootless-buildkit", BuilderAddr: "unix:///run/workspace-buildkit/buildkitd.sock",
+	}
+	result, err := s.IngestVerifiedBuildReceipt(context.Background(), application.IngestVerifiedBuildReceiptCommand{
+		TenantID: "t1", ActorID: "workspace-agent", IdempotencyKey: "receipt-1",
+		BuildID: requested.Build.ID, Receipt: receipt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Build.State != buildv1.BuildSucceeded || result.Artifact == nil || result.Artifact.State != domain.ArtifactReleasable {
+		t.Fatalf("result=%+v", result)
+	}
+	if result.TrustChain == nil || result.TrustChain.Validate() != nil || result.TrustChain.ProvenanceDigest != provenanceResult.Digest {
+		t.Fatalf("trust chain=%+v", result.TrustChain)
+	}
+	if len(builder.Requests) != 0 || registry.PublishCalls != 0 || registry.ResolveCalls != 1 {
+		t.Fatalf("builder=%d publish=%d resolve=%d", len(builder.Requests), registry.PublishCalls, registry.ResolveCalls)
+	}
+	for _, mediaType := range []string{"application/spdx+json", "application/vnd.dev.cosign.simplesigning.v1+json", provenanceResult.MediaType} {
+		if _, ok := registry.Attachments[mediaType]; !ok {
+			t.Fatalf("attachment %s missing: %+v", mediaType, registry.Attachments)
+		}
+	}
+	if len(attestor.Materials) != 1 || attestor.Materials[0].BuildSpecDigest != requested.Build.BuildSpecDigest || attestor.Materials[0].OutputDigest != dg("a") {
+		t.Fatalf("provenance materials=%+v", attestor.Materials)
+	}
+	again, err := s.IngestVerifiedBuildReceipt(context.Background(), application.IngestVerifiedBuildReceiptCommand{
+		TenantID: "t1", ActorID: "workspace-agent", IdempotencyKey: "receipt-1",
+		BuildID: requested.Build.ID, Receipt: receipt,
+	})
+	if err != nil || again.TrustChain == nil || again.TrustChain.ProvenanceDigest != provenanceResult.Digest {
+		t.Fatalf("idempotent result=%+v err=%v", again, err)
+	}
+}
+
+func TestBuildReceipt_RejectsSpoofedSpecBeforeRegistryAccess(t *testing.T) {
+	s, _, registry, _, clock := setup(t)
+	provenanceDocument := []byte(`{"payload":"signed-provenance"}`)
+	provenanceResult := application.ProvenanceResult{Digest: rawDigest(provenanceDocument), MediaType: "application/vnd.dsse.envelope.v1+json", Document: provenanceDocument}
+	s.Provenance = &testkit.ProvenanceAttestor{Result: provenanceResult}
+	s.ProvenanceVerifier = &testkit.ProvenanceVerifier{Result: provenanceResult}
+	requested, err := s.RequestBuildV2(context.Background(), explicitDockerfileCommand("receipt-spoof"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt := buildv2.VerifiedBuildReceipt{
+		SourceSHA: requested.Build.Source.CommitSHA, SpecDigest: dg("9"),
+		Repository: "registry.test/tenants/t1/apps/p1", Digest: dg("a"),
+		MediaType: "application/vnd.oci.image.manifest.v1+json", CapturedAt: clock.Now(),
+		Builder: "rootless-buildkit",
+	}
+	if _, err := s.IngestVerifiedBuildReceipt(context.Background(), application.IngestVerifiedBuildReceiptCommand{TenantID: "t1", ActorID: "workspace-agent", IdempotencyKey: "receipt-spoof-ingest", BuildID: requested.Build.ID, Receipt: receipt}); !domain.HasCode(err, domain.CodePolicyRejected) {
+		t.Fatalf("err=%v", err)
+	}
+	if registry.ResolveCalls != 0 || registry.PublishCalls != 0 {
+		t.Fatalf("registry was touched: publish=%d resolve=%d", registry.PublishCalls, registry.ResolveCalls)
+	}
+}
+
+func TestBuildReceipt_FailsClosedWithoutProvenanceAdapters(t *testing.T) {
+	s, _, registry, _, clock := setup(t)
+	requested, err := s.RequestBuildV2(context.Background(), explicitDockerfileCommand("receipt-no-provenance"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt := buildv2.VerifiedBuildReceipt{
+		SourceSHA: requested.Build.Source.CommitSHA, SpecDigest: requested.Build.BuildSpecDigest,
+		Repository: "registry.test/tenants/t1/apps/p1", Digest: dg("a"),
+		MediaType: "application/vnd.oci.image.manifest.v1+json", CapturedAt: clock.Now(),
+		Builder: "rootless-buildkit",
+	}
+	if _, err := s.IngestVerifiedBuildReceipt(context.Background(), application.IngestVerifiedBuildReceiptCommand{TenantID: "t1", ActorID: "workspace-agent", IdempotencyKey: "receipt-no-provenance", BuildID: requested.Build.ID, Receipt: receipt}); !domain.HasCode(err, domain.CodeUnavailable) {
+		t.Fatalf("err=%v", err)
+	}
+	if registry.ResolveCalls != 0 {
+		t.Fatalf("registry was touched before provenance wiring: resolve=%d", registry.ResolveCalls)
+	}
+}
+
 func TestBuildRequest_ConcurrentDuplicateCreatesOneBuild(t *testing.T) {
 	s, _, _, _, _ := setup(t)
 	const workers = 32
