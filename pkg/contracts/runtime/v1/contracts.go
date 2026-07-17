@@ -418,13 +418,14 @@ func (a PaaSApp) SortedProcessNames() []string {
 }
 
 type DeployRequest struct {
-	TenantID       string              `json:"tenant_id"`
-	ApplicationID  string              `json:"application_id"`
-	EnvironmentID  string              `json:"environment_id"`
-	Artifact       buildv1.ArtifactRef `json:"artifact"`
-	Configuration  ReleaseConfig       `json:"configuration"`
-	IdempotencyKey string              `json:"idempotency_key"`
-	ActorID        string              `json:"actor_id"`
+	TenantID                    string              `json:"tenant_id"`
+	ApplicationID               string              `json:"application_id"`
+	EnvironmentID               string              `json:"environment_id"`
+	Artifact                    buildv1.ArtifactRef `json:"artifact"`
+	Configuration               ReleaseConfig       `json:"configuration"`
+	IdempotencyKey              string              `json:"idempotency_key"`
+	ActorID                     string              `json:"actor_id"`
+	ExpectedEnvironmentRevision int64               `json:"expected_environment_revision,omitempty"`
 }
 
 type ReleaseConfig struct {
@@ -449,6 +450,9 @@ func (r DeployRequest) Validate() error {
 	}
 	if strings.TrimSpace(r.Configuration.Region) == "" || strings.TrimSpace(r.Configuration.Unit) == "" || len(r.Configuration.Processes) == 0 {
 		return fmt.Errorf("%w: release configuration is incomplete", ErrInvalidDeployRequest)
+	}
+	if r.ExpectedEnvironmentRevision < 0 {
+		return fmt.Errorf("%w: expected environment revision is invalid", ErrInvalidDeployRequest)
 	}
 	return nil
 }

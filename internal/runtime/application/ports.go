@@ -118,6 +118,7 @@ type RegisterCellRequest struct {
 type RollbackRequest struct {
 	TenantID, EnvironmentID, TargetReleaseID, ActorID, IdempotencyKey string
 	CriticalOverride                                                  bool
+	ExpectedEnvironmentRevision                                       int64
 }
 type ExplicitMigrationRequest struct {
 	TenantID, EnvironmentID, TargetCellID, ActorID string

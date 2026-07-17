@@ -99,3 +99,38 @@ func TestRollback_RejectsArtifactNoLongerAllowedByCriticalPolicyUnlessOverride(t
 		t.Fatalf("candidate=%+v", candidate)
 	}
 }
+
+func TestRollbackByDeploymentResolvesAuthoritativeEnvironmentAndRevision(t *testing.T) {
+	f := newFixture(t)
+	targetID := deployRollbackTarget(t, f)
+	snapshot := f.store.Snapshot()
+	var deploymentID string
+	for _, deployment := range snapshot.Deployments {
+		if deployment.ReleaseID == targetID {
+			deploymentID = deployment.ID
+			break
+		}
+	}
+	if deploymentID == "" {
+		t.Fatal("target deployment missing")
+	}
+	environment := snapshot.Environments[f.env.ID]
+	ref, err := f.service.RollbackDeploymentWithRequest(context.Background(), deploymentID, application.RollbackRequest{
+		TenantID: f.app.TenantID, TargetReleaseID: targetID, ActorID: "agent-api", IdempotencyKey: "rollback-by-deployment",
+		ExpectedEnvironmentRevision: environment.Version,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ref.DeploymentID == "" || f.store.Snapshot().Releases[ref.ReleaseID].RollbackOf != targetID {
+		t.Fatalf("rollback ref=%+v", ref)
+	}
+
+	_, err = f.service.RollbackDeploymentWithRequest(context.Background(), deploymentID, application.RollbackRequest{
+		TenantID: f.app.TenantID, TargetReleaseID: targetID, ActorID: "agent-api", IdempotencyKey: "rollback-stale-revision",
+		ExpectedEnvironmentRevision: environment.Version + 100,
+	})
+	if !domain.HasCode(err, domain.CodeStaleVersion) {
+		t.Fatalf("stale rollback err=%v", err)
+	}
+}

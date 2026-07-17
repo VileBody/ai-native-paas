@@ -19,6 +19,7 @@ import (
 	commercepostgres "github.com/keir-research/ai-native-paas/internal/commerce/postgres"
 	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
 	"github.com/keir-research/ai-native-paas/internal/identity/oidcverify"
+	"github.com/keir-research/ai-native-paas/internal/identity/servicemtls"
 	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 )
@@ -88,6 +89,7 @@ func main() {
 			platformprofile.Prod("oidc-jwks-verifier"),
 			platformprofile.Prod("postgres-membership-resolver"),
 			platformprofile.Prod("verified-identity-middleware"),
+			platformprofile.Prod("internal-spiffe-mtls-server"),
 			platformprofile.Prod("deny-by-default-ownership"),
 		}
 	} else {
@@ -111,19 +113,32 @@ func main() {
 		Store: store, Clock: realClock{}, IDs: &sequentialIDs{},
 		Ownership: ownership, DriftAlertThreshold: 60,
 	}
-	var handler http.Handler = httpapi.Handler{Commerce: service, MaxBodyBytes: 2 << 20}
-	handler = (httpauth.Middleware{Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}}}).Wrap(handler)
+	baseHandler := http.Handler(httpapi.Handler{Commerce: service, MaxBodyBytes: 2 << 20})
+	handler := (httpauth.Middleware{Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}}}).Wrap(baseHandler)
 	server := &http.Server{
 		Addr:              env("COMMERCE_API_ADDR", ":8084"),
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second,
 		WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
 	}
-	failures := make(chan error, 1)
+	var internalServer *http.Server
+	if profile == platformprofile.Production {
+		internalServer, err = servicemtls.NewServer(servicemtls.ServerConfigFromEnv("agent-api,workspace-manager,attachments-api", "commerce:read commerce:write"), baseHandler)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	failures := make(chan error, 2)
 	go func() {
 		log.Printf("commerce-api listening on %s (storage=%s profile=%s)", server.Addr, storageName, profile)
 		failures <- server.ListenAndServe()
 	}()
+	if internalServer != nil {
+		go func() {
+			log.Printf("commerce internal mTLS API listening on %s", internalServer.Addr)
+			failures <- internalServer.ListenAndServeTLS("", "")
+		}()
+	}
 	select {
 	case <-ctx.Done():
 	case err := <-failures:
@@ -135,5 +150,10 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("commerce-api shutdown: %v", err)
+	}
+	if internalServer != nil {
+		if err := internalServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("commerce internal mTLS API shutdown: %v", err)
+		}
 	}
 }

@@ -24,6 +24,7 @@ import (
 	attachmentspostgres "github.com/keir-research/ai-native-paas/internal/attachments/postgres"
 	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
 	"github.com/keir-research/ai-native-paas/internal/identity/oidcverify"
+	"github.com/keir-research/ai-native-paas/internal/identity/servicemtls"
 	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
@@ -103,6 +104,7 @@ func main() {
 			platformprofile.Prod("oidc-jwks-verifier"),
 			platformprofile.Prod("postgres-membership-resolver"),
 			platformprofile.Prod("verified-identity-middleware"),
+			platformprofile.Prod("internal-spiffe-mtls-server"),
 			platformprofile.Prod("fail-closed-cozystack-until-runtime-cell"),
 			platformprofile.Prod("fail-closed-dns-acme-until-network-gate"),
 			platformprofile.Prod("fail-closed-approval-commerce-runtime-gateways"),
@@ -211,8 +213,8 @@ func main() {
 	mustPlan(service, redis)
 	mustPlan(service, s3)
 
-	var handler http.Handler = httpapi.Handler{Attachments: service, MaxBodyBytes: 1 << 20}
-	handler = (httpauth.Middleware{Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}}}).Wrap(handler)
+	baseHandler := http.Handler(httpapi.Handler{Attachments: service, MaxBodyBytes: 1 << 20})
+	handler := (httpauth.Middleware{Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}}}).Wrap(baseHandler)
 	server := &http.Server{
 		Addr:              env("ATTACHMENTS_API_ADDR", ":8084"),
 		Handler:           handler,
@@ -221,11 +223,24 @@ func main() {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-	failures := make(chan error, 1)
+	var internalServer *http.Server
+	if profile == platformprofile.Production {
+		internalServer, err = servicemtls.NewServer(servicemtls.ServerConfigFromEnv("agent-api", "attachments:read attachments:write"), baseHandler)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	failures := make(chan error, 2)
 	go func() {
 		log.Printf("attachments-api listening on %s (storage=%s profile=%s)", server.Addr, storageName, profile)
 		failures <- server.ListenAndServe()
 	}()
+	if internalServer != nil {
+		go func() {
+			log.Printf("attachments internal mTLS API listening on %s", internalServer.Addr)
+			failures <- internalServer.ListenAndServeTLS("", "")
+		}()
+	}
 
 	select {
 	case <-ctx.Done():
@@ -238,5 +253,10 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("attachments-api shutdown: %v", err)
+	}
+	if internalServer != nil {
+		if err := internalServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("attachments internal mTLS API shutdown: %v", err)
+		}
 	}
 }

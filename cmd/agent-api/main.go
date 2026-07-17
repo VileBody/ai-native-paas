@@ -5,8 +5,10 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/agent/support"
 	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
 	"github.com/keir-research/ai-native-paas/internal/identity/oidcverify"
+	"github.com/keir-research/ai-native-paas/internal/identity/servicemtls"
 	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 	agentv1 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v1"
@@ -43,6 +46,7 @@ func main() {
 			platformprofile.Prod("commerce-http-gateway-or-fail-closed"),
 			platformprofile.Prod("kernel-http-operation-gateway-or-fail-closed"),
 			platformprofile.Prod("build-http-gateway-or-fail-closed"),
+			platformprofile.Prod("internal-spiffe-mtls-client"),
 			platformprofile.Prod("fail-closed-mcp-v1-until-agent-mtls"),
 			platformprofile.Prod("fail-closed-service-gateways-until-internal-mtls"),
 		}
@@ -101,13 +105,35 @@ func main() {
 	)
 	if profile == platformprofile.Production {
 		sourceGateway, runtimeGateway = productiongate.Source{}, productiongate.Runtime{}
-		commerceClient := productiongate.NewHTTPCommerce(os.Getenv("COMMERCE_API_URL"), env("AGENT_API_SERVICE_PRINCIPAL", "agent-api"))
-		buildGateway = productiongate.NewHTTPBuilds(
-			os.Getenv("BUILD_API_URL"), env("AGENT_API_SERVICE_PRINCIPAL", "agent-api"),
+		serviceURLs := []string{os.Getenv("COMMERCE_API_URL"), os.Getenv("KERNEL_API_URL"), os.Getenv("BUILD_API_URL"), os.Getenv("RUNTIME_API_URL"), os.Getenv("ATTACHMENTS_API_URL")}
+		var internalClient *http.Client
+		if anyConfigured(serviceURLs...) {
+			if urlErr := requireHTTPS(serviceURLs...); urlErr != nil {
+				log.Fatal(urlErr)
+			}
+			internalClient, err = servicemtls.NewClient(os.Getenv("INTERNAL_MTLS_CA_FILE"), os.Getenv("INTERNAL_MTLS_CLIENT_CERT_FILE"), os.Getenv("INTERNAL_MTLS_CLIENT_KEY_FILE"))
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+		principal := env("AGENT_API_SERVICE_PRINCIPAL", "agent-api")
+		commerceClient := productiongate.NewHTTPCommerce(os.Getenv("COMMERCE_API_URL"), principal)
+		commerceClient.HTTPClient = internalClient
+		buildClient := productiongate.NewHTTPBuilds(
+			os.Getenv("BUILD_API_URL"), principal,
 			os.Getenv("AGENT_BUILD_BUILDER_DIGEST"), os.Getenv("AGENT_BUILD_RUN_IMAGE_DIGEST"), os.Getenv("AGENT_BUILD_PLATFORM_VERSION"),
 		)
-		attachmentGateway, commerceGateway = productiongate.Attachments{}, commerceClient
-		operationGateway = productiongate.NewHTTPOperations(os.Getenv("KERNEL_API_URL"), env("AGENT_API_SERVICE_PRINCIPAL", "agent-api"))
+		buildClient.HTTPClient = internalClient
+		buildGateway = buildClient
+		runtimeClient := productiongate.NewHTTPRuntime(os.Getenv("RUNTIME_API_URL"), principal)
+		runtimeClient.HTTPClient = internalClient
+		runtimeGateway = runtimeClient
+		attachmentsClient := productiongate.NewHTTPAttachments(os.Getenv("ATTACHMENTS_API_URL"), principal)
+		attachmentsClient.HTTPClient = internalClient
+		attachmentGateway, commerceGateway = attachmentsClient, commerceClient
+		operationsClient := productiongate.NewHTTPOperations(os.Getenv("KERNEL_API_URL"), principal)
+		operationsClient.HTTPClient = internalClient
+		operationGateway = operationsClient
 		logGateway, usageGateway = productiongate.Logs{}, commerceClient
 	} else {
 		commerce := &devadapter.Commerce{Allowed: true}
@@ -178,4 +204,27 @@ func env(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func anyConfigured(values ...string) bool {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func requireHTTPS(values ...string) error {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		parsed, err := url.Parse(value)
+		if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+			return errors.New("configured internal service URLs must use https")
+		}
+	}
+	return nil
 }

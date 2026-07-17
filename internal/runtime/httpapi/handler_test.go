@@ -136,6 +136,38 @@ func TestHandler_StatusDoesNotRevealAnotherTenantDeployment(t *testing.T) {
 	}
 }
 
+func TestHandler_RollbackByDeploymentMatchesAgentContract(t *testing.T) {
+	handler, service, appID, envID := runtimeHandler(t)
+	target, err := service.Deploy(context.Background(), runtimev1.DeployRequest{
+		TenantID: "tenant-1", ApplicationID: appID, EnvironmentID: envID,
+		Artifact: testkit.Artifact("a"), Configuration: testkit.Config(), IdempotencyKey: "deploy-rollback-target", ActorID: "user-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := json.Marshal(map[string]any{"target_release_id": target.ReleaseID})
+	response := request(t, handler, http.MethodPost, "/v1/organizations/tenant-1/deployments/"+target.DeploymentID+"/rollback", "tenant-1", string(body), map[string]string{"Idempotency-Key": "rollback-by-deployment"})
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	var rollback runtimev1.DeploymentRef
+	if err := json.Unmarshal(response.Body.Bytes(), &rollback); err != nil || rollback.ReleaseID == target.ReleaseID || rollback.DeploymentID == "" {
+		t.Fatalf("rollback=%+v err=%v", rollback, err)
+	}
+}
+
+func TestHandler_RejectsMalformedExpectedEnvironmentRevision(t *testing.T) {
+	handler, _, appID, envID := runtimeHandler(t)
+	body, _ := json.Marshal(map[string]any{"artifact": testkit.Artifact("a"), "configuration": testkit.Config()})
+	path := "/v1/organizations/tenant-1/applications/" + appID + "/environments/" + envID + "/deployments"
+	response := request(t, handler, http.MethodPost, path, "tenant-1", string(body), map[string]string{
+		"Idempotency-Key": "deploy-invalid-revision", "X-Expected-Environment-Revision": "not-a-number",
+	})
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestHandler_EnforcesBodyLimit(t *testing.T) {
 	handler, _, _, _ := runtimeHandler(t)
 	handler.MaxBodyBytes = 16

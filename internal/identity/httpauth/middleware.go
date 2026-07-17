@@ -58,12 +58,6 @@ func (m Middleware) Wrap(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		for _, header := range developmentIdentityHeaders {
-			if strings.TrimSpace(r.Header.Get(header)) != "" {
-				unauthorized(w)
-				return
-			}
-		}
 		identity, err := m.authenticate(r)
 		if err != nil {
 			unauthorized(w)
@@ -111,13 +105,28 @@ func (m Middleware) authenticate(r *http.Request) (Identity, error) {
 	)
 	switch {
 	case strings.HasPrefix(bearer, "Bearer ") && m.OIDC != nil:
+		if hasAnyIdentityHeader(r, developmentIdentityHeaders...) {
+			return Identity{}, errors.New("OIDC requests may not supply identity headers")
+		}
 		identity, err = m.OIDC.VerifyOIDC(r.Context(), strings.TrimSpace(strings.TrimPrefix(bearer, "Bearer ")))
 		kind = kernelv2.PrincipalUser
 		identity.Source = "oidc"
 	case certificate != nil && m.MTLS != nil:
+		// A verified internal service may select the tenant/project scope for the
+		// operation it is delegating. Every principal-bearing header remains
+		// forbidden: the service identity and its scopes come exclusively from
+		// the client certificate verifier.
+		if hasAnyIdentityHeader(r, "X-Principal-ID", "X-Principal-Kind", "X-Principal-Role", "X-Agent-ID", "X-User-ID", "X-Scopes") {
+			return Identity{}, errors.New("mTLS requests may not supply principal headers")
+		}
 		identity, err = m.MTLS.VerifyMTLS(r.Context(), certificate)
 		kind = kernelv2.PrincipalService
 		identity.Source = "mtls"
+		if err == nil {
+			if identity.TenantID, err = delegatedScope(identity.TenantID, r.Header.Get("X-Tenant-ID"), true); err == nil {
+				identity.ProjectID, err = delegatedScope(identity.ProjectID, r.Header.Get("X-Project-ID"), false)
+			}
+		}
 	default:
 		return Identity{}, errors.New("verified OIDC or mTLS identity is required")
 	}
@@ -128,6 +137,31 @@ func (m Middleware) authenticate(r *http.Request) (Identity, error) {
 	// claim returned by an upstream token/certificate parser is overwritten.
 	identity.KindClaim = string(kind)
 	return identity, nil
+}
+
+func hasAnyIdentityHeader(r *http.Request, headers ...string) bool {
+	for _, header := range headers {
+		if strings.TrimSpace(r.Header.Get(header)) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func delegatedScope(certificateValue, requestedValue string, required bool) (string, error) {
+	certificateValue = strings.TrimSpace(certificateValue)
+	requestedValue = strings.TrimSpace(requestedValue)
+	if certificateValue != "" && requestedValue != "" && certificateValue != requestedValue {
+		return "", errors.New("delegated scope conflicts with certificate scope")
+	}
+	value := certificateValue
+	if value == "" {
+		value = requestedValue
+	}
+	if required && value == "" {
+		return "", errors.New("delegated tenant scope is required")
+	}
+	return value, nil
 }
 
 func unauthorized(w http.ResponseWriter) {

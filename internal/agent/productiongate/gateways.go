@@ -353,8 +353,6 @@ func (b *HTTPBuilds) do(ctx context.Context, method, path, tenant, idempotencyKe
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("X-Tenant-ID", tenant)
-	request.Header.Set("X-Principal-ID", b.principal())
-	request.Header.Set("X-Principal-Kind", "service")
 	if strings.TrimSpace(correlationID) != "" {
 		request.Header.Set("X-Correlation-ID", strings.TrimSpace(correlationID))
 	}
@@ -451,8 +449,6 @@ func (c *HTTPCommerce) do(ctx context.Context, method, path, tenant string, body
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("X-Tenant-ID", tenant)
-	request.Header.Set("X-Principal-ID", c.principal())
-	request.Header.Set("X-Principal-Kind", "service")
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
@@ -521,9 +517,6 @@ func (o *HTTPOperations) do(ctx context.Context, method, path, tenant, operation
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("X-Tenant-ID", tenant)
-	request.Header.Set("X-Principal-ID", o.principal())
-	request.Header.Set("X-Principal-Kind", "service")
-	request.Header.Set("X-Scopes", "kernel.operation.read kernel.operation.cancel")
 	request.Header.Set("X-Correlation-ID", "agent-api-operation-"+operationID)
 	if method != http.MethodGet {
 		request.Header.Set("Idempotency-Key", "agent-api-"+strings.ToLower(method)+"-"+operationID)

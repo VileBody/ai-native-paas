@@ -21,6 +21,7 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/build/support"
 	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
 	"github.com/keir-research/ai-native-paas/internal/identity/oidcverify"
+	"github.com/keir-research/ai-native-paas/internal/identity/servicemtls"
 	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 )
@@ -81,6 +82,7 @@ func main() {
 			platformprofile.Prod("oidc-jwks-verifier"),
 			platformprofile.Prod("postgres-membership-resolver"),
 			platformprofile.Prod("verified-identity-middleware"),
+			platformprofile.Prod("internal-spiffe-mtls-server"),
 			platformprofile.Prod("fail-closed-build-execution-until-workspace-image"),
 			platformprofile.Prod("fail-closed-build-logs-until-harbor-s3"),
 		}
@@ -100,12 +102,19 @@ func main() {
 		Store: store, Logs: logStore, Clock: support.Clock{}, IDs: &support.IDs{},
 		RepositoryBase: os.Getenv("BUILD_REGISTRY_BASE"),
 	}
-	var handler http.Handler = httpapi.Handler{Build: service, MaxBodyBytes: 2 << 20}
-	handler = (httpauth.Middleware{Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}}}).Wrap(handler)
+	baseHandler := http.Handler(httpapi.Handler{Build: service, MaxBodyBytes: 2 << 20})
+	handler := (httpauth.Middleware{Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}}}).Wrap(baseHandler)
 	server := &http.Server{
 		Addr: env("LISTEN_ADDR", ":8082"), Handler: handler,
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second,
 		WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
+	}
+	var internalServer *http.Server
+	if profile == platformprofile.Production {
+		internalServer, err = servicemtls.NewServer(servicemtls.ServerConfigFromEnv("agent-api", "build:read build:write"), baseHandler)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	go func() {
 		log.Printf("build api listening on %s (storage=%s profile=%s)", server.Addr, storageName, profile)
@@ -114,10 +123,24 @@ func main() {
 			stop()
 		}
 	}()
+	if internalServer != nil {
+		go func() {
+			log.Printf("build internal mTLS API listening on %s", internalServer.Addr)
+			if serveErr := internalServer.ListenAndServeTLS("", ""); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+				log.Printf("build internal mTLS API failed: %v", serveErr)
+				stop()
+			}
+		}()
+	}
 	<-ctx.Done()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("build api shutdown: %v", err)
+	}
+	if internalServer != nil {
+		if err := internalServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("build internal mTLS API shutdown: %v", err)
+		}
 	}
 }

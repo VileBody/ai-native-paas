@@ -183,6 +183,51 @@ func TestAgentAPIProductionUsesBuildGatewayWhenConfigured(t *testing.T) {
 	}
 }
 
+func TestProductionInternalServiceGatewaysUseVerifiedMTLS(t *testing.T) {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve repository root")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", ".."))
+	agentRaw, err := os.ReadFile(filepath.Join(root, "cmd", "agent-api", "main.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	agent := string(agentRaw)
+	for _, required := range []string{
+		"servicemtls.NewClient(", "INTERNAL_MTLS_CA_FILE", "INTERNAL_MTLS_CLIENT_CERT_FILE", "INTERNAL_MTLS_CLIENT_KEY_FILE",
+		"requireHTTPS(serviceURLs...)", "productiongate.NewHTTPRuntime(", "RUNTIME_API_URL", "productiongate.NewHTTPAttachments(", "ATTACHMENTS_API_URL",
+		"internal-spiffe-mtls-client",
+	} {
+		if !strings.Contains(agent, required) {
+			t.Errorf("agent-api internal mTLS wiring missing %q", required)
+		}
+	}
+	for _, api := range []string{"build-api", "runtime-api", "attachments-api", "commerce-api", "kernel-api"} {
+		raw, err := os.ReadFile(filepath.Join(root, "cmd", api, "main.go"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		source := string(raw)
+		for _, required := range []string{"servicemtls.NewServer(", "servicemtls.ServerConfigFromEnv(", "ListenAndServeTLS(\"\", \"\")", "internal-spiffe-mtls-server"} {
+			if !strings.Contains(source, required) {
+				t.Errorf("%s internal mTLS server wiring missing %q", api, required)
+			}
+		}
+	}
+	for _, name := range []string{"gateways.go", "runtime_gateway.go", "attachments_gateway.go"} {
+		raw, err := os.ReadFile(filepath.Join(root, "internal", "agent", "productiongate", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, forbidden := range []string{"Header.Set(\"X-Principal-ID\"", "Header.Set(\"X-Principal-Kind\"", "Header.Set(\"X-Scopes\""} {
+			if strings.Contains(string(raw), forbidden) {
+				t.Errorf("%s still sends forgeable identity header %q", name, forbidden)
+			}
+		}
+	}
+}
+
 func TestProductionKernelRequiresJetStreamOutboxPublisher(t *testing.T) {
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {

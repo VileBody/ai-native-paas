@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/keir-research/ai-native-paas/internal/runtime/application"
@@ -52,6 +53,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.status(w, r, tenantID, parts[4])
 	case len(parts) == 6 && parts[3] == "environments" && parts[5] == "rollbacks" && r.Method == http.MethodPost:
 		h.rollback(w, r, tenantID, actorID, parts[4])
+	case len(parts) == 6 && parts[3] == "deployments" && parts[5] == "rollback" && r.Method == http.MethodPost:
+		h.rollbackDeployment(w, r, tenantID, actorID, parts[4])
 	default:
 		writeError(w, domain.NewError(domain.CodeNotFound, "route not found"))
 	}
@@ -116,6 +119,7 @@ func (h Handler) deploy(w http.ResponseWriter, r *http.Request, tenantID, actorI
 		TenantID: tenantID, ApplicationID: applicationID, EnvironmentID: environmentID,
 		Artifact: body.Artifact, Configuration: body.Configuration,
 		IdempotencyKey: strings.TrimSpace(r.Header.Get("Idempotency-Key")), ActorID: actorID,
+		ExpectedEnvironmentRevision: expectedEnvironmentRevision(r),
 	})
 	if err != nil {
 		writeError(w, err)
@@ -147,12 +151,43 @@ func (h Handler) rollback(w http.ResponseWriter, r *http.Request, tenantID, acto
 	result, err := h.Runtime.RollbackWithRequest(r.Context(), application.RollbackRequest{
 		TenantID: tenantID, EnvironmentID: environmentID, TargetReleaseID: body.TargetReleaseID,
 		ActorID: actorID, IdempotencyKey: strings.TrimSpace(r.Header.Get("Idempotency-Key")), CriticalOverride: body.CriticalOverride,
+		ExpectedEnvironmentRevision: expectedEnvironmentRevision(r),
 	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusAccepted, result)
+}
+
+func (h Handler) rollbackDeployment(w http.ResponseWriter, r *http.Request, tenantID, actorID, deploymentID string) {
+	var body rollbackBody
+	if err := decode(r, h.limit(), &body); err != nil {
+		writeError(w, domain.Wrap(domain.CodeInvalidArgument, "invalid json", err))
+		return
+	}
+	result, err := h.Runtime.RollbackDeploymentWithRequest(r.Context(), deploymentID, application.RollbackRequest{
+		TenantID: tenantID, TargetReleaseID: body.TargetReleaseID, ActorID: actorID,
+		IdempotencyKey: strings.TrimSpace(r.Header.Get("Idempotency-Key")), CriticalOverride: body.CriticalOverride,
+		ExpectedEnvironmentRevision: expectedEnvironmentRevision(r),
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, result)
+}
+
+func expectedEnvironmentRevision(r *http.Request) int64 {
+	raw := strings.TrimSpace(r.Header.Get("X-Expected-Environment-Revision"))
+	if raw == "" {
+		return 0
+	}
+	revision, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || revision < 1 {
+		return -1
+	}
+	return revision
 }
 
 func (h Handler) limit() int64 {

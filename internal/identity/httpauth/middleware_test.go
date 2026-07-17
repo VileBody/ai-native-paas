@@ -129,6 +129,62 @@ func TestProductionOIDCAndMTLSRejectForgedPrincipalRoleBeforeDispatch(t *testing
 	}
 }
 
+func TestProductionMTLSMayDelegateOnlyTenantAndProjectScope(t *testing.T) {
+	verified := Middleware{
+		Profile: platformprofile.Production,
+		MTLS: mtlsVerifierFunc(func(_ context.Context, _ *x509.Certificate) (Identity, error) {
+			return Identity{SubjectID: "agent-api", Scopes: []string{"runtime:write"}}, nil
+		}),
+	}.Wrap(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		identity, ok := IdentityFromContext(request.Context())
+		if !ok || identity.SubjectID != "agent-api" || identity.TenantID != "tenant-1" || identity.ProjectID != "project-1" || identity.KindClaim != "SERVICE" {
+			t.Fatalf("delegated identity=%+v ok=%t", identity, ok)
+		}
+		if request.Header.Get("X-Principal-ID") != "agent-api" || request.Header.Get("X-Tenant-ID") != "tenant-1" || request.Header.Get("X-Project-ID") != "project-1" {
+			t.Fatalf("trusted headers=%v", request.Header)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	request := httptest.NewRequest(http.MethodPost, "/v1/organizations/tenant-1/applications", nil)
+	request.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{{}}}
+	request.Header.Set("X-Tenant-ID", "tenant-1")
+	request.Header.Set("X-Project-ID", "project-1")
+	response := httptest.NewRecorder()
+	verified.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("delegated request status=%d body=%s", response.Code, response.Body.String())
+	}
+
+	forged := httptest.NewRequest(http.MethodPost, "/v1/organizations/tenant-1/applications", nil)
+	forged.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{{}}}
+	forged.Header.Set("X-Tenant-ID", "tenant-1")
+	forged.Header.Set("X-Principal-ID", "attacker")
+	forgedResponse := httptest.NewRecorder()
+	verified.ServeHTTP(forgedResponse, forged)
+	if forgedResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("forged principal accepted: %d", forgedResponse.Code)
+	}
+}
+
+func TestProductionMTLSCertificateScopeCannotBeOverridden(t *testing.T) {
+	handler := Middleware{
+		Profile: platformprofile.Production,
+		MTLS: mtlsVerifierFunc(func(_ context.Context, _ *x509.Certificate) (Identity, error) {
+			return Identity{SubjectID: "workspace-agent", TenantID: "tenant-bound", ProjectID: "project-bound"}, nil
+		}),
+	}.Wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Fatal("conflicting scope reached handler") }))
+
+	request := httptest.NewRequest(http.MethodPost, "/mcp/v2/invoke", nil)
+	request.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{{}}}
+	request.Header.Set("X-Tenant-ID", "tenant-other")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("conflicting certificate scope accepted: %d", response.Code)
+	}
+}
+
 func TestProductionPublicPrefixesAreExplicit(t *testing.T) {
 	var invoked bool
 	handler := Middleware{

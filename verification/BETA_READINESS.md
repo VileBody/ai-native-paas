@@ -77,6 +77,15 @@ gates.
   material settings are configured; it maps build-api 4xx responses to
   non-retryable agent errors and exposes artifacts only when build-api reports
   them as `RELEASABLE`.
+- Production `agent-api` now has tenant-scoped Runtime and Attachments API
+  bridges. Runtime deploy/status/deployment-scoped rollback carries exact
+  revision and idempotency metadata; attachments keeps secret writes
+  non-reflective and validates returned tenant/application/environment scope.
+- Internal Agent/Build/Runtime/Attachments/Commerce/Kernel calls now have an
+  executable TLS 1.3 + SPIFFE mTLS boundary. Downstream APIs use separate
+  certificate-only listeners, clients cannot forge principal/scope headers,
+  and a real ephemeral-CA handshake test proves clients without a certificate
+  are rejected.
 - Project MCP v2 now wires `build_execute` into the workspace service as a
   governed `workspace-agent verified-build` command bound to the workspace's
   exact source SHA; spoofed source revisions and generic command bypasses fail
@@ -130,8 +139,8 @@ reconciliation and old-key rejection evidence.
 
 ## Still required
 
-- Run the durable CoreDNS reconcile path on future bootstraps so the runtime
-  DNS domain converges to `cozy.local` before LINSTOR gates run.
+- Keep the tested CoreDNS reconcile step in every future bootstrap; generation
+  10 already converged the runtime domain to `cozy.local` before LINSTOR.
 - Pass the `provider_gate` PostgreSQL/Redis/S3 lifecycle, backup/restore,
   isolation, security, and `E2E-1` through `E2E-12` live gates.
 - Pass the `DEV_PRODUCT_GREEN` simulator path:
@@ -141,6 +150,10 @@ reconciliation and old-key rejection evidence.
   now queues the governed build command, and workspace-agent has the verified
   rootless BuildKit Dockerfile boundary; GitLab repository bootstrap,
   disposable VM, Harbor receipt ingestion/trust chain and live Argo remain open.
+- Replace the remaining legacy Agent source/project façade stub through an
+  additive v2 compatibility command carrying workspace plan, commit receipt
+  and attestation context. The old v1 source signatures are intentionally not
+  allowed to bypass Project MCP v2 governance.
 - Pass `COZYSTACK_LIVE_GREEN` and `PROVIDER_FULL_GREEN` in a funded
   `provider_gate_full` window; simulator evidence must not be substituted.
 - Complete GitLab, OpenBao holder, capability-provider, beta-domain/DNS, and
@@ -151,6 +164,8 @@ reconciliation and old-key rejection evidence.
 - Rotate the Timeweb main S3 secret and reconcile state-service, backend,
   workspace-log and image-staging consumers; prove the previous secret fails.
 - Produce signed immutable release artifacts and the final restore drill.
+- Issue/mount OpenBao admin-service certificates and record a live in-cluster
+  handshake against the new internal mTLS listeners.
 
 Until those items pass, `DEV_PRODUCT_GREEN`, `PROVIDER_GREEN`, `K8S_GREEN`,
 `COZYSTACK_LIVE_GREEN`, `PROVIDER_FULL_GREEN`, `SECURITY_GREEN`, and

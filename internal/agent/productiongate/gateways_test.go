@@ -57,7 +57,7 @@ func TestHTTPBuilds_RequestUsesTenantScopedBuildAPI(t *testing.T) {
 		if r.Method != http.MethodPost || r.URL.Path != "/v1/organizations/tenant-1/builds" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
-		if r.Header.Get("X-Tenant-ID") != "tenant-1" || r.Header.Get("X-Principal-ID") != "agent-api" || r.Header.Get("X-Principal-Kind") != "service" ||
+		if r.Header.Get("X-Tenant-ID") != "tenant-1" || r.Header.Get("X-Principal-ID") != "" || r.Header.Get("X-Principal-Kind") != "" ||
 			r.Header.Get("Idempotency-Key") != "idem-1" || r.Header.Get("X-Correlation-ID") != "corr-1" {
 			t.Fatalf("headers=%v", r.Header)
 		}
@@ -155,7 +155,7 @@ func TestHTTPCommerce_CheckUsesTenantScopedCommerceAPI(t *testing.T) {
 		if r.Method != http.MethodPost || r.URL.Path != "/v1/organizations/tenant-1/entitlements/check" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
-		if r.Header.Get("X-Tenant-ID") != "tenant-1" || r.Header.Get("X-Principal-ID") != "agent-api" || r.Header.Get("X-Principal-Kind") != "service" {
+		if r.Header.Get("X-Tenant-ID") != "tenant-1" || r.Header.Get("X-Principal-ID") != "" || r.Header.Get("X-Principal-Kind") != "" {
 			t.Fatalf("headers=%v", r.Header)
 		}
 		var body commercev1.EntitlementRequest
@@ -184,7 +184,7 @@ func TestHTTPCommerce_GetUsageUsesTenantScopedPreviewAPI(t *testing.T) {
 		if r.Method != http.MethodGet || r.URL.Path != "/v1/organizations/tenant-1/billing-periods/period-1/invoice-preview" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
-		if r.Header.Get("X-Tenant-ID") != "tenant-1" || r.Header.Get("X-Principal-ID") != "agent-api" || r.Header.Get("X-Principal-Kind") != "service" {
+		if r.Header.Get("X-Tenant-ID") != "tenant-1" || r.Header.Get("X-Principal-ID") != "" || r.Header.Get("X-Principal-Kind") != "" {
 			t.Fatalf("headers=%v", r.Header)
 		}
 		_ = json.NewEncoder(w).Encode(commercev1.InvoicePreview{
@@ -220,7 +220,7 @@ func TestHTTPOperations_GetUsesTenantScopedKernelAPI(t *testing.T) {
 		if r.Method != http.MethodGet || r.URL.Path != "/v1/operations/operation-1" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
-		if r.Header.Get("X-Tenant-ID") != "tenant-1" || r.Header.Get("X-Principal-ID") != "agent-api" || r.Header.Get("X-Principal-Kind") != "service" || r.Header.Get("X-Scopes") != "kernel.operation.read kernel.operation.cancel" {
+		if r.Header.Get("X-Tenant-ID") != "tenant-1" || r.Header.Get("X-Principal-ID") != "" || r.Header.Get("X-Principal-Kind") != "" || r.Header.Get("X-Scopes") != "" {
 			t.Fatalf("headers=%v", r.Header)
 		}
 		if r.Header.Get("Idempotency-Key") != "" {
@@ -251,7 +251,7 @@ func TestHTTPOperations_CancelUsesIdempotentKernelAPI(t *testing.T) {
 		if r.Method != http.MethodPost || r.URL.Path != "/v1/operations/operation-1/cancel" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
-		if r.Header.Get("X-Tenant-ID") != "tenant-1" || r.Header.Get("X-Principal-ID") != "agent-api" || r.Header.Get("X-Principal-Kind") != "service" || r.Header.Get("Idempotency-Key") != "agent-api-post-operation-1" {
+		if r.Header.Get("X-Tenant-ID") != "tenant-1" || r.Header.Get("X-Principal-ID") != "" || r.Header.Get("X-Principal-Kind") != "" || r.Header.Get("Idempotency-Key") != "agent-api-post-operation-1" {
 			t.Fatalf("headers=%v", r.Header)
 		}
 		_ = json.NewEncoder(w).Encode(struct {

@@ -15,6 +15,7 @@ import (
 	kernelv1 "github.com/keir-research/ai-native-paas/contracts/kernel/v1"
 	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
 	"github.com/keir-research/ai-native-paas/internal/identity/oidcverify"
+	"github.com/keir-research/ai-native-paas/internal/identity/servicemtls"
 	"github.com/keir-research/ai-native-paas/internal/kernel"
 	"github.com/keir-research/ai-native-paas/internal/kernel/httpapi"
 	"github.com/keir-research/ai-native-paas/internal/kernel/memory"
@@ -92,6 +93,7 @@ func main() {
 			platformprofile.Prod("oidc-jwks-verifier"),
 			platformprofile.Prod("postgres-membership-resolver"),
 			platformprofile.Prod("verified-identity-middleware"),
+			platformprofile.Prod("internal-spiffe-mtls-server"),
 			platformprofile.Prod("nats-jetstream-outbox-publisher"),
 		}
 	} else {
@@ -117,7 +119,7 @@ func main() {
 		dispatcher := kernel.OutboxDispatcher{Store: store, Publisher: eventBus, Clock: kernel.SystemClock{}, Lease: 30 * time.Second}
 		go runOutboxDispatcher(ctx, logger, dispatcher)
 	}
-	handler, err := httpapi.NewHandler(service, ids)
+	baseHandler, err := httpapi.NewHandler(service, ids)
 	if err != nil {
 		logger.Error("initialize HTTP handler", "error", err)
 		os.Exit(1)
@@ -127,13 +129,13 @@ func main() {
 	if address == "" {
 		address = ":8080"
 	}
-	handler = (httpauth.Middleware{
+	handler := (httpauth.Middleware{
 		Profile: profile,
 		OIDC:    oidcVerifier,
 		PublicPaths: map[string]struct{}{
 			"/healthz": {},
 		},
-	}).Wrap(handler)
+	}).Wrap(baseHandler)
 	server := &http.Server{
 		Addr:              address,
 		Handler:           handler,
@@ -142,6 +144,21 @@ func main() {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
+	var internalServer *http.Server
+	if profile == platformprofile.Production {
+		internalServer, err = servicemtls.NewServer(servicemtls.ServerConfigFromEnv("agent-api,project-api,workspace-manager", "kernel.operation.read kernel.operation.cancel kernel.operation.write"), baseHandler)
+		if err != nil {
+			logger.Error("initialize internal mTLS server", "error", err)
+			os.Exit(1)
+		}
+		go func() {
+			logger.Info("kernel internal mTLS API listening", "address", internalServer.Addr)
+			if serveErr := internalServer.ListenAndServeTLS("", ""); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+				logger.Error("internal mTLS HTTP server failed", "error", serveErr)
+				stop()
+			}
+		}()
+	}
 
 	go func() {
 		<-ctx.Done()
@@ -149,6 +166,11 @@ func main() {
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			logger.Error("HTTP shutdown", "error", err)
+		}
+		if internalServer != nil {
+			if err := internalServer.Shutdown(shutdownCtx); err != nil {
+				logger.Error("internal mTLS HTTP shutdown", "error", err)
+			}
 		}
 	}()
 

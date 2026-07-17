@@ -121,6 +121,9 @@ func (s Service) replayCreateRelease(ctx context.Context, req runtimev1.DeployRe
 		if !ok || env.ApplicationID != app.ID || env.TenantID != req.TenantID {
 			return domain.NewError(domain.CodeNotFound, "environment not found")
 		}
+		if req.ExpectedEnvironmentRevision > 0 && env.Version != req.ExpectedEnvironmentRevision {
+			return domain.NewError(domain.CodeStaleVersion, "environment revision changed")
+		}
 		placement, ok = tx.GetCurrentPlacement(env.ID)
 		if !ok {
 			return domain.NewError(domain.CodeInternal, "release exists without placement")
@@ -571,6 +574,31 @@ func (s Service) Rollback(ctx context.Context, environmentID, targetReleaseID st
 	return s.RollbackWithRequest(ctx, RollbackRequest{EnvironmentID: environmentID, TargetReleaseID: targetReleaseID, TenantID: "", ActorID: "system", IdempotencyKey: "rollback-" + targetReleaseID})
 }
 
+func (s Service) RollbackDeploymentWithRequest(ctx context.Context, deploymentID string, req RollbackRequest) (runtimev1.DeploymentRef, error) {
+	if err := s.validateBase(); err != nil {
+		return runtimev1.DeploymentRef{}, err
+	}
+	deploymentID = strings.TrimSpace(deploymentID)
+	req.TenantID = strings.TrimSpace(req.TenantID)
+	if deploymentID == "" || req.TenantID == "" {
+		return runtimev1.DeploymentRef{}, domain.NewError(domain.CodeInvalidArgument, "deployment rollback request is incomplete")
+	}
+	var deployment domain.Deployment
+	err := s.Store.Transact(ctx, func(tx Tx) error {
+		var ok bool
+		deployment, ok = tx.GetDeployment(deploymentID)
+		if !ok || deployment.TenantID != req.TenantID {
+			return domain.NewError(domain.CodeNotFound, "deployment not found")
+		}
+		return nil
+	})
+	if err != nil {
+		return runtimev1.DeploymentRef{}, err
+	}
+	req.EnvironmentID = deployment.EnvironmentID
+	return s.RollbackWithRequest(ctx, req)
+}
+
 func (s Service) RollbackWithRequest(ctx context.Context, req RollbackRequest) (runtimev1.DeploymentRef, error) {
 	if err := s.validateBase(); err != nil {
 		return runtimev1.DeploymentRef{}, err
@@ -583,7 +611,7 @@ func (s Service) RollbackWithRequest(ctx context.Context, req RollbackRequest) (
 	req.TargetReleaseID = strings.TrimSpace(req.TargetReleaseID)
 	req.ActorID = strings.TrimSpace(req.ActorID)
 	req.IdempotencyKey = strings.TrimSpace(req.IdempotencyKey)
-	if req.EnvironmentID == "" || req.TargetReleaseID == "" || req.ActorID == "" || req.IdempotencyKey == "" {
+	if req.EnvironmentID == "" || req.TargetReleaseID == "" || req.ActorID == "" || req.IdempotencyKey == "" || req.ExpectedEnvironmentRevision < 0 {
 		return runtimev1.DeploymentRef{}, domain.NewError(domain.CodeInvalidArgument, "rollback request is incomplete")
 	}
 
@@ -629,6 +657,9 @@ func (s Service) RollbackWithRequest(ctx context.Context, req RollbackRequest) (
 			}
 			replay = true
 			return nil
+		}
+		if req.ExpectedEnvironmentRevision > 0 && env.Version != req.ExpectedEnvironmentRevision {
+			return domain.NewError(domain.CodeStaleVersion, "environment revision changed")
 		}
 		target, ok = tx.GetRelease(req.TargetReleaseID)
 		if !ok || target.EnvironmentID != env.ID {
