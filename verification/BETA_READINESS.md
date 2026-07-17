@@ -68,6 +68,10 @@ gates.
 - Production `agent-api` now has a tenant-scoped Commerce HTTP bridge for
   entitlement checks and usage preview when `COMMERCE_API_URL` is configured;
   without it, mutations remain fail-closed.
+- Project MCP v2 now wires `build_execute` into the workspace service as a
+  governed `workspace-agent verified-build` command bound to the workspace's
+  exact source SHA; spoofed source revisions and generic command bypasses fail
+  closed before creating a billable command.
 
 ## Live checkpoint
 
@@ -115,7 +119,8 @@ reconciliation and old-key rejection evidence.
 - Pass the `DEV_PRODUCT_GREEN` simulator path:
   `Create Project -> GitLab/MCP -> plan -> approval -> build -> GitOps ->
   runtime_sim_k8s -> probe -> usage/audit -> destroy`.
-  The local acceptance slice covers the agent/runtime/audit half; GitLab MCP,
+  The local acceptance slice covers the agent/runtime/audit half and Project
+  MCP now queues the governed build command; GitLab repository bootstrap,
   disposable VM, Harbor trust chain and live Argo remain open.
 - Pass `COZYSTACK_LIVE_GREEN` and `PROVIDER_FULL_GREEN` in a funded
   `provider_gate_full` window; simulator evidence must not be substituted.

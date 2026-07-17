@@ -679,6 +679,66 @@ func TestProjectMCP_WorkspaceToolsDeriveScopeAndProjectFromAccessCredential(t *t
 	}
 }
 
+func TestProjectMCP_BuildExecuteQueuesGovernedWorkspaceBuild(t *testing.T) {
+	handler, access, workspaces := mcpFixture(t, []string{"agent.tool:build_execute"})
+	workspaces.revision.SourceRoot = "app"
+
+	build := invocation(agentv2.ToolBuildExecute)
+	build.IdempotencyKey = "build-1"
+	build.Arguments = json.RawMessage(`{
+		"workspace_id":"workspace-1",
+		"spec":{
+			"source_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"driver":"dockerfile",
+			"platforms":["linux/amd64"],
+			"timeout_seconds":600,
+			"definition_path":"Dockerfile",
+			"secret_refs":["secret-ref-1"]
+		}
+	}`)
+	response := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, build)
+	if response.Code != http.StatusOK || workspaces.execCalls != 1 || !strings.Contains(response.Body.String(), `"command_id":"command-1"`) {
+		t.Fatalf("build status=%d body=%s request=%#v", response.Code, response.Body.String(), workspaces.exec)
+	}
+	if workspaces.exec.Scope.TenantID != "tenant-1" || workspaces.exec.Scope.ProjectID != "project-1" || workspaces.exec.Scope.ActorID != "agent-1" {
+		t.Fatalf("build scope=%#v", workspaces.exec.Scope)
+	}
+	if workspaces.exec.WorkspaceID != "workspace-1" || workspaces.exec.Kind != "build_execute" || workspaces.exec.SerializationKey != "build:"+strings.Repeat("a", 40) || workspaces.exec.IdempotencyKey != "build-1" {
+		t.Fatalf("build request=%#v", workspaces.exec)
+	}
+	if workspaces.exec.Spec.WorkingDir != "app" || workspaces.exec.Spec.TimeoutSeconds != 600 || workspaces.exec.Spec.OutputLimitBytes != 8<<20 {
+		t.Fatalf("build spec=%#v", workspaces.exec.Spec)
+	}
+	argv := workspaces.exec.Spec.Argv
+	if len(argv) != 4 || argv[0] != "workspace-agent" || argv[1] != "verified-build" || argv[2] != strings.Repeat("a", 40) {
+		t.Fatalf("build argv=%#v", argv)
+	}
+	var payload buildExecuteSpec
+	if err := json.Unmarshal([]byte(argv[3]), &payload); err != nil || payload.SourceSHA != strings.Repeat("a", 40) || payload.Driver != "dockerfile" || payload.DefinitionPath != "Dockerfile" || len(payload.Platforms) != 1 || payload.Platforms[0] != "linux/amd64" || len(payload.SecretRefs) != 1 || payload.SecretRefs[0] != "secret-ref-1" {
+		t.Fatalf("build payload=%#v err=%v", payload, err)
+	}
+}
+
+func TestProjectMCP_BuildExecuteRejectsSourceSpoofing(t *testing.T) {
+	handler, access, workspaces := mcpFixture(t, []string{"agent.tool:build_execute"})
+
+	build := invocation(agentv2.ToolBuildExecute)
+	build.Arguments = json.RawMessage(`{
+		"workspace_id":"workspace-1",
+		"spec":{
+			"source_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			"driver":"dockerfile",
+			"platforms":["linux/amd64"],
+			"timeout_seconds":600,
+			"definition_path":"Dockerfile"
+		}
+	}`)
+	response := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, build)
+	if response.Code != http.StatusForbidden || !strings.Contains(response.Body.String(), `"POLICY_DENIED"`) || workspaces.execCalls != 0 {
+		t.Fatalf("spoofed build status=%d body=%s calls=%d request=%#v", response.Code, response.Body.String(), workspaces.execCalls, workspaces.exec)
+	}
+}
+
 func TestProjectMCP_NetworkDeferredReturnsDependencyCodesWithoutBillableCommand(t *testing.T) {
 	scopes := []string{
 		"agent.tool:workspace_create", "agent.tool:workspace_exec", "agent.tool:infra_plan",

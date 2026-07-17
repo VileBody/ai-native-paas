@@ -332,6 +332,7 @@ func governedWorkspaceAgentCommand(kind string, argv []string) bool {
 		"repository_push":     "verified-git-push",
 		"infra_plan":          "verified-tofu-plan",
 		"infra_apply":         "verified-tofu-apply",
+		"build_execute":       "verified-build",
 	}[kind]
 	return expected != "" && argv[0] == "workspace-agent" && argv[1] == expected
 }

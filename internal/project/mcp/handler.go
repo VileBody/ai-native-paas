@@ -193,11 +193,7 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 	case agentv2.ToolSecretSet, agentv2.ToolSecretListMetadata:
 		result, err = h.invokeSecrets(r.Context(), verified, request)
 	case agentv2.ToolBuildExecute:
-		if h.Dependencies.WorkspaceNAT {
-			result = waitingDependency("workspace_nat", nil)
-			break
-		}
-		result, err = nil, errors.New("build execution adapter is unavailable")
+		result, err = h.invokeBuild(r.Context(), verified, request)
 	case agentv2.ToolGitOpsValidate, agentv2.ToolGitOpsCommit, agentv2.ToolArgoCDSync, agentv2.ToolArgoCDGetStatus, agentv2.ToolArgoCDRollback, agentv2.ToolDeploymentGetLogs, agentv2.ToolDeploymentGetEvents:
 		if h.Dependencies.RuntimeCell {
 			result = waitingDependency("runtime_cell", nil)
@@ -702,6 +698,97 @@ type workspaceExecArguments struct {
 	Kind             string            `json:"kind"`
 	SerializationKey string            `json:"serialization_key,omitempty"`
 	CredentialLeases []string          `json:"credential_leases,omitempty"`
+}
+
+type buildExecuteArguments struct {
+	WorkspaceID string           `json:"workspace_id"`
+	Spec        buildExecuteSpec `json:"spec"`
+}
+
+type buildExecuteSpec struct {
+	SourceSHA      string   `json:"source_sha"`
+	Driver         string   `json:"driver"`
+	Platforms      []string `json:"platforms"`
+	TimeoutSeconds int64    `json:"timeout_seconds"`
+	DefinitionPath string   `json:"definition_path,omitempty"`
+	SecretRefs     []string `json:"secret_refs,omitempty"`
+}
+
+func (h Handler) invokeBuild(ctx context.Context, verified agentv2.VerifiedInvocationContext, request agentv2.InvocationRequest) (any, error) {
+	if h.Workspaces == nil {
+		return nil, errors.New("workspace service is unavailable")
+	}
+	if h.Dependencies.WorkspaceNAT {
+		return waitingDependency("workspace_nat", nil), nil
+	}
+	var arguments buildExecuteArguments
+	if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || !validBuildExecute(arguments) {
+		return nil, errInvalidWorkspaceArguments
+	}
+	scope := workspace.Scope{TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID}
+	revision, err := h.Workspaces.GetSourceRevision(ctx, scope, arguments.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if arguments.Spec.SourceSHA != revision.CommitSHA {
+		return nil, workspace.ErrPolicyDenied
+	}
+	payload, err := json.Marshal(arguments.Spec)
+	if err != nil {
+		return nil, errInvalidWorkspaceArguments
+	}
+	timeout := arguments.Spec.TimeoutSeconds
+	if timeout == 0 {
+		timeout = 1800
+	}
+	spec := workspacev1.CommandSpec{
+		Argv:             []string{"workspace-agent", "verified-build", revision.CommitSHA, string(payload)},
+		WorkingDir:       revision.SourceRoot,
+		TimeoutSeconds:   timeout,
+		OutputLimitBytes: 8 << 20,
+	}
+	return h.Workspaces.Exec(ctx, workspace.ExecRequest{
+		Scope: scope, WorkspaceID: arguments.WorkspaceID, IdempotencyKey: request.IdempotencyKey,
+		Kind: "build_execute", SerializationKey: "build:" + revision.CommitSHA, Spec: spec,
+	})
+}
+
+func validBuildExecute(arguments buildExecuteArguments) bool {
+	if !agentv1.ValidID(arguments.WorkspaceID) || !validCommitSHA(arguments.Spec.SourceSHA) || !validBuildDriver(arguments.Spec.Driver) || len(arguments.Spec.Platforms) == 0 || len(arguments.Spec.Platforms) > 8 || arguments.Spec.TimeoutSeconds < 0 || arguments.Spec.TimeoutSeconds > 86400 {
+		return false
+	}
+	if arguments.Spec.DefinitionPath != "" && !validRelativeBuildPath(arguments.Spec.DefinitionPath) {
+		return false
+	}
+	for _, platform := range arguments.Spec.Platforms {
+		if platform != "linux/amd64" && platform != "linux/arm64" {
+			return false
+		}
+	}
+	if len(arguments.Spec.SecretRefs) > 128 {
+		return false
+	}
+	for _, ref := range arguments.Spec.SecretRefs {
+		if !agentv1.ValidID(ref) {
+			return false
+		}
+	}
+	return true
+}
+
+func validBuildDriver(value string) bool {
+	switch value {
+	case "dockerfile", "buildpacks", "nix", "custom-approved":
+		return true
+	default:
+		return false
+	}
+}
+
+func validRelativeBuildPath(value string) bool {
+	value = strings.TrimSpace(value)
+	clean := filepath.Clean(value)
+	return clean != "" && clean == value && !filepath.IsAbs(clean) && clean != "." && clean != ".." && !strings.Contains(value, `\`) && !strings.HasPrefix(clean, ".."+string(filepath.Separator))
 }
 
 func (h Handler) invokeWorkspace(ctx context.Context, verified agentv2.VerifiedInvocationContext, request agentv2.InvocationRequest) (any, error) {

@@ -270,10 +270,24 @@ func TestWorkspace_VerifiedAgentExecutableRequiresExactGovernedCommandKind(t *te
 			Scope: f.scope, WorkspaceID: ready.WorkspaceID, Kind: "infra_plan", IdempotencyKey: "agent-bypass-2",
 			Spec: workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-tofu-apply"}, TimeoutSeconds: 60, OutputLimitBytes: 4096},
 		},
+		{
+			Scope: f.scope, WorkspaceID: ready.WorkspaceID, Kind: "command", IdempotencyKey: "agent-bypass-3",
+			Spec: workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-build", strings.Repeat("a", 40), `{"driver":"dockerfile"}`}, TimeoutSeconds: 60, OutputLimitBytes: 4096},
+		},
+		{
+			Scope: f.scope, WorkspaceID: ready.WorkspaceID, Kind: "build_execute", IdempotencyKey: "agent-bypass-4",
+			Spec: workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-tofu-plan"}, TimeoutSeconds: 60, OutputLimitBytes: 4096},
+		},
 	} {
 		if _, err := f.service.Exec(context.Background(), request); !errors.Is(err, ErrPolicyDenied) {
 			t.Fatalf("governed workspace-agent bypass err=%v request=%#v", err, request)
 		}
+	}
+	if _, err := f.service.Exec(context.Background(), ExecRequest{
+		Scope: f.scope, WorkspaceID: ready.WorkspaceID, Kind: "build_execute", IdempotencyKey: "agent-build-1",
+		Spec: workspacev1.CommandSpec{Argv: []string{"workspace-agent", "verified-build", strings.Repeat("a", 40), `{"driver":"dockerfile"}`}, TimeoutSeconds: 60, OutputLimitBytes: 4096},
+	}); err != nil {
+		t.Fatalf("governed build command rejected: %v", err)
 	}
 }
 
