@@ -1,0 +1,108 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: legacy-quarantine
+  namespace: legacy-argocd
+spec:
+  description: Operator-owned legacy apps excluded from the AI-native PaaS runtime.
+  sourceRepos:
+    - https://github.com/VileBody/rec-sidecar-mvp.git
+    - https://github.com/VileBody/vietnam-rent-miniapp.git
+  destinations:
+    - namespace: rec-sidecar
+      server: https://kubernetes.default.svc
+    - namespace: vietnam-rent
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceBlacklist:
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
+    - group: rbac.authorization.k8s.io
+      kind: Role
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rec-sidecar
+  namespace: legacy-argocd
+  labels:
+    ai-native-paas.io/scope: legacy-quarantine
+spec:
+  project: legacy-quarantine
+  source:
+    repoURL: https://github.com/VileBody/rec-sidecar-mvp.git
+    targetRevision: 59a6e0c8fe0cfb4022988a9bc3ce5cf43b0d3102
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rec-sidecar
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
+        - /spec/template/spec/imagePullSecrets
+        - /spec/template/spec/nodeSelector
+    - group: ""
+      kind: PersistentVolumeClaim
+      jsonPointers:
+        - /spec/storageClassName
+        - /spec/resources/requests/storage
+    - group: apps
+      kind: Deployment
+      name: clean-start-edge
+      jsonPointers:
+        - /spec/template/spec/containers/0/volumeMounts
+        - /spec/template/spec/volumes
+    - group: ""
+      kind: ConfigMap
+      name: clean-start-edge-caddy
+      jsonPointers:
+        - /data
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - RespectIgnoreDifferences=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vietnam-rent
+  namespace: legacy-argocd
+  labels:
+    ai-native-paas.io/scope: legacy-quarantine
+spec:
+  project: legacy-quarantine
+  source:
+    repoURL: https://github.com/VileBody/vietnam-rent-miniapp.git
+    targetRevision: eb19e80905554639a28d16c9a1538578ae00cf7b
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vietnam-rent
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
+        - /spec/template/spec/imagePullSecrets
+        - /spec/template/spec/nodeSelector
+    - group: ""
+      kind: PersistentVolumeClaim
+      jsonPointers:
+        - /spec/storageClassName
+        - /spec/resources/requests/storage
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - RespectIgnoreDifferences=true

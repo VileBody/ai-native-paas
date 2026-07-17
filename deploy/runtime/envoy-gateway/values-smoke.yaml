@@ -1,0 +1,21 @@
+global:
+  images:
+    envoyGateway:
+      image: docker.io/envoyproxy/gateway@sha256:6b86fcef4f012fff1edc452db891ae6d09757e385305c73f5022c32550258d26
+      pullPolicy: IfNotPresent
+crds:
+  enabled: true
+deployment:
+  replicas: 1
+  envoyGateway:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+service:
+  type: ClusterIP
+hpa:
+  enabled: false

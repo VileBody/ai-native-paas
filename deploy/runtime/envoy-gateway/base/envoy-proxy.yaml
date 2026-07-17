@@ -1,0 +1,47 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: runtime-proxy
+  namespace: envoy-gateway-system
+spec:
+  ipFamily: IPv4
+  shutdown:
+    drainTimeout: 30s
+    minDrainDuration: 5s
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        replicas: 1
+        container:
+          image: docker.io/envoyproxy/envoy@sha256:574348fada8eb1130b448132287d76626dfb07525b16668075382f8e154a45a8
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1
+              memory: 512Mi
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: shutdown-manager
+                      image: docker.io/envoyproxy/gateway@sha256:6b86fcef4f012fff1edc452db891ae6d09757e385305c73f5022c32550258d26
+      envoyService:
+        type: NodePort
+        externalTrafficPolicy: Cluster
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              ports:
+                - port: 80
+                  nodePort: 30080
+                - port: 443
+                  nodePort: 30443
+      envoyPDB:
+        minAvailable: 0

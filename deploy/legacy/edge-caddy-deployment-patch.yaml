@@ -1,0 +1,13 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: caddy
+          volumeMounts:
+            - name: legacy-tls
+              mountPath: /etc/caddy/legacy-tls
+              readOnly: true
+      volumes:
+        - name: legacy-tls
+          secret:
+            secretName: legacy-edge-caddy-tls

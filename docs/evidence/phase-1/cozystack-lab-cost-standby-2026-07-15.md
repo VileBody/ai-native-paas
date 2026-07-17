@@ -65,12 +65,14 @@ Preset `6633` was priced by the live provider API at `19,900 RUB/month` per
 server on the deletion date. Removing both retained servers stops approximately
 `39,800 RUB/month` of idle compute allocation.
 
-The stack now has `lab_enabled=false` by default. With that default, a live
-remote-state plan reports no changes and no provider resource actions. A future
-live gate must deliberately export `TF_VAR_lab_enabled=true` and the separate
-exact cost acknowledgement. The plan also rejects a partial node set. After its
-evidence and backups are retained, the complete lab is destroyed again.
+The stack now has `cozystack_profile=off`, `lab_enabled=false`, and
+`ipv4_enabled=false` by default. With those defaults, a live remote-state plan
+reports no provider resource actions. Future `smoke` and `provider_gate`
+profiles have fixed three-node shapes, separate exact cost acknowledgements,
+and require the independently authorized IPv4 gate. A non-zero profile can only
+be entered from `off`; moving between non-zero sizes requires backup and full
+recreation so disks are never shrunk in place.
 
-Verification proved all three guard states: the configuration validates, an
-enabled lab without the exact acknowledgement is rejected during plan, and the
-default standby profile produces a zero-change live remote-state plan.
+Verification proved the configuration validates, an enabled profile without
+IPv4/cost/transition guards is rejected, and the default off profile produces
+zero live provider resource actions.

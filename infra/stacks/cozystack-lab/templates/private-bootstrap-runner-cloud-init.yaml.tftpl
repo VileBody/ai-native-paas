@@ -1,0 +1,117 @@
+#cloud-config
+package_update: false
+package_upgrade: false
+ssh_pwauth: false
+disable_root: true
+write_files:
+  - path: /usr/local/sbin/ai-native-paas-talos-bootstrap
+    owner: root:root
+    permissions: "0700"
+    content: |
+      #!/usr/bin/env bash
+      set -Eeuo pipefail
+      umask 077
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      work=/run/ai-native-paas-bootstrap
+      mkdir -p "$work"
+      cleanup() {
+        find "$work" -type f -exec shred -fuz {} + 2>/dev/null || true
+        rm -rf "$work"
+      }
+      trap cleanup EXIT
+
+      decode() { printf '%s' "$1" | base64 -d; }
+      bundle_url="$(decode '${bundle_url_base64}')"
+      passphrase="$(decode '${decryption_passphrase_base64}')"
+      evidence_url="$(decode '${evidence_upload_url_base64}')"
+      talosctl_url="$(decode '${talosctl_url_base64}')"
+
+      # Keep the one-shot runner private-only while giving it outbound access
+      # through network-foundation's shared NAT router.
+      ip route replace default via "${runtime_gateway_ip}" dev eth1
+      resolvectl dns eth1 1.1.1.1
+      resolvectl domain eth1 '~.'
+
+      curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+        --retry 8 --retry-all-errors --connect-timeout 10 --max-time 300 \
+        "$bundle_url" --output "$work/bootstrap.enc"
+      printf '%s  %s\n' '${bundle_sha256}' "$work/bootstrap.enc" | sha256sum --check --status
+      printf '%s' "$passphrase" | openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 \
+        -pass stdin -in "$work/bootstrap.enc" -out "$work/bootstrap.tar.gz"
+      mkdir "$work/input"
+      while IFS= read -r entry; do
+        case "$entry" in
+          /*|../*|*/../*|*/..) echo "unsafe bootstrap archive path" >&2; exit 1 ;;
+        esac
+      done < <(tar --list --gzip --file "$work/bootstrap.tar.gz")
+      tar --extract --gzip --file "$work/bootstrap.tar.gz" --directory "$work/input" \
+        --no-same-owner --no-same-permissions
+      (cd "$work/input" && sha256sum --check --strict MANIFEST.sha256)
+
+      curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+        --retry 8 --retry-all-errors --connect-timeout 10 --max-time 600 \
+        "$talosctl_url" --output "$work/talosctl"
+      printf '%s  %s\n' '${talosctl_sha256}' "$work/talosctl" | sha256sum --check --status
+      chmod 0500 "$work/talosctl"
+
+      for node in 192.168.74.11 192.168.74.12 192.168.74.13; do
+        case "$node" in
+          192.168.74.11) name=cp-1 ;;
+          192.168.74.12) name=cp-2 ;;
+          192.168.74.13) name=cp-3 ;;
+        esac
+        applied=false
+        for attempt in $(seq 1 180); do
+          if "$work/talosctl" apply-config --insecure --nodes "$node" \
+            --file "$work/input/machine-configs/$name.yaml"; then
+            applied=true
+            break
+          fi
+          sleep 10
+        done
+        test "$applied" = true
+      done
+
+      bootstrapped=false
+      for attempt in $(seq 1 90); do
+        if "$work/talosctl" --talosconfig "$work/input/talosconfig" \
+          --nodes 192.168.74.11 --endpoints 192.168.74.11 bootstrap; then
+          bootstrapped=true
+          break
+        fi
+        sleep 10
+      done
+      test "$bootstrapped" = true
+      kubeconfig_ready=false
+      for attempt in $(seq 1 90); do
+        if "$work/talosctl" --talosconfig "$work/input/talosconfig" \
+          --nodes 192.168.74.11 --endpoints 192.168.74.11 \
+          kubeconfig "$work/kubeconfig" --force; then
+          kubeconfig_ready=true
+          break
+        fi
+        sleep 10
+      done
+      test "$kubeconfig_ready" = true
+      "$work/talosctl" --talosconfig "$work/input/talosconfig" \
+        --nodes 192.168.74.11,192.168.74.12,192.168.74.13 \
+        --endpoints 192.168.74.11 health --wait-timeout 15m
+
+      bundle_hash="$(sha256sum "$work/bootstrap.enc" | cut -d' ' -f1)"
+      kubeconfig_hash="$(sha256sum "$work/kubeconfig" | cut -d' ' -f1)"
+      completed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      cat >"$work/evidence.json" <<EOF
+      {"schema":"ai-native-paas.io/talos-bootstrap-evidence/v1","generation":${bootstrap_generation},"nodes":["192.168.74.11","192.168.74.12","192.168.74.13"],"bundle_sha256":"sha256:$bundle_hash","kubeconfig_sha256":"sha256:$kubeconfig_hash","completed_at":"$completed_at","success":true}
+      EOF
+      cp "$work/input/talosconfig" "$work/talosconfig"
+      tar --create --gzip --file "$work/result.tar.gz" --directory "$work" \
+        evidence.json kubeconfig talosconfig
+      printf '%s' "$passphrase" | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 600000 -md sha256 \
+        -pass stdin -in "$work/result.tar.gz" -out "$work/result.enc"
+      curl --fail --silent --show-error --request PUT --upload-file "$work/result.enc" \
+        --proto '=https' --tlsv1.2 --connect-timeout 10 --max-time 300 "$evidence_url"
+      sync
+      shutdown -h now
+runcmd:
+  - [/usr/local/sbin/ai-native-paas-talos-bootstrap]
+final_message: "private Talos bootstrap runner finished"

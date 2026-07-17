@@ -1,0 +1,114 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: legacy-argocd-cluster-reader
+  labels:
+    ai-native-paas.io/scope: legacy-quarantine
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: legacy-argocd-cluster-reader
+  labels:
+    ai-native-paas.io/scope: legacy-quarantine
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: legacy-argocd-cluster-reader
+subjects:
+  - kind: ServiceAccount
+    name: argocd-application-controller
+    namespace: legacy-argocd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: legacy-argocd-namespace-label-manager
+  labels:
+    ai-native-paas.io/scope: legacy-quarantine
+rules:
+  - apiGroups: [""]
+    resources: [namespaces]
+    resourceNames: [rec-sidecar, vietnam-rent]
+    verbs: [get, patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: legacy-argocd-namespace-label-manager
+  labels:
+    ai-native-paas.io/scope: legacy-quarantine
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: legacy-argocd-namespace-label-manager
+subjects:
+  - kind: ServiceAccount
+    name: argocd-application-controller
+    namespace: legacy-argocd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: legacy-argocd-application-manager
+  namespace: rec-sidecar
+  labels:
+    ai-native-paas.io/scope: legacy-quarantine
+rules:
+  - apiGroups: [""]
+    resources: [configmaps, services, persistentvolumeclaims]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: legacy-argocd-application-manager
+  namespace: rec-sidecar
+  labels:
+    ai-native-paas.io/scope: legacy-quarantine
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: legacy-argocd-application-manager
+subjects:
+  - kind: ServiceAccount
+    name: argocd-application-controller
+    namespace: legacy-argocd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: legacy-argocd-application-manager
+  namespace: vietnam-rent
+  labels:
+    ai-native-paas.io/scope: legacy-quarantine
+rules:
+  - apiGroups: [""]
+    resources: [configmaps, services, persistentvolumeclaims]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: legacy-argocd-application-manager
+  namespace: vietnam-rent
+  labels:
+    ai-native-paas.io/scope: legacy-quarantine
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: legacy-argocd-application-manager
+subjects:
+  - kind: ServiceAccount
+    name: argocd-application-controller
+    namespace: legacy-argocd

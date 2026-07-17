@@ -25,6 +25,19 @@ write_files:
       readonly expected_raw_size="${talos_raw_size_bytes}"
       readonly timeout_seconds="${talos_bootstrap_timeout_seconds}"
 
+      # Timeweb private networks do not inject a default route or resolver into
+      # the temporary Ubuntu writer. The VPC and its nodes remain private-only;
+      # outbound traffic crosses the separately owned shared NAT router.
+      ip route replace default via "${runtime_gateway_ip}" dev eth1
+      resolvectl dns eth1 1.1.1.1 8.8.8.8
+      resolvectl domain eth1 '~.'
+
+      # Ubuntu sizes /dev/shm to roughly half of RAM. The pinned 4.45 GiB RAW
+      # plus its 348 MB archive does not fit in that default on the 8 GiB smoke
+      # preset. Expand the tmpfs explicitly while retaining about 2 GiB for the
+      # bootstrap OS; allocations remain demand-backed and disappear on reboot.
+      mountpoint -q /dev/shm
+      mount -o remount,size=6G /dev/shm
       install -d -m 0700 "$work"
       available=$(df -B1 --output=avail /dev/shm | tail -1 | tr -d ' ')
       test "$available" -gt $((expected_raw_size + 1073741824))

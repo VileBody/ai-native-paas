@@ -1,0 +1,10 @@
+project_id                 = 1234567
+network_mode               = "off"
+cost_guard_acknowledgement = ""
+kubernetes_api_cidrs       = ["72.56.246.80/32", "5.129.202.241/32"]
+talos_bootstrap_dnat_enabled = false
+talos_bootstrap_source_cidr  = ""
+talos_disk_repair_ssh_enabled     = false
+talos_disk_repair_ssh_source_cidr = ""
+
+# Supply state_passphrase through TF_VAR_state_passphrase.

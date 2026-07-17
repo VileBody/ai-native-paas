@@ -1,0 +1,63 @@
+apiVersion: cozystack.io/v1alpha1
+kind: Package
+metadata:
+  name: cozystack.cozystack-platform
+spec:
+  variant: isp-full-generic
+  components:
+    networking:
+      values:
+        cilium:
+          k8sServiceHost: "192.168.74.6"
+          k8sServicePort: "6443"
+    platform:
+      values:
+        bundles:
+          system:
+            enabled: true
+            variant: isp-full
+          iaas:
+            enabled: false
+          paas:
+            enabled: false
+          naas:
+            enabled: false
+          enabledPackages:
+            - cozystack.victoria-metrics-operator
+          disabledPackages:
+            - cozystack.backup-controller
+            - cozystack.backupstrategy-controller
+            - cozystack.cozystack-basics
+            - cozystack.etcd-application
+            - cozystack.etcd-operator
+            - cozystack.goldpinger
+            - cozystack.grafana-operator
+            - cozystack.info-application
+            - cozystack.kubeovn-plunger
+            - cozystack.metrics-server
+            - cozystack.monitoring-agents
+            - cozystack.monitoring-application
+            - cozystack.objectstorage-controller
+            - cozystack.postgres-operator
+            - cozystack.prometheus-operator-crds
+            - cozystack.seaweedfs-application
+            - cozystack.tenant-application
+            - cozystack.velero
+            - cozystack.vertical-pod-autoscaler
+        publishing:
+          host: cozystack.internal
+          apiServerEndpoint: "https://5.42.126.95:6443"
+          exposedServices: []
+          proxyProtocol: false
+          certificates:
+            issuerName: letsencrypt-stage
+        networking:
+          podCIDR: "10.244.0.0/16"
+          podGateway: "10.244.0.1"
+          serviceCIDR: "10.96.0.0/16"
+          joinCIDR: "100.64.0.0/16"
+          kubeovn:
+            MASTER_NODES: "192.168.74.11,192.168.74.12,192.168.74.13"
+        authentication:
+          oidc:
+            enabled: false
