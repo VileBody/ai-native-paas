@@ -1,6 +1,7 @@
 package contract_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -105,4 +106,63 @@ func TestRuntimeOperatorRBAC_HasNoSecretsOrNamespaceMutation(t *testing.T) {
 	raw := readManifest(t, "deploy/rbac/runtime-operator.yaml")
 	requireAll(t, raw, "resources: [paasapps/status]", "resources: [deployments]", "resources: [services]", "resources: [horizontalpodautoscalers]", "resources: [jobs]", "resources: [httproutes]", "resources: [networkpolicies]")
 	forbidAll(t, raw, "resources: [secrets]", "resources: [namespaces]", "resources: ['*']", "verbs: ['*']")
+}
+
+func TestRuntimeEnvoyGateway_UsesFixedPrivateNodePortsAndScopedRoutes(t *testing.T) {
+	proxy := readManifest(t, "deploy/runtime/envoy-gateway/base/envoy-proxy.yaml")
+	gateway := readManifest(t, "deploy/runtime/envoy-gateway/base/gateway.yaml")
+	requireAll(t, proxy,
+		"type: NodePort", "externalTrafficPolicy: Cluster",
+		"nodePort: 30080", "nodePort: 30443", "replicas: 1",
+		"minAvailable: 0", "ipFamily: IPv4",
+	)
+	requireAll(t, gateway,
+		"kind: Gateway", "gatewayClassName: ai-native-paas-runtime",
+		"protocol: HTTP", "protocol: HTTPS", "mode: Terminate",
+		"name: runtime-wildcard-tls", "from: Selector",
+		"ai-native-paas.io/runtime-project: \"true\"",
+	)
+	forbidAll(t, proxy+gateway, "type: LoadBalancer", "nodePort: 50000", "from: All", "kind: ReferenceGrant")
+}
+
+func TestRuntimeEnvoyGateway_ImagesAndChartAreImmutable(t *testing.T) {
+	raw := readManifest(t, "deploy/runtime/envoy-gateway/images.lock.json")
+	var lock struct {
+		Chart struct {
+			Version string `json:"version"`
+			Digest  string `json:"digest"`
+		} `json:"chart"`
+		Images struct {
+			Gateway string `json:"gateway"`
+			Envoy   string `json:"envoy"`
+		} `json:"images"`
+	}
+	if err := json.Unmarshal([]byte(raw), &lock); err != nil {
+		t.Fatal(err)
+	}
+	if lock.Chart.Version != "v1.8.2" || !strings.HasPrefix(lock.Chart.Digest, "sha256:") {
+		t.Fatalf("Envoy Gateway chart is not pinned: %#v", lock.Chart)
+	}
+	for name, image := range map[string]string{"gateway": lock.Images.Gateway, "envoy": lock.Images.Envoy} {
+		if !strings.Contains(image, "@sha256:") || strings.Contains(image, ":latest") {
+			t.Fatalf("%s image is mutable: %s", name, image)
+		}
+	}
+	manifests := readManifest(t, "deploy/runtime/envoy-gateway/base/envoy-proxy.yaml") +
+		readManifest(t, "deploy/runtime/envoy-gateway/values-smoke.yaml") +
+		readManifest(t, "deploy/runtime/envoy-gateway/values-provider-gate.yaml")
+	for _, image := range []string{lock.Images.Gateway, lock.Images.Envoy} {
+		if !strings.Contains(manifests, image) {
+			t.Errorf("locked image is not used by manifests: %s", image)
+		}
+	}
+}
+
+func TestRuntimeEnvoyGateway_ProviderGateRestoresHA(t *testing.T) {
+	controller := readManifest(t, "deploy/runtime/envoy-gateway/values-provider-gate.yaml")
+	proxy := readManifest(t, "deploy/runtime/envoy-gateway/provider-gate/runtime-proxy-ha-patch.yaml")
+	for _, raw := range []string{controller, proxy} {
+		requireAll(t, raw, "replicas: 2", "podAntiAffinity:", "requiredDuringSchedulingIgnoredDuringExecution:", "minAvailable: 1")
+	}
+	forbidAll(t, controller+proxy, "replicas: 3", "type: LoadBalancer")
 }

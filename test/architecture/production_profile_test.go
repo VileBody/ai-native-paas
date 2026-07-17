@@ -58,3 +58,53 @@ func TestProductionHumanAPIEntrypointsBootstrapPostgresOIDC(t *testing.T) {
 		}
 	}
 }
+
+func TestProductionExecutionAPIsPersistAndVerifyIdentity(t *testing.T) {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve repository root")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", ".."))
+	for _, api := range []string{"agent-api", "attachments-api", "build-api", "runtime-api"} {
+		raw, err := os.ReadFile(filepath.Join(root, "cmd", api, "main.go"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		source := string(raw)
+		for _, required := range []string{
+			"postgresbootstrap.Open(",
+			"postgresbootstrap.WithMigrationLock(",
+			"oidcverify.NewPostgresVerifier(",
+			"httpauth.Middleware{",
+			"verified-identity-middleware",
+		} {
+			if !strings.Contains(source, required) {
+				t.Errorf("%s does not wire production persistence/identity component %q", api, required)
+			}
+		}
+	}
+}
+
+func TestProductionKernelRequiresJetStreamOutboxPublisher(t *testing.T) {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve repository root")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, "cmd", "kernel-api", "main.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(raw)
+	for _, required := range []string{
+		"kernelnats.Connect(",
+		"NATS_URL",
+		"NATS_AUTH_TOKEN",
+		"nats-jetstream-outbox-publisher",
+		"kernel.OutboxDispatcher",
+	} {
+		if !strings.Contains(source, required) {
+			t.Errorf("kernel-api does not wire production event component %q", required)
+		}
+	}
+}

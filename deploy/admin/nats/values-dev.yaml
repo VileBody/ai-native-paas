@@ -1,0 +1,14 @@
+# Overlay for the cost-saving development window. Apply only after the HA
+# recovery gate and a verified JetStream backup/export.
+config:
+  cluster:
+    replicas: 1
+
+podTemplate:
+  topologySpreadConstraints:
+    kubernetes.io/hostname:
+      maxSkew: 1
+      whenUnsatisfiable: ScheduleAnyway
+
+podDisruptionBudget:
+  enabled: false

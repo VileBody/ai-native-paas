@@ -1,1 +1,15 @@
-{}
+{
+  "K14": {"status": "LIVE_ONLY"},
+  "E2E-1": {"status": "LIVE_ONLY"},
+  "E2E-2": {"status": "LIVE_ONLY"},
+  "E2E-3": {"status": "LIVE_ONLY"},
+  "E2E-4": {"status": "LIVE_ONLY"},
+  "E2E-5": {"status": "LIVE_ONLY"},
+  "E2E-6": {"status": "LIVE_ONLY"},
+  "E2E-7": {"status": "LIVE_ONLY"},
+  "E2E-8": {"status": "LIVE_ONLY"},
+  "E2E-9": {"status": "LIVE_ONLY"},
+  "E2E-10": {"status": "LIVE_ONLY"},
+  "E2E-11": {"status": "LIVE_ONLY"},
+  "E2E-12": {"status": "LIVE_ONLY"}
+}

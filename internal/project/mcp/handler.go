@@ -86,7 +86,25 @@ type Handler struct {
 	MergeRequests  RepositoryMergeRequests
 	Secrets        SecretCommands
 	Audit          TaskEvidenceRecorder
+	Dependencies   DependencyGates
 	MaxBodyBytes   int64
+}
+
+// DependencyGates are deployment facts supplied by the control-plane
+// composition root. They make network absence a first-class operation state,
+// not an internal error or a reason to create billable work.
+type DependencyGates struct {
+	WorkspaceNAT  bool
+	RuntimeCell   bool
+	PublicIngress bool
+}
+
+func waitingDependency(code string, value any) map[string]any {
+	result := map[string]any{"status": "WAITING_DEPENDENCY", "dependency_code": code}
+	if value != nil {
+		result["resource"] = value
+	}
+	return result
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -162,12 +180,36 @@ func (h Handler) invoke(w http.ResponseWriter, r *http.Request, claims enrollmen
 		result, err = h.Projects.GetRepositoryForProject(r.Context(), verified.TenantID, verified.ProjectID)
 	case agentv2.ToolRepositoryDiff, agentv2.ToolRepositoryApplyPatch, agentv2.ToolRepositoryCreateBranch, agentv2.ToolRepositoryCommit, agentv2.ToolRepositoryPush, agentv2.ToolRepositoryCreateMergeRequest:
 		result, err = h.invokeRepository(r.Context(), verified, request)
-	case agentv2.ToolWorkspaceCreate, agentv2.ToolWorkspaceGet, agentv2.ToolWorkspaceExec, agentv2.ToolWorkspaceDestroy:
+	case agentv2.ToolWorkspaceCreate, agentv2.ToolWorkspaceGet, agentv2.ToolWorkspaceExec, agentv2.ToolWorkspaceUploadArtifact, agentv2.ToolWorkspaceCancelCommand, agentv2.ToolWorkspaceDestroy:
 		result, err = h.invokeWorkspace(r.Context(), verified, request)
 	case agentv2.ToolInfraPlan, agentv2.ToolInfraGetPlan, agentv2.ToolInfraApply, agentv2.ToolApprovalRequest, agentv2.ToolApprovalGet:
 		result, err = h.invokeInfrastructure(r.Context(), verified, request)
+	case agentv2.ToolInfraInit, agentv2.ToolInfraValidate, agentv2.ToolInfraDestroy, agentv2.ToolInfraStateList, agentv2.ToolInfraImport:
+		if h.Dependencies.WorkspaceNAT {
+			result = waitingDependency("workspace_nat", nil)
+			break
+		}
+		result, err = nil, errors.New("infrastructure workspace adapter is unavailable")
 	case agentv2.ToolSecretSet, agentv2.ToolSecretListMetadata:
 		result, err = h.invokeSecrets(r.Context(), verified, request)
+	case agentv2.ToolBuildExecute:
+		if h.Dependencies.WorkspaceNAT {
+			result = waitingDependency("workspace_nat", nil)
+			break
+		}
+		result, err = nil, errors.New("build execution adapter is unavailable")
+	case agentv2.ToolGitOpsValidate, agentv2.ToolGitOpsCommit, agentv2.ToolArgoCDSync, agentv2.ToolArgoCDGetStatus, agentv2.ToolArgoCDRollback, agentv2.ToolDeploymentGetLogs, agentv2.ToolDeploymentGetEvents:
+		if h.Dependencies.RuntimeCell {
+			result = waitingDependency("runtime_cell", nil)
+			break
+		}
+		result, err = nil, errors.New("runtime adapter is unavailable")
+	case agentv2.ToolDeploymentHTTPProbe:
+		if h.Dependencies.PublicIngress {
+			result = waitingDependency("public_ingress", nil)
+			break
+		}
+		result, err = nil, errors.New("public ingress probe adapter is unavailable")
 	default:
 		writeResponse(w, http.StatusNotImplemented, agentv2.InvocationResponse{
 			APIVersion: agentv2.APIVersion, InvocationID: "read-" + request.CorrelationID,
@@ -686,7 +728,14 @@ func (h Handler) invokeWorkspace(ctx context.Context, verified agentv2.VerifiedI
 		if spec.Validate() != nil {
 			return nil, errInvalidWorkspaceArguments
 		}
-		return h.Workspaces.Create(ctx, workspace.CreateRequest{Scope: scope, IdempotencyKey: request.IdempotencyKey, Spec: spec})
+		created, err := h.Workspaces.Create(ctx, workspace.CreateRequest{Scope: scope, IdempotencyKey: request.IdempotencyKey, Spec: spec})
+		if err != nil {
+			return nil, err
+		}
+		if h.Dependencies.WorkspaceNAT {
+			return waitingDependency("workspace_nat", created), nil
+		}
+		return created, nil
 	case agentv2.ToolWorkspaceGet:
 		var arguments workspaceGetArguments
 		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || strings.TrimSpace(arguments.WorkspaceID) == "" {
@@ -703,11 +752,19 @@ func (h Handler) invokeWorkspace(ctx context.Context, verified agentv2.VerifiedI
 		if strings.TrimSpace(arguments.WorkspaceID) == "" || strings.TrimSpace(arguments.Kind) == "" || spec.Validate() != nil || requiresGovernedInfrastructureTool(arguments.Kind, spec.Argv) || requiresGovernedSourceTool(spec.Argv) {
 			return nil, errInvalidWorkspaceArguments
 		}
+		if h.Dependencies.WorkspaceNAT {
+			return waitingDependency("workspace_nat", map[string]string{"workspace_id": arguments.WorkspaceID}), nil
+		}
 		return h.Workspaces.Exec(ctx, workspace.ExecRequest{
 			Scope: scope, WorkspaceID: arguments.WorkspaceID, IdempotencyKey: request.IdempotencyKey,
 			Kind: arguments.Kind, SerializationKey: arguments.SerializationKey, CredentialLeases: append([]string(nil), arguments.CredentialLeases...),
 			Spec: spec,
 		})
+	case agentv2.ToolWorkspaceUploadArtifact, agentv2.ToolWorkspaceCancelCommand:
+		if h.Dependencies.WorkspaceNAT {
+			return waitingDependency("workspace_nat", nil), nil
+		}
+		return nil, errors.New("workspace command adapter is unavailable")
 	case agentv2.ToolWorkspaceDestroy:
 		var arguments workspaceGetArguments
 		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || strings.TrimSpace(arguments.WorkspaceID) == "" {
@@ -769,6 +826,9 @@ func (h Handler) invokeInfrastructure(ctx context.Context, verified agentv2.Veri
 		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || !validRelativePlanPath(arguments.PlanPath) || h.Workspaces == nil {
 			return nil, errInvalidInfrastructureArguments
 		}
+		if h.Dependencies.WorkspaceNAT {
+			return waitingDependency("workspace_nat", map[string]string{"workspace_id": arguments.WorkspaceID}), nil
+		}
 		revision, err := h.Workspaces.GetSourceRevision(ctx, workspace.Scope{
 			TenantID: verified.TenantID, ProjectID: verified.ProjectID, ActorID: verified.AgentID,
 		}, arguments.WorkspaceID)
@@ -809,7 +869,7 @@ func (h Handler) invokeInfrastructure(ctx context.Context, verified agentv2.Veri
 			SourceSHA: arguments.SourceSHA, IdempotencyKey: request.IdempotencyKey, StateGeneration: arguments.StateGeneration,
 		})
 		if errors.Is(err, infraapp.ErrDependencyPending) {
-			return map[string]any{"status": "WAITING_DEPENDENCY", "command": command}, nil
+			return waitingDependency("workspace_nat", command), nil
 		}
 		return result, err
 	case agentv2.ToolInfraGetPlan:
@@ -828,6 +888,9 @@ func (h Handler) invokeInfrastructure(ctx context.Context, verified agentv2.Veri
 		var arguments infraApplyArguments
 		if err := agentv2.DecodeStrict(request.Arguments, &arguments); err != nil || !validRelativePlanPath(arguments.PlanPath) {
 			return nil, errInvalidInfrastructureArguments
+		}
+		if h.Dependencies.WorkspaceNAT {
+			return waitingDependency("workspace_nat", nil), nil
 		}
 		plan, err := h.Infrastructure.GetPlan(ctx, verified.TenantID, verified.ProjectID, arguments.PlanID)
 		if err != nil {

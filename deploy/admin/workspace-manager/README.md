@@ -15,8 +15,8 @@ The manifest is intentionally not self-bootstrapping. Apply it only after:
    workspace client CA;
 3. the current signed workspace VM artifact is imported and locked in the
    `workspace-images` remote state;
-4. Timeweb balance is restored, the workspace NAT router and both LoadBalancer
-   services exist, and DNS/TLS names resolve;
+4. the workspace NAT router exists and the preserved legacy edge routes a
+   dedicated TLS listener to the internal `workspace-manager` ClusterIP;
 5. `workspace-manager-release` contains the exact project/configurator/VPC/image
    values and the final agent/gateway URLs and `/32` gateway policy.
 
@@ -25,3 +25,4 @@ The manifest is intentionally not self-bootstrapping. Apply it only after:
 provider before changing them.
 
 The deployment must not be applied while any release input is a placeholder.
+The manifest never creates a LoadBalancer or IPv4 of its own.

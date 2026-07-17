@@ -15,6 +15,11 @@ no secret values. Before applying it, an operator must create:
   `OIDC_ISSUER` and `OIDC_CLIENT_ID`;
 - `project-api-release` with the verified imported workspace VM image digest.
 
+The checked-in `project-api-dependencies` ConfigMap is deliberately fail-closed.
+Its three readiness facts stay `false` in `off`; a live-window overlay may set
+one to `true` only after its corresponding NAT/runtime/ingress probe succeeds.
+Unset or malformed values also keep MCP mutations in `WAITING_DEPENDENCY`.
+
 The GitLab token must be the bot for the dedicated private beta group, not a
 personal or group-wide human token. `MCP_BASE_URL` must be the final HTTPS API
 origin. OIDC memberships are seeded separately and remain invite-only.

@@ -18,12 +18,18 @@ output "admin_router_id" {
   value = twc_router.admin.id
 }
 
+output "legacy_edge_public_ip" {
+  description = "Existing router IPv4 used by ADR 0006; this is not a new allocation."
+  value       = twc_floating_ip.admin_egress.ip
+}
+
 output "ci_node_group_id" {
   value = twc_k8s_node_group.ci.id
 }
 
 output "system_node_group_id" {
-  value = twc_k8s_node_group.system.id
+  description = "System node group id, or null while admin_capacity_mode is off."
+  value       = try(twc_k8s_node_group.system[0].id, null)
 }
 
 output "control_plane_database_id" {
@@ -44,6 +50,10 @@ output "control_plane_database_login" {
 
 output "control_plane_database_name" {
   value = twc_database_instance.control_plane.name
+}
+
+output "integration_test_database_name" {
+  value = twc_database_instance.integration_test.name
 }
 
 output "control_plane_database_password" {

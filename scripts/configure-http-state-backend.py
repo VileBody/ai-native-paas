@@ -9,7 +9,13 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / ".state-backend"
-NAMESPACES = ("admin", "cozystack-lab", "workspace-images", "state-bootstrap")
+NAMESPACES = (
+    "admin",
+    "network-foundation",
+    "cozystack-lab",
+    "workspace-images",
+    "state-bootstrap",
+)
 
 
 def main():

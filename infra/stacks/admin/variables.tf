@@ -14,6 +14,17 @@ variable "state_passphrase" {
   }
 }
 
+variable "legacy_edge_private_ip" {
+  description = "Private IP of the CI worker receiving the temporary ADR 0006 NodePorts."
+  type        = string
+  default     = "192.168.73.5"
+
+  validation {
+    condition     = can(cidrhost("${var.legacy_edge_private_ip}/32", 0))
+    error_message = "legacy_edge_private_ip must be an IPv4 address."
+  }
+}
+
 variable "location" {
   description = "Timeweb Cloud location. ru-3 is Moscow."
   type        = string
@@ -50,14 +61,14 @@ variable "system_worker_preset_id" {
   default     = 1685
 }
 
-variable "system_worker_count" {
-  description = "Dedicated admin-services workers."
-  type        = number
-  default     = 3
+variable "admin_capacity_mode" {
+  description = "Admin service capacity: off removes the system node group, dev uses one system worker, and ha uses three."
+  type        = string
+  default     = "ha"
 
   validation {
-    condition     = var.system_worker_count >= 3 && var.system_worker_count <= 6
-    error_message = "admin HA requires between three and six system workers."
+    condition     = contains(["off", "dev", "ha"], var.admin_capacity_mode)
+    error_message = "admin_capacity_mode must be off, dev, or ha."
   }
 }
 

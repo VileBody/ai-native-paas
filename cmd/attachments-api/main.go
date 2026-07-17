@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log"
 	"net/http"
@@ -12,16 +13,68 @@ import (
 	"time"
 
 	"github.com/keir-research/ai-native-paas/internal/attachments/application"
+	"github.com/keir-research/ai-native-paas/internal/attachments/certificate"
+	"github.com/keir-research/ai-native-paas/internal/attachments/cozystack"
 	"github.com/keir-research/ai-native-paas/internal/attachments/devadapter"
+	"github.com/keir-research/ai-native-paas/internal/attachments/dns"
 	"github.com/keir-research/ai-native-paas/internal/attachments/domain"
 	"github.com/keir-research/ai-native-paas/internal/attachments/httpapi"
 	"github.com/keir-research/ai-native-paas/internal/attachments/memory"
 	"github.com/keir-research/ai-native-paas/internal/attachments/openbao"
 	attachmentspostgres "github.com/keir-research/ai-native-paas/internal/attachments/postgres"
+	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
+	"github.com/keir-research/ai-native-paas/internal/identity/oidcverify"
 	"github.com/keir-research/ai-native-paas/internal/platformprofile"
 	"github.com/keir-research/ai-native-paas/internal/postgresbootstrap"
 	attachmentsv1 "github.com/keir-research/ai-native-paas/pkg/contracts/attachments/v1"
+	commercev1 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1"
 )
+
+type postgresEnvironmentDirectory struct{ db *sql.DB }
+
+func (d postgresEnvironmentDirectory) ResolveEnvironment(ctx context.Context, tenant, id string) (application.EnvironmentRef, error) {
+	var ref application.EnvironmentRef
+	var ready bool
+	err := d.db.QueryRowContext(ctx, `SELECT e.tenant_id,e.application_id,e.id,e.name,(a.lifecycle='ACTIVE') FROM runtime.environments e JOIN runtime.applications a ON a.id=e.application_id WHERE e.id=$1 AND e.tenant_id=$2`, id, tenant).Scan(&ref.TenantID, &ref.ApplicationID, &ref.EnvironmentID, &ref.Name, &ready)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ref, domain.NewError(domain.CodeNotFound, "environment not found")
+	}
+	if err != nil {
+		return ref, domain.Wrap(domain.CodeUnavailable, "environment directory query failed", err)
+	}
+	ref.Ready = ready
+	return ref, nil
+}
+
+type denyApprovals struct{}
+
+func (denyApprovals) Verify(context.Context, string, application.ApprovalBinding) error {
+	return domain.NewError(domain.CodeUnavailable, "approval service dependency is not installed")
+}
+
+type deferredRuntime struct{}
+
+func (deferredRuntime) Publish(context.Context, attachmentsv1.AttachmentSnapshot) error {
+	return domain.NewError(domain.CodeUnavailable, "runtime_cell dependency is not installed")
+}
+
+type deferredCommerce struct{}
+
+func (deferredCommerce) Check(context.Context, commercev1.EntitlementRequest) (commercev1.EntitlementDecision, error) {
+	return commercev1.EntitlementDecision{Allowed: false, Reason: "commerce dependency is not installed", PolicyVersion: "network-deferred-v1"}, nil
+}
+
+type deferredUsage struct{}
+
+func (deferredUsage) Append(context.Context, commercev1.UsageEvent) error {
+	return domain.NewError(domain.CodeUnavailable, "usage sink dependency is not installed")
+}
+
+type structuredLogger struct{}
+
+func (structuredLogger) Log(_ context.Context, event string, fields map[string]string) {
+	log.Printf("attachments event=%s field_count=%d", event, len(fields))
+}
 
 func env(name, fallback string) string {
 	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
@@ -41,15 +94,26 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	adapters := []platformprofile.Adapter{
-		platformprofile.Dev("openbao-memory-backend"),
-		platformprofile.Dev("managed-provider-development-gateways"),
-		platformprofile.Dev("development-identity-headers"),
-	}
+	var adapters []platformprofile.Adapter
 	if profile == platformprofile.Production {
-		adapters = append(adapters, platformprofile.Prod("attachments-postgres-store"))
+		adapters = []platformprofile.Adapter{
+			platformprofile.Prod("attachments-postgres-store"),
+			platformprofile.Prod("openbao-kv-v2-write-only-secrets"),
+			platformprofile.Prod("runtime-postgres-environment-directory"),
+			platformprofile.Prod("oidc-jwks-verifier"),
+			platformprofile.Prod("postgres-membership-resolver"),
+			platformprofile.Prod("verified-identity-middleware"),
+			platformprofile.Prod("fail-closed-cozystack-until-runtime-cell"),
+			platformprofile.Prod("fail-closed-dns-acme-until-network-gate"),
+			platformprofile.Prod("fail-closed-approval-commerce-runtime-gateways"),
+		}
 	} else {
-		adapters = append(adapters, platformprofile.Dev("attachments-memory-store"))
+		adapters = []platformprofile.Adapter{
+			platformprofile.Dev("attachments-memory-store"),
+			platformprofile.Dev("openbao-memory-backend"),
+			platformprofile.Dev("managed-provider-development-gateways"),
+			platformprofile.Dev("development-identity-headers"),
+		}
 	}
 	if _, err := platformprofile.Validate(string(profile), "attachments-api", adapters...); err != nil {
 		log.Fatal(err)
@@ -62,8 +126,19 @@ func main() {
 	environmentID := env("ATTACHMENTS_DEV_ENVIRONMENT_ID", "env-local")
 
 	var (
-		store       application.Store
-		storageName string
+		store         application.Store
+		storageName   string
+		environments  application.EnvironmentDirectory
+		secrets       application.SecretProvider
+		provider      application.ManagedServiceProvider
+		dnsResolver   application.DNSResolver
+		certificates  application.CertificateProvider
+		approvals     application.ApprovalVerifier
+		runtimeTarget application.RuntimeSnapshotPublisher
+		commerce      application.CommercialEntitlementPort
+		usage         application.UsageSink
+		logger        application.StructuredLogger
+		oidcVerifier  httpauth.OIDCVerifier
 	)
 	if profile == platformprofile.Production {
 		db, openErr := postgresbootstrap.Open(ctx, os.Getenv("DATABASE_URL"))
@@ -78,30 +153,53 @@ func main() {
 		if migrateErr := postgresbootstrap.WithMigrationLock(ctx, db, "attachments", postgresStore.Migrate); migrateErr != nil {
 			log.Fatal(migrateErr)
 		}
+		backend, backendErr := openbao.NewKVV2Backend(openbao.KVV2Config{
+			Address: env("OPENBAO_ADDR", ""), TokenFile: env("OPENBAO_TOKEN_FILE", ""), Mount: env("OPENBAO_KV_MOUNT", "attachments"),
+		})
+		if backendErr != nil {
+			log.Fatal(backendErr)
+		}
+		verifier, verifierErr := oidcverify.NewPostgresVerifier(ctx, db, os.Getenv("OIDC_ISSUER"), os.Getenv("OIDC_CLIENT_ID"))
+		if verifierErr != nil {
+			log.Fatal(verifierErr)
+		}
 		store = postgresStore
 		storageName = "postgres"
+		environments = postgresEnvironmentDirectory{db: db}
+		secrets = openbao.Adapter{Backend: backend}
+		provider = cozystack.Adapter{}
+		dnsResolver = dns.Adapter{}
+		certificates = certificate.Adapter{}
+		approvals, runtimeTarget, commerce, usage, logger = denyApprovals{}, deferredRuntime{}, deferredCommerce{}, deferredUsage{}, structuredLogger{}
+		oidcVerifier = verifier
 	} else {
 		store = memory.New()
 		storageName = "memory-development-only"
-	}
-	backend := openbao.NewMemoryBackend()
-	service := &application.Service{
-		Store: store,
-		Environments: devadapter.NewEnvironments(application.EnvironmentRef{
+		backend := openbao.NewMemoryBackend()
+		environments = devadapter.NewEnvironments(application.EnvironmentRef{
 			TenantID: tenantID, ApplicationID: applicationID, EnvironmentID: environmentID, Name: "production", Ready: true,
-		}),
-		Secrets:             openbao.Adapter{Backend: backend},
-		Provider:            devadapter.NewManagedProvider(),
-		DNS:                 devadapter.NewDNS(),
-		Certificates:        devadapter.Certificates{},
-		Approvals:           devadapter.Approvals{},
-		Runtime:             devadapter.NewRuntime(),
-		Commerce:            devadapter.Commerce{},
-		Usage:               devadapter.Usage{},
-		Logger:              devadapter.Logger{},
+		})
+		secrets = openbao.Adapter{Backend: backend}
+		provider = devadapter.NewManagedProvider()
+		dnsResolver = devadapter.NewDNS()
+		certificates = devadapter.Certificates{}
+		approvals, runtimeTarget, commerce, usage, logger = devadapter.Approvals{}, devadapter.NewRuntime(), devadapter.Commerce{}, devadapter.Usage{}, devadapter.Logger{}
+	}
+	service := &application.Service{
+		Store:               store,
+		Environments:        environments,
+		Secrets:             secrets,
+		Provider:            provider,
+		DNS:                 dnsResolver,
+		Certificates:        certificates,
+		Approvals:           approvals,
+		Runtime:             runtimeTarget,
+		Commerce:            commerce,
+		Usage:               usage,
+		Logger:              logger,
 		Clock:               application.RealClock{},
 		IDs:                 &application.SequentialIDs{},
-		DefaultDomain:       env("ATTACHMENTS_DEFAULT_DOMAIN", "apps.localhost"),
+		DefaultDomain:       env("ATTACHMENTS_DEFAULT_DOMAIN", "network-deferred.invalid"),
 		DNSObservationDelay: time.Second,
 		DomainQuarantine:    24 * time.Hour,
 	}
@@ -113,9 +211,11 @@ func main() {
 	mustPlan(service, redis)
 	mustPlan(service, s3)
 
+	var handler http.Handler = httpapi.Handler{Attachments: service, MaxBodyBytes: 1 << 20}
+	handler = (httpauth.Middleware{Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}}}).Wrap(handler)
 	server := &http.Server{
 		Addr:              env("ATTACHMENTS_API_ADDR", ":8084"),
-		Handler:           httpapi.Handler{Attachments: service, MaxBodyBytes: 1 << 20},
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -123,7 +223,7 @@ func main() {
 	}
 	failures := make(chan error, 1)
 	go func() {
-		log.Printf("attachments-api listening on %s (storage=%s profile=%s; development gateways)", server.Addr, storageName, profile)
+		log.Printf("attachments-api listening on %s (storage=%s profile=%s)", server.Addr, storageName, profile)
 		failures <- server.ListenAndServe()
 	}()
 

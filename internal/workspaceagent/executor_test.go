@@ -114,30 +114,30 @@ func TestWorkspaceAgentExecutor_SeparatesTaskUIDFromIdentityReader(t *testing.T)
 
 func TestWorkspaceAgentExecutor_TimeoutTerminatesForkedProcessGroup(t *testing.T) {
 	root := t.TempDir()
-	pidFile := filepath.Join(root, "child.pid")
-	code := `import os,time; child=os.fork(); (open(` + strconv.Quote(pidFile) + `,"w").write(str(os.getpid())), time.sleep(60)) if child == 0 else time.sleep(60)`
+	pidFile := filepath.Join(root, "process-group.pid")
+	code := `import os,time; f=open(` + strconv.Quote(pidFile) + `,"w"); f.write(str(os.getpid())); f.flush(); os.fsync(f.fileno()); f.close(); os.fork(); time.sleep(60)`
 	executor := Executor{WorkspaceRoot: root, Policy: workspace.DefaultCommandPolicy(), Now: time.Now, KillGrace: 100 * time.Millisecond}
 	result, err := executor.Execute(context.Background(), "command-1", workspacev1.CommandSpec{
-		Argv: []string{"python3", "-c", code}, WorkingDir: "", TimeoutSeconds: 1, OutputLimitBytes: 4096,
+		Argv: []string{"python3", "-c", code}, WorkingDir: "", TimeoutSeconds: 10, OutputLimitBytes: 4096,
 	}, ResolvedEnvironment{Values: map[string]string{}})
 	if err != nil || result.State != workspacev1.CommandTimedOut || !result.ProcessTreeTerminated {
 		t.Fatalf("timeout result=%#v err=%v", result, err)
 	}
 	raw, err := os.ReadFile(pidFile)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("read process group pid: %v stdout=%q stderr=%q", err, result.Stdout, result.Stderr)
 	}
-	pid, err := strconv.Atoi(strings.TrimSpace(string(raw)))
+	pgid, err := strconv.Atoi(strings.TrimSpace(string(raw)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		err = syscall.Kill(pid, 0)
+		err = syscall.Kill(-pgid, 0)
 		if errors.Is(err, syscall.ESRCH) {
 			return
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	t.Fatalf("forked child process %d survived timeout: %v", pid, err)
+	t.Fatalf("workspace command process group %d survived timeout: %v", pgid, err)
 }

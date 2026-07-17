@@ -138,7 +138,16 @@ func main() {
 
 	projectHandler := projecthttp.Handler{Projects: projects, Infrastructure: infrastructureService, SourceChanges: workspaceService, MaxBodyBytes: 64 << 10}
 	enrollmentHandler := enrollmenthttp.Handler{Enrollment: enrollmentService, MaxBodyBytes: 64 << 10}
-	mcpHandler := projectmcp.Handler{Enrollment: enrollmentService, Projects: source, Workspaces: workspaceService, Infrastructure: infrastructureService, SourceChanges: workspaceService, MergeRequests: source, MaxBodyBytes: agentv2.MaximumArgumentsBytes + (64 << 10)}
+	mcpHandler := projectmcp.Handler{
+		Enrollment: enrollmentService, Projects: source, Workspaces: workspaceService,
+		Infrastructure: infrastructureService, SourceChanges: workspaceService, MergeRequests: source,
+		Dependencies: projectmcp.DependencyGates{
+			WorkspaceNAT:  dependencyUnavailable("WORKSPACE_NAT_READY"),
+			RuntimeCell:   dependencyUnavailable("RUNTIME_CELL_READY"),
+			PublicIngress: dependencyUnavailable("PUBLIC_INGRESS_READY"),
+		},
+		MaxBodyBytes: agentv2.MaximumArgumentsBytes + (64 << 10),
+	}
 	humanHandler := (httpauth.Middleware{
 		Profile: profile, OIDC: oidcVerifier, PublicPaths: map[string]struct{}{`/healthz`: {}},
 	}).Wrap(projectHandler)
@@ -210,4 +219,16 @@ func env(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// dependencyUnavailable is fail-closed. Network/runtime mutations remain in
+// WAITING_DEPENDENCY until the deployment explicitly supplies a true readiness
+// fact; an unset or malformed value can never enable billable work.
+func dependencyUnavailable(name string) bool {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return true
+	}
+	ready, err := strconv.ParseBool(value)
+	return err != nil || !ready
 }

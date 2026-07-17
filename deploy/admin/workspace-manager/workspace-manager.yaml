@@ -273,8 +273,7 @@ metadata:
   annotations:
     ai-native-paas.io/exposure: workspace-agent-mtls-only
 spec:
-  type: LoadBalancer
-  externalTrafficPolicy: Cluster
+  type: ClusterIP
   selector:
     app.kubernetes.io/name: workspace-manager
   ports:

@@ -1,3 +1,8 @@
+locals {
+  system_worker_count   = var.admin_capacity_mode == "ha" ? 3 : var.admin_capacity_mode == "dev" ? 1 : 0
+  system_worker_enabled = local.system_worker_count > 0
+}
+
 resource "twc_vpc" "platform" {
   name        = "ai-native-paas-msk"
   description = "Private Moscow network for AI-native DevOps admin services."
@@ -35,9 +40,32 @@ resource "twc_router" "admin" {
   }
 }
 
+# Temporary edge for the operator-owned workloads documented by ADR 0006.
+# It reuses the admin router IPv4 and forwards only the two ports expected by
+# the retained SPB load balancer. No new public address is allocated.
+resource "twc_router_dnat_rule" "legacy_http" {
+  router_id = twc_router.admin.id
+  protocol  = "tcp"
+
+  public_ip   = twc_floating_ip.admin_egress.ip
+  public_port = "30870"
+  local_ip    = var.legacy_edge_private_ip
+  local_port  = "30870"
+}
+
+resource "twc_router_dnat_rule" "legacy_https" {
+  router_id = twc_router.admin.id
+  protocol  = "tcp"
+
+  public_ip   = twc_floating_ip.admin_egress.ip
+  public_port = "30443"
+  local_ip    = var.legacy_edge_private_ip
+  local_port  = "31443"
+}
+
 resource "twc_k8s_cluster" "platform" {
   name              = "ai-native-paas-test"
-  description       = "Admin control plane Kubernetes cluster. User workloads are forbidden."
+  description       = "Admin control plane. PaaS tenant workloads are forbidden. ADR 0006 quarantines operator legacy apps."
   project_id        = var.project_id
   preset_id         = var.master_preset_id
   version           = var.kubernetes_version
@@ -68,10 +96,12 @@ moved {
 }
 
 resource "twc_k8s_node_group" "system" {
+  count = local.system_worker_enabled ? 1 : 0
+
   cluster_id        = twc_k8s_cluster.platform.id
   name              = "system-workers"
   preset_id         = var.system_worker_preset_id
-  node_count        = var.system_worker_count
+  node_count        = local.system_worker_count
   is_autohealing    = true
   is_autoscaling    = false
   public_ip_enabled = false
@@ -87,6 +117,11 @@ resource "twc_k8s_node_group" "system" {
     value  = "true"
     effect = "NoSchedule"
   }
+}
+
+moved {
+  from = twc_k8s_node_group.system
+  to   = twc_k8s_node_group.system[0]
 }
 
 resource "random_password" "control_plane" {
@@ -124,6 +159,12 @@ resource "twc_database_instance" "control_plane" {
   description = "Admin/control-plane data only; never user-managed databases."
 }
 
+resource "twc_database_instance" "integration_test" {
+  cluster_id  = twc_database_cluster.control_plane.id
+  name        = "ai_native_paas_integration_test"
+  description = "Destructive PostgreSQL integration-test database; never used by production services."
+}
+
 resource "twc_database_user" "control_plane" {
   cluster_id  = twc_database_cluster.control_plane.id
   login       = "platform_admin"
@@ -133,6 +174,21 @@ resource "twc_database_user" "control_plane" {
 
   instance {
     instance_id = twc_database_instance.control_plane.id
+    privileges = [
+      "SELECT",
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "CREATE",
+      "TRUNCATE",
+      "REFERENCES",
+      "TRIGGER",
+      "TEMPORARY",
+    ]
+  }
+
+  instance {
+    instance_id = twc_database_instance.integration_test.id
     privileges = [
       "SELECT",
       "INSERT",

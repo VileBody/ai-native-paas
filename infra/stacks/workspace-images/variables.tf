@@ -14,22 +14,26 @@ variable "state_passphrase" {
   }
 }
 
-variable "location" {
-  description = "Moscow Timeweb location."
+variable "workspace_vpc_id" {
+  description = "Workspace VPC ID from the network-foundation state."
   type        = string
-  default     = "ru-3"
 }
 
-variable "availability_zone" {
-  description = "Moscow availability zone for the workspace NAT address."
+variable "workspace_router_id" {
+  description = "Optional live shared router ID from network-foundation; empty while network mode is off."
   type        = string
-  default     = "msk-1"
+  default     = ""
 }
 
-variable "router_preset_id" {
-  description = "Timeweb one-node 1 vCPU router preset in ru-3."
-  type        = number
-  default     = 2009
+variable "workspace_nat_ip" {
+  description = "Reviewed shared egress IPv4 from network-foundation."
+  type        = string
+  default     = "72.56.234.22"
+
+  validation {
+    condition     = var.workspace_nat_ip == "72.56.234.22"
+    error_message = "workspace_nat_ip must remain the reviewed 72.56.234.22 reservation."
+  }
 }
 
 variable "image_staging_bucket_name" {

@@ -1,0 +1,167 @@
+# Template for the fallback Talos bootstrap path that runs from the admin
+# Kubernetes cluster when a private Timeweb bootstrap VM cannot be created.
+# Render `${GENERATION}` before apply and create the matching Secret/ConfigMap:
+#   Secret talos-bootstrap-generation-${GENERATION}: bootstrap.enc, passphrase, stage.json
+#   ConfigMap talos-bootstrap-generation-${GENERATION}: bootstrap.sh
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: talos-bootstrap-generation-${GENERATION}
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: talos-bootstrap
+    ai-native-paas.io/ephemeral: "true"
+    ai-native-paas.io/generation: "${GENERATION}"
+spec:
+  activeDeadlineSeconds: 1800
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: talos-bootstrap
+        ai-native-paas.io/generation: "${GENERATION}"
+    spec:
+      hostNetwork: true
+      dnsPolicy: Default
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: craas-ai-native-paas-registry
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: private-tls-transport
+          image: cr-internal.twcstorage.ru/cilium/cilium:v1.19.5@sha256:20fbbc14ac20b55a292c0dcda5571bf31cde30a7dbc68c29db3e709390ab0732
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              for rule in '192.168.74.11 50011' '192.168.74.12 50012' '192.168.74.13 50013'; do
+                set -- $rule
+                /usr/sbin/xtables-nft-multi iptables --wait -t nat -A OUTPUT \
+                  -p tcp -d "$1" --dport 50000 -m owner --uid-owner 999 \
+                  -j DNAT --to-destination "72.56.234.22:$2"
+              done
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_ADMIN
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      containers:
+        - name: bootstrap
+          image: ai-native-paas-registry.registry.twcstorage.ru/platform/talos-bootstrap@sha256:f2f7ff8d1d439f6592655f034aca346de5925f9bcb6ca38166dce31801895ac0
+          imagePullPolicy: IfNotPresent
+          command:
+            - /usr/bin/bash
+            - -ec
+          args:
+            - |
+              trap 'touch /coord/bootstrap.finished' EXIT
+              cp /secrets/bootstrap.enc /work/bootstrap.enc
+              extract() { sed -n "s/.*\"$1\": \"\([^\"]*\)\".*/\1/p" /secrets/stage.json; }
+              export BUNDLE_URL="$(extract bundle_url)"
+              export BUNDLE_SHA256="$(extract bundle_sha256)"
+              export EVIDENCE_UPLOAD_URL="$(extract evidence_upload_url)"
+              export BOOTSTRAP_GENERATION="${GENERATION}"
+              export BUNDLE_PASSPHRASE="$(tr -d '\r\n' </secrets/passphrase)"
+              export UPLOAD_EXTERNAL=logs TRANSPARENT_DNAT=true CONFIG_APPLY_MODE=secure
+              # For config-only re-apply to an already bootstrapped cluster,
+              # render the next line without the leading "# ".
+              # export ETCD_ALREADY_BOOTSTRAPPED=true
+              printf '%s  %s\n' 4aa5cd191c708b8c1a3b358bfd7dd21fb0cc6bd4dc7a07f2aa925cd2a8473bae /usr/local/bin/talosctl | sha256sum --check --strict
+              /usr/bin/bash /bootstrap/bootstrap.sh
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          volumeMounts:
+            - name: work
+              mountPath: /work
+            - name: secrets
+              mountPath: /secrets
+              readOnly: true
+            - name: bootstrap-script
+              mountPath: /bootstrap
+              readOnly: true
+            - name: transport-coordination
+              mountPath: /coord
+        - name: transport-cleaner
+          image: cr-internal.twcstorage.ru/cilium/cilium:v1.19.5@sha256:20fbbc14ac20b55a292c0dcda5571bf31cde30a7dbc68c29db3e709390ab0732
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              for i in $(seq 1 1800); do [ -e /coord/bootstrap.finished ] && break; sleep 1; done
+              test -e /coord/bootstrap.finished
+              for rule in '192.168.74.11 50011' '192.168.74.12 50012' '192.168.74.13 50013'; do
+                set -- $rule
+                /usr/sbin/xtables-nft-multi iptables --wait -t nat -D OUTPUT \
+                  -p tcp -d "$1" --dport 50000 -m owner --uid-owner 999 \
+                  -j DNAT --to-destination "72.56.234.22:$2"
+              done
+              touch /coord/transport.cleaned
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_ADMIN
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          volumeMounts:
+            - name: transport-coordination
+              mountPath: /coord
+      volumes:
+        - name: work
+          emptyDir:
+            medium: Memory
+            sizeLimit: 192Mi
+        - name: secrets
+          secret:
+            secretName: talos-bootstrap-generation-${GENERATION}
+            defaultMode: 0400
+        - name: bootstrap-script
+          configMap:
+            name: talos-bootstrap-generation-${GENERATION}
+            defaultMode: 0500
+        - name: transport-coordination
+          emptyDir: {}

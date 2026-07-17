@@ -1,5 +1,5 @@
 output "workspace_vpc_id" {
-  value = twc_vpc.workspace.id
+  value = var.workspace_vpc_id
 }
 
 output "workspace_vpc_cidr" {
@@ -7,11 +7,11 @@ output "workspace_vpc_cidr" {
 }
 
 output "workspace_router_id" {
-  value = twc_router.workspace_nat.id
+  value = var.workspace_router_id
 }
 
 output "workspace_nat_ip" {
-  value = twc_floating_ip.workspace_nat.ip
+  value = var.workspace_nat_ip
 }
 
 output "image_staging_bucket_name" {

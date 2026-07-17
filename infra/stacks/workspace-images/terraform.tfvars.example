@@ -1,4 +1,7 @@
 project_id = 1234567
+workspace_vpc_id    = "network-REPLACE_FROM_NETWORK_FOUNDATION"
+workspace_router_id = ""
+workspace_nat_ip    = "72.56.234.22"
 
 # Set both only after the pinned workspace image is built, signed and uploaded.
 workspace_image_id     = ""

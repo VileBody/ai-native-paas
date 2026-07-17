@@ -5,7 +5,8 @@ kubernetes_version       = "v1.35.6+k0s.0"
 master_preset_id         = 1673
 ci_worker_preset_id      = 1683
 system_worker_preset_id  = 1685
-system_worker_count      = 3
+# ha = three system workers, dev = one, off = no system node group.
+admin_capacity_mode      = "ha"
 postgres_preset_id       = 1175
 
 # Supply state_passphrase through TF_VAR_state_passphrase.

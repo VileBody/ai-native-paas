@@ -1,0 +1,12 @@
+# Full cost standby. Apply only after a verified encrypted JetStream account
+# backup. The StatefulSet and helper deployment stop; PVCs remain retained.
+statefulSet:
+  merge:
+    spec:
+      replicas: 0
+
+podDisruptionBudget:
+  enabled: false
+
+natsBox:
+  enabled: false

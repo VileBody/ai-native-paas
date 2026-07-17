@@ -679,6 +679,40 @@ func TestProjectMCP_WorkspaceToolsDeriveScopeAndProjectFromAccessCredential(t *t
 	}
 }
 
+func TestProjectMCP_NetworkDeferredReturnsDependencyCodesWithoutBillableCommand(t *testing.T) {
+	scopes := []string{
+		"agent.tool:workspace_create", "agent.tool:workspace_exec", "agent.tool:infra_plan",
+		"agent.tool:build_execute", "agent.tool:argocd_sync", "agent.tool:deployment_http_probe",
+	}
+	handler, access, workspaces := mcpFixture(t, scopes)
+	handler.Dependencies = DependencyGates{WorkspaceNAT: true, RuntimeCell: true, PublicIngress: true}
+
+	create := invocation(agentv2.ToolWorkspaceCreate)
+	create.Arguments = json.RawMessage(`{"repository_id":"repo-1","commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","image_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cpu_millis":2000,"memory_mib":4096,"ttl_seconds":900,"network_profile":"isolated-governed"}`)
+	created := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, create)
+	if created.Code != http.StatusOK || !strings.Contains(created.Body.String(), `"status":"WAITING_DEPENDENCY"`) || !strings.Contains(created.Body.String(), `"dependency_code":"workspace_nat"`) || workspaces.created.Spec.TaskID != "task-1" {
+		t.Fatalf("deferred create status=%d body=%s request=%#v", created.Code, created.Body.String(), workspaces.created)
+	}
+
+	exec := invocation(agentv2.ToolWorkspaceExec)
+	exec.Arguments = json.RawMessage(`{"workspace_id":"workspace-1","argv":["go","test","./..."],"working_dir":".","timeout_seconds":300,"output_limit_bytes":4096,"kind":"test"}`)
+	executed := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, exec)
+	if executed.Code != http.StatusOK || !strings.Contains(executed.Body.String(), `"dependency_code":"workspace_nat"`) || workspaces.execCalls != 0 {
+		t.Fatalf("deferred exec created billable command: status=%d body=%s calls=%d", executed.Code, executed.Body.String(), workspaces.execCalls)
+	}
+
+	for tool, code := range map[agentv2.Tool]string{
+		agentv2.ToolBuildExecute:        "workspace_nat",
+		agentv2.ToolArgoCDSync:          "runtime_cell",
+		agentv2.ToolDeploymentHTTPProbe: "public_ingress",
+	} {
+		response := request(t, handler, http.MethodPost, "/projects/project-1/mcp/v2/invoke", access, invocation(tool))
+		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"dependency_code":"`+code+`"`) {
+			t.Fatalf("tool=%s status=%d body=%s", tool, response.Code, response.Body.String())
+		}
+	}
+}
+
 func TestProjectMCP_SuccessfulToolAppendsIdempotentTaskEvidence(t *testing.T) {
 	handler, access, _ := mcpFixture(t, []string{"agent.tool:workspace_create"})
 	service := mcpAuditService(t)

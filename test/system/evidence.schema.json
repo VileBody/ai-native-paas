@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-native-paas.example/schemas/e2e-evidence-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "scenario", "run_id", "success", "started_at", "finished_at", "assertions"],
+  "properties": {
+    "schema": {"const": "ai-native-paas.io/e2e-evidence/v1"},
+    "scenario": {"pattern": "^E2E-(?:[1-9]|1[0-2])$"},
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "success": {"const": true},
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "assertions": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "boolean"}
+    },
+    "artifacts": {}
+  }
+}

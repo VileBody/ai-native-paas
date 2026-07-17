@@ -1,0 +1,12 @@
+# Overlay for the cost-saving development window. Apply only after the HA
+# failover gate and a verified Raft snapshot. Persistent volumes stay retained.
+injector:
+  replicas: 1
+  podDisruptionBudget:
+    maxUnavailable: 1
+
+server:
+  ha:
+    replicas: 1
+    disruptionBudget:
+      enabled: false

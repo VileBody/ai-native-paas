@@ -11,8 +11,8 @@ func TestPostgres_Migrations_AreOrderedAndChecksummed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(migrations) != 2 {
-		t.Fatalf("migration count = %d, want 2", len(migrations))
+	if len(migrations) != 3 {
+		t.Fatalf("migration count = %d, want 3", len(migrations))
 	}
 	expected := []struct {
 		version  int
@@ -21,11 +21,31 @@ func TestPostgres_Migrations_AreOrderedAndChecksummed(t *testing.T) {
 	}{
 		{1, "001_initial.sql", "954611146a03378910e49c2423d83b74993519eed203ca8b7902d606359a46f9"},
 		{2, "002_indexes.sql", "14c4a858c91ce3f568f0493ed849be6cde86f87154449add051ce923d292f72d"},
+		{3, "003_execution_graphs.sql", "186efe0793a6d3d8459017f728b538be812d14c61f415d0df26d8caaf3ffbad9"},
 	}
 	for i, want := range expected {
 		got := migrations[i]
 		if got.Version != want.version || got.Name != want.name || got.Checksum != want.checksum {
 			t.Errorf("migration[%d] = version=%d name=%s checksum=%s", i, got.Version, got.Name, got.Checksum)
+		}
+	}
+}
+
+func TestPostgres_ExecutionGraphMigrationIsDurableAndAppendOnly(t *testing.T) {
+	migrations, err := Migrations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql := migrations[2].SQL
+	for _, fragment := range []string{
+		"CREATE TABLE kernel.operation_graphs",
+		"UNIQUE (tenant_id, project_id, idempotency_key)",
+		"CREATE TABLE kernel.execution_audit_records",
+		"BEFORE UPDATE ON kernel.execution_audit_records",
+		"BEFORE DELETE ON kernel.execution_audit_records",
+	} {
+		if !strings.Contains(sql, fragment) {
+			t.Errorf("execution migration fragment %q is missing", fragment)
 		}
 	}
 }

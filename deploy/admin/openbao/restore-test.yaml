@@ -1,0 +1,150 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openbao-restore-test
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openbao-restore-config
+  namespace: openbao-restore-test
+data:
+  config.hcl: |
+    ui = false
+    disable_mlock = true
+    api_addr = "http://POD_IP:8200"
+    cluster_addr = "https://POD_IP:8201"
+
+    listener "tcp" {
+      address         = "[::]:8200"
+      cluster_address = "[::]:8201"
+      tls_disable     = 1
+    }
+
+    storage "raft" {
+      path    = "/openbao/data"
+      node_id = "HOSTNAME"
+
+      retry_join {
+        leader_api_addr = "http://openbao-0.openbao-internal:8200"
+      }
+    }
+
+    audit "file" "file" {
+      description = "Dedicated OpenBao audit PVC"
+      options {
+        file_path = "/openbao/audit/audit.log"
+        mode      = "0600"
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openbao-internal
+  namespace: openbao-restore-test
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: openbao-restore-test
+  ports:
+    - name: api
+      port: 8200
+    - name: cluster
+      port: 8201
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: openbao
+  namespace: openbao-restore-test
+spec:
+  serviceName: openbao-internal
+  replicas: 3
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openbao-restore-test
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openbao-restore-test
+    spec:
+      nodeSelector:
+        ai-native-paas.io/pool: system
+      tolerations:
+        - key: ai-native-paas.io/system
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: openbao
+          image: quay.io/openbao/openbao:2.5.5@sha256:6150c4a6b62067db6141c8da7a6a6b5763f4f47c315343d0c848b40fecdfd452
+          imagePullPolicy: IfNotPresent
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              cp /openbao/config/config.hcl /tmp/config.hcl
+              sed -i "s/HOSTNAME/${HOSTNAME}/g; s/POD_IP/${POD_IP}/g" /tmp/config.hcl
+              exec bao server -config=/tmp/config.hcl
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          ports:
+            - name: api
+              containerPort: 8200
+            - name: cluster
+              containerPort: 8201
+          readinessProbe:
+            httpGet:
+              path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+              port: api
+              scheme: HTTP
+            initialDelaySeconds: 3
+            periodSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: config
+              mountPath: /openbao/config
+              readOnly: true
+            - name: data
+              mountPath: /openbao/data
+            - name: audit
+              mountPath: /openbao/audit
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: openbao-restore-config
+        - name: data
+          emptyDir: {}
+        - name: audit
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

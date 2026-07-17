@@ -10,7 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	kernelnats "github.com/keir-research/ai-native-paas/adapters/nats/kernel"
 	kernelpostgres "github.com/keir-research/ai-native-paas/adapters/postgres/kernel"
+	kernelv1 "github.com/keir-research/ai-native-paas/contracts/kernel/v1"
 	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
 	"github.com/keir-research/ai-native-paas/internal/identity/oidcverify"
 	"github.com/keir-research/ai-native-paas/internal/kernel"
@@ -35,6 +37,7 @@ func main() {
 		storageName  string
 		adapters     []platformprofile.Adapter
 		oidcVerifier httpauth.OIDCVerifier
+		eventBus     kernelv1.EventPublisher
 	)
 	if profile == platformprofile.Production {
 		bootstrapCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
@@ -62,12 +65,34 @@ func main() {
 			os.Exit(1)
 		}
 		oidcVerifier = verifier
+		publisher, connection, natsErr := kernelnats.Connect(kernelnats.Config{
+			URL:             os.Getenv("NATS_URL"),
+			ClientName:      "kernel-api",
+			Token:           os.Getenv("NATS_AUTH_TOKEN"),
+			CredentialsFile: os.Getenv("NATS_CREDS_FILE"),
+			RootCAFile:      os.Getenv("NATS_CA_FILE"),
+			ClientCertFile:  os.Getenv("NATS_CLIENT_CERT_FILE"),
+			ClientKeyFile:   os.Getenv("NATS_CLIENT_KEY_FILE"),
+			Subject:         os.Getenv("NATS_KERNEL_SUBJECT"),
+			Stream:          os.Getenv("NATS_OPERATIONS_STREAM"),
+		})
+		if natsErr != nil {
+			logger.Error("initialize NATS JetStream", "error", natsErr)
+			os.Exit(1)
+		}
+		defer func() {
+			if drainErr := connection.Drain(); drainErr != nil {
+				logger.Error("drain NATS connection", "error", drainErr)
+			}
+		}()
+		eventBus = publisher
 		storageName = "postgres"
 		adapters = []platformprofile.Adapter{
 			platformprofile.Prod("kernel-postgres-store"),
 			platformprofile.Prod("oidc-jwks-verifier"),
 			platformprofile.Prod("postgres-membership-resolver"),
 			platformprofile.Prod("verified-identity-middleware"),
+			platformprofile.Prod("nats-jetstream-outbox-publisher"),
 		}
 	} else {
 		store = memory.NewStore()
@@ -87,6 +112,10 @@ func main() {
 	if err != nil {
 		logger.Error("initialize kernel service", "error", err)
 		os.Exit(1)
+	}
+	if profile == platformprofile.Production {
+		dispatcher := kernel.OutboxDispatcher{Store: store, Publisher: eventBus, Clock: kernel.SystemClock{}, Lease: 30 * time.Second}
+		go runOutboxDispatcher(ctx, logger, dispatcher)
 	}
 	handler, err := httpapi.NewHandler(service, ids)
 	if err != nil {
@@ -127,5 +156,25 @@ func main() {
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error("HTTP server failed", "error", err)
 		os.Exit(1)
+	}
+}
+
+func runOutboxDispatcher(ctx context.Context, logger *slog.Logger, dispatcher kernel.OutboxDispatcher) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			published, err := dispatcher.Dispatch(ctx, 64)
+			if err != nil && !errors.Is(err, context.Canceled) {
+				logger.Error("kernel outbox dispatch failed", "error", err)
+				continue
+			}
+			if published > 0 {
+				logger.Info("kernel outbox dispatched", "events", published)
+			}
+		}
 	}
 }

@@ -30,6 +30,13 @@ spec:
     spec:
       serviceAccountName: state-service
       automountServiceAccountToken: false
+      # The managed k0s/Cilium pod CIDR has no return route from the private
+      # Timeweb PostgreSQL network. Bind only on the private admin node so the
+      # database sees 192.168.73.5; the user-facing surface remains ClusterIP.
+      hostNetwork: true
+      # The managed node resolver reaches public S3; CoreDNS is itself behind
+      # the pod network and is not reachable from this host-network process.
+      dnsPolicy: Default
       imagePullSecrets:
         - name: craas-ai-native-paas-registry
       securityContext:
@@ -38,9 +45,10 @@ spec:
           type: RuntimeDefault
       affinity:
         nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
                   - key: ai-native-paas.io/pool
                     operator: In
                     values: [system]
@@ -82,6 +90,12 @@ spec:
           envFrom:
             - secretRef:
                 name: state-service-secrets
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 12
           readinessProbe:
             httpGet:
               path: /healthz

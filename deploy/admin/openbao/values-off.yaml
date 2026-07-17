@@ -1,0 +1,13 @@
+# Full cost standby. Apply only after the HA failover gate and a verified,
+# restorable encrypted Raft snapshot. PVCs remain retained.
+injector:
+  # A zero-replica injector leaves a failurePolicy=Fail admission webhook
+  # behind and blocks every new Pod while OpenBao is off. Disable the chart
+  # component so Helm removes the webhook configuration as well.
+  enabled: false
+
+server:
+  ha:
+    replicas: 0
+    disruptionBudget:
+      enabled: false

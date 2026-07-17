@@ -48,6 +48,18 @@ data:
       }
     }
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: project-api-dependencies
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: project-api
+data:
+  WORKSPACE_NAT_READY: "false"
+  RUNTIME_CELL_READY: "false"
+  PUBLIC_INGRESS_READY: "false"
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -155,6 +167,21 @@ spec:
                 configMapKeyRef:
                   name: project-api-release
                   key: WORKSPACE_IMAGE_DIGEST
+            - name: WORKSPACE_NAT_READY
+              valueFrom:
+                configMapKeyRef:
+                  name: project-api-dependencies
+                  key: WORKSPACE_NAT_READY
+            - name: RUNTIME_CELL_READY
+              valueFrom:
+                configMapKeyRef:
+                  name: project-api-dependencies
+                  key: RUNTIME_CELL_READY
+            - name: PUBLIC_INGRESS_READY
+              valueFrom:
+                configMapKeyRef:
+                  name: project-api-dependencies
+                  key: PUBLIC_INGRESS_READY
           volumeMounts:
             - name: project-api-secrets
               mountPath: /var/run/secrets/project-api

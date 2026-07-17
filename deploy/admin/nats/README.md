@@ -12,4 +12,25 @@ Kubernetes Secrets without printing values.
 
 ```bash
 ./scripts/deploy-nats.sh
+NATS_STREAM_REPLICAS=3 ./scripts/configure-nats-streams.sh
 ```
+
+The stream reconciler creates four fail-closed, file-backed streams with a
+seven-day maximum age and server-side message deduplication:
+
+- `PLATFORM_EVENTS` for source/build/runtime/attachments/commerce/agent events;
+- `PLATFORM_OPERATIONS` for kernel and operation state;
+- `WORKSPACE_COMMANDS` for disposable workspace command delivery;
+- `PLATFORM_USAGE` for usage ledger ingestion.
+
+Streams deny ad-hoc delete and purge. Run with `NATS_STREAM_REPLICAS=1` only
+after the documented JetStream backup and admin dev-mode transition; restore
+three replicas before a resilience gate or beta window.
+
+`kernel-api` uses a synchronous JetStream publisher for its transactional
+outbox. Production startup requires `NATS_URL` and the existing token via
+`NATS_AUTH_TOKEN`; `NATS_CA_FILE` must point at the mounted server CA. Optional
+client-certificate or NATS credentials-file authentication can be supplied with
+`NATS_CLIENT_CERT_FILE`/`NATS_CLIENT_KEY_FILE` or `NATS_CREDS_FILE`. Each event
+is published to `kernel.events`, requires an acknowledgement from
+`PLATFORM_OPERATIONS`, and uses its event id as `Nats-Msg-Id`.

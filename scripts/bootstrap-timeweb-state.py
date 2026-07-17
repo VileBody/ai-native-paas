@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = ROOT / "infra" / "bootstrap" / "timeweb-state"
 BACKENDS = ROOT / "infra" / "backend"
 LOCAL = ROOT / ".state-backend"
-STACKS = ("admin", "cozystack-lab", "workspace-images")
+STACKS = ("admin", "network-foundation", "cozystack-lab", "workspace-images")
 
 
 def output_values():

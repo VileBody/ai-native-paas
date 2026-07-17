@@ -15,6 +15,8 @@ func TestAdminProjectAPI_UsesImmutableProductionImageAndSystemPool(t *testing.T)
 		"runAsNonRoot: true", "readOnlyRootFilesystem: true", "drop: [ALL]",
 		"type: ClusterIP", "secretName: project-api-secrets", "defaultMode: 0440",
 		"ai-native-paas-project-api@sha256:",
+		"name: project-api-dependencies", "WORKSPACE_NAT_READY: \"false\"",
+		"RUNTIME_CELL_READY: \"false\"", "PUBLIC_INGRESS_READY: \"false\"",
 	)
 	forbidAll(t, raw, ":latest", "kind: Ingress", "type: LoadBalancer", "kind: Secret", "stringData:")
 }
@@ -42,12 +44,12 @@ func TestAdminWorkspaceEgressGateway_IsMTLSOnlyAndFailClosed(t *testing.T) {
 	requireAll(t, raw,
 		"PLATFORM_PROFILE", "value: production", "WORKSPACE_EGRESS_CLIENT_CA_FILE",
 		"WORKSPACE_EGRESS_ALLOWED_HOSTS", "WORKSPACE_EGRESS_DENIED_CIDRS",
-		"ai-native-paas.io/pool", "values: [system]", "type: LoadBalancer",
+		"ai-native-paas.io/pool", "values: [system]", "type: ClusterIP",
 		"port: 8443", "cidr: 0.0.0.0/0", "192.168.0.0/16",
 		"runAsNonRoot: true", "readOnlyRootFilesystem: true", "drop: [ALL]",
 		"ai-native-paas-workspace-egress-gateway@sha256:",
 	)
-	forbidAll(t, raw, ":latest", "automountServiceAccountToken: true", "kind: Ingress", "stringData:", "port: 80")
+	forbidAll(t, raw, ":latest", "automountServiceAccountToken: true", "kind: Ingress", "type: LoadBalancer", "stringData:", "port: 80")
 }
 
 func TestAdminWorkspaceEgressGateway_ImageLockMatchesManifest(t *testing.T) {
@@ -77,11 +79,11 @@ func TestAdminWorkspaceManager_UsesProductionBackendsAndKubernetesOpenBaoAuth(t 
 		"TIMEWEB_WORKSPACE_BANDWIDTH_MBPS", "value: \"1000\"",
 		"WORKSPACE_EGRESS_GATEWAY_URL", "WORKSPACE_EGRESS_GATEWAY_CIDRS",
 		"WORKSPACE_IMAGE_MAP_JSON", "secretName: workspace-manager-secrets",
-		"ai-native-paas.io/pool", "values: [system]", "type: LoadBalancer",
+		"ai-native-paas.io/pool", "values: [system]", "type: ClusterIP",
 		"192.168.73.6/32", "runAsNonRoot: true", "readOnlyRootFilesystem: true", "drop: [ALL]",
 		"ai-native-paas-workspace-manager@sha256:",
 	)
-	forbidAll(t, raw, ":latest", "memory-store", "dev-adapter", "kind: Ingress", "kind: Secret", "stringData:", "port: 22")
+	forbidAll(t, raw, ":latest", "memory-store", "dev-adapter", "kind: Ingress", "type: LoadBalancer", "kind: Secret", "stringData:", "port: 22")
 }
 
 func TestAdminWorkspaceManager_ImageLockMatchesManifest(t *testing.T) {
