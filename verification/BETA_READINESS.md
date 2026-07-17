@@ -65,6 +65,9 @@ gates.
 - Production `project-api` now injects an agent PostgreSQL-backed task evidence
   recorder into Project MCP v2; successful workspace/infra/repository tools are
   no longer unaudited in the production composition root.
+- Production `agent-api` now has a tenant-scoped Commerce HTTP bridge for
+  entitlement checks and usage preview when `COMMERCE_API_URL` is configured;
+  without it, mutations remain fail-closed.
 
 ## Live checkpoint
 

@@ -1,10 +1,18 @@
-// Package productiongate provides fail-closed dependency adapters used while
-// the internal mTLS service mesh and network-deferred providers are absent.
-// Mutations are denied by Commerce before the agent service reserves budget.
+// Package productiongate provides production-safe dependency adapters for the
+// Agent MCP façade. Missing optional internal service URLs remain fail-closed;
+// configured URLs are called through narrow tenant-scoped HTTP clients.
 package productiongate
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
 
 	kernelv1 "github.com/keir-research/ai-native-paas/contracts/kernel/v1"
 	"github.com/keir-research/ai-native-paas/internal/agent/application"
@@ -82,8 +90,36 @@ func (Attachments) AddDomain(context.Context, attachmentsv1.DomainRequest) (atta
 
 type Commerce struct{}
 
+// HTTPCommerce is the production bridge from the Agent MCP façade to the
+// Commerce control-plane API. An empty BaseURL deliberately keeps mutations
+// fail-closed during partial deployments.
+type HTTPCommerce struct {
+	BaseURL     string
+	PrincipalID string
+	HTTPClient  *http.Client
+}
+
+func NewHTTPCommerce(baseURL, principalID string) *HTTPCommerce {
+	return &HTTPCommerce{BaseURL: baseURL, PrincipalID: principalID, HTTPClient: &http.Client{Timeout: 10 * time.Second}}
+}
+
 func (Commerce) Check(context.Context, commercev1.EntitlementRequest) (commercev1.EntitlementDecision, error) {
 	return commercev1.EntitlementDecision{Allowed: false, Reason: "control-plane service gateways are not installed", PolicyVersion: "network-deferred-v1"}, nil
+}
+
+func (c *HTTPCommerce) Check(ctx context.Context, request commercev1.EntitlementRequest) (commercev1.EntitlementDecision, error) {
+	if !c.configured() {
+		return (Commerce{}).Check(ctx, request)
+	}
+	tenant := strings.TrimSpace(request.TenantID)
+	if tenant == "" {
+		return commercev1.EntitlementDecision{}, unavailable("commerce_gateway")
+	}
+	var out commercev1.EntitlementDecision
+	if err := c.do(ctx, http.MethodPost, "/v1/organizations/"+url.PathEscape(tenant)+"/entitlements/check", tenant, request, &out); err != nil {
+		return commercev1.EntitlementDecision{}, err
+	}
+	return out, nil
 }
 
 type Operations struct{}
@@ -103,4 +139,89 @@ type Usage struct{}
 
 func (Usage) GetUsage(context.Context, string, string) (commercev1.InvoicePreview, error) {
 	return commercev1.InvoicePreview{}, unavailable("commerce_gateway")
+}
+
+func (c *HTTPCommerce) GetUsage(ctx context.Context, tenant, period string) (commercev1.InvoicePreview, error) {
+	if !c.configured() {
+		return commercev1.InvoicePreview{}, unavailable("commerce_gateway")
+	}
+	tenant, period = strings.TrimSpace(tenant), strings.TrimSpace(period)
+	if tenant == "" || period == "" {
+		return commercev1.InvoicePreview{}, unavailable("commerce_gateway")
+	}
+	var out commercev1.InvoicePreview
+	if err := c.do(ctx, http.MethodGet, "/v1/organizations/"+url.PathEscape(tenant)+"/billing-periods/"+url.PathEscape(period)+"/invoice-preview", tenant, nil, &out); err != nil {
+		return commercev1.InvoicePreview{}, err
+	}
+	return out, nil
+}
+
+func (c *HTTPCommerce) configured() bool {
+	return c != nil && strings.TrimSpace(c.BaseURL) != ""
+}
+
+func (c *HTTPCommerce) do(ctx context.Context, method, path, tenant string, body, out any) error {
+	endpoint, err := c.endpoint(path)
+	if err != nil {
+		return unavailable("commerce_gateway")
+	}
+	var reader io.Reader
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			return unavailable("commerce_gateway")
+		}
+		reader = bytes.NewReader(raw)
+	}
+	request, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
+	if err != nil {
+		return unavailable("commerce_gateway")
+	}
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("X-Tenant-ID", tenant)
+	request.Header.Set("X-Principal-ID", c.principal())
+	request.Header.Set("X-Principal-Kind", "service")
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	client := c.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return unavailable("commerce_gateway")
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return &application.ProviderError{Message: "commerce gateway returned non-success", Retryable: response.StatusCode >= 500 || response.StatusCode == http.StatusTooManyRequests}
+	}
+	if out == nil {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
+		return nil
+	}
+	decoder := json.NewDecoder(io.LimitReader(response.Body, 2<<20))
+	if err := decoder.Decode(out); err != nil {
+		return unavailable("commerce_gateway")
+	}
+	return nil
+}
+
+func (c *HTTPCommerce) endpoint(path string) (string, error) {
+	raw := strings.TrimSpace(c.BaseURL)
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return "", fmt.Errorf("invalid commerce base url")
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + path
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String(), nil
+}
+
+func (c *HTTPCommerce) principal() string {
+	if c != nil && strings.TrimSpace(c.PrincipalID) != "" {
+		return strings.TrimSpace(c.PrincipalID)
+	}
+	return "agent-api"
 }
