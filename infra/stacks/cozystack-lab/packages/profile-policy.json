@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "cozystack_version": "v1.5.0",
+  "deny_unknown_packages": true,
+  "root_packages": [
+    "cozystack.cozystack-platform"
+  ],
+  "profiles": {
+    "smoke": {
+      "allowed_packages": [
+        "cozystack.cert-manager",
+        "cozystack.cozystack-engine",
+        "cozystack.cozystack-scheduler",
+        "cozystack.cozy-proxy",
+        "cozystack.flux-plunger",
+        "cozystack.flux-shard-operator",
+        "cozystack.gateway-api-crds",
+        "cozystack.gateway-application",
+        "cozystack.ingress-application",
+        "cozystack.kubeovn-webhook",
+        "cozystack.linstor",
+        "cozystack.linstor-scheduler",
+        "cozystack.metallb",
+        "cozystack.multus",
+        "cozystack.networking",
+        "cozystack.reloader",
+        "cozystack.snapshot-controller",
+        "cozystack.victoria-metrics-operator"
+      ]
+    },
+    "provider_gate": {
+      "allowed_packages": [
+        "cozystack.backup-controller",
+        "cozystack.bucket-application",
+        "cozystack.cert-manager",
+        "cozystack.cozystack-engine",
+        "cozystack.cozystack-scheduler",
+        "cozystack.cozy-proxy",
+        "cozystack.flux-plunger",
+        "cozystack.flux-shard-operator",
+        "cozystack.gateway-api-crds",
+        "cozystack.gateway-application",
+        "cozystack.ingress-application",
+        "cozystack.kubeovn-plunger",
+        "cozystack.kubeovn-webhook",
+        "cozystack.linstor",
+        "cozystack.linstor-scheduler",
+        "cozystack.metallb",
+        "cozystack.multus",
+        "cozystack.networking",
+        "cozystack.objectstorage-controller",
+        "cozystack.postgres-application",
+        "cozystack.postgres-operator",
+        "cozystack.prometheus-operator-crds",
+        "cozystack.redis-application",
+        "cozystack.redis-operator",
+        "cozystack.reloader",
+        "cozystack.seaweedfs-application",
+        "cozystack.snapshot-controller",
+        "cozystack.victoria-metrics-operator"
+      ]
+    }
+  },
+  "always_forbidden": [
+    "cozystack.clickhouse-application",
+    "cozystack.clickhouse-operator",
+    "cozystack.foundationdb-application",
+    "cozystack.foundationdb-operator",
+    "cozystack.gpu-operator",
+    "cozystack.kafka-application",
+    "cozystack.kafka-operator",
+    "cozystack.kamaji",
+    "cozystack.kubernetes-application",
+    "cozystack.kubevirt",
+    "cozystack.kubevirt-cdi",
+    "cozystack.mariadb-application",
+    "cozystack.mariadb-operator",
+    "cozystack.mongodb-application",
+    "cozystack.mongodb-operator",
+    "cozystack.monitoring-application",
+    "cozystack.monitoring-agents",
+    "cozystack.nats-application",
+    "cozystack.openbao-application",
+    "cozystack.opensearch-application",
+    "cozystack.opensearch-operator",
+    "cozystack.qdrant-application",
+    "cozystack.rabbitmq-application",
+    "cozystack.rabbitmq-operator",
+    "cozystack.virtualprivatecloud-application",
+    "cozystack.vm-disk-application",
+    "cozystack.vm-instance-application"
+  ]
+}

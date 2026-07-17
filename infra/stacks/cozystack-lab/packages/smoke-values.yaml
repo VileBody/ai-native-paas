@@ -1,0 +1,45 @@
+# Cozystack v1.5.0 smoke profile. This is deliberately below the supported
+# production sizing floor and has no managed data services or monitoring stack.
+bundles:
+  system:
+    enabled: true
+    variant: isp-full
+  iaas:
+    enabled: false
+  paas:
+    enabled: false
+  naas:
+    enabled: false
+  enabledPackages:
+    - cozystack.victoria-metrics-operator
+  disabledPackages:
+    - cozystack.backup-controller
+    - cozystack.backupstrategy-controller
+    - cozystack.cozystack-basics
+    - cozystack.etcd-application
+    - cozystack.etcd-operator
+    - cozystack.goldpinger
+    - cozystack.grafana-operator
+    - cozystack.info-application
+    - cozystack.kubeovn-plunger
+    - cozystack.metrics-server
+    - cozystack.monitoring-agents
+    - cozystack.monitoring-application
+    - cozystack.objectstorage-controller
+    - cozystack.postgres-operator
+    - cozystack.prometheus-operator-crds
+    - cozystack.seaweedfs-application
+    - cozystack.tenant-application
+    - cozystack.velero
+    - cozystack.vertical-pod-autoscaler
+
+publishing:
+  host: cozystack.internal
+  exposedServices: []
+  proxyProtocol: false
+  certificates:
+    issuerName: letsencrypt-stage
+
+authentication:
+  oidc:
+    enabled: false

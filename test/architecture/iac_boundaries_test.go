@@ -306,7 +306,7 @@ func TestArchitecture_TalosBootstrapUsesDisposablePrivateRunner(t *testing.T) {
 func TestArchitecture_CozystackPackagePolicyIsGoldenAndFailClosed(t *testing.T) {
 	raw := readRepositoryFile(t, "infra", "stacks", "cozystack-lab", "packages", "profile-policy.json")
 	sum := fmt.Sprintf("%x", sha256.Sum256([]byte(raw)))
-	if sum != "daa2b121dec32e84e00031f044ac68f805eef5d4b7e9d7e36761c25fe5d6262a" {
+	if sum != "5a9b12d9f887b5eb1b64f3335beb30ab7b2b9f790044a227cba2922fe57716bf" {
 		t.Fatalf("Cozystack package golden changed: got sha256 %s", sum)
 	}
 
@@ -328,7 +328,7 @@ func TestArchitecture_CozystackPackagePolicyIsGoldenAndFailClosed(t *testing.T) 
 	if len(policy.RootPackages) != 1 || policy.RootPackages[0] != "cozystack.cozystack-platform" {
 		t.Fatal("Cozystack package policy must explicitly approve the root platform Package")
 	}
-	if len(policy.Profiles["smoke"].AllowedPackages) != 18 || len(policy.Profiles["provider_gate"].AllowedPackages) != 30 {
+	if len(policy.Profiles["smoke"].AllowedPackages) != 18 || len(policy.Profiles["provider_gate"].AllowedPackages) != 28 {
 		t.Fatalf("unexpected profile package counts: smoke=%d provider_gate=%d", len(policy.Profiles["smoke"].AllowedPackages), len(policy.Profiles["provider_gate"].AllowedPackages))
 	}
 	for _, profile := range []string{"smoke", "provider_gate"} {
