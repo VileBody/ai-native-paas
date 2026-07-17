@@ -220,6 +220,70 @@ COZYSTACK_PROVIDER_GATE_ZERO_DRIFT=PASS
 The steady state has no bootstrap DNAT and no node firewall rule exposing Talos
 port `50000`.
 
+## Scale-to-zero after evidence
+
+After collecting provider-gate evidence, the lab was returned to `off` to stop
+compute and data-disk spend.
+
+Reviewed destroy plan:
+
+```text
+.state-backend/cozystack-provider-gate-to-off-20260717.tfplan
+COZYSTACK_PROVIDER_GATE_TO_OFF_PLAN=PASS
+destroy_count=19
+```
+
+Destroyed resources:
+
+```text
+talos_machine_secrets.cluster[0]
+twc_server.node["cp-1"]
+twc_server.node["cp-2"]
+twc_server.node["cp-3"]
+twc_server_disk.data["cp-1"]
+twc_server_disk.data["cp-2"]
+twc_server_disk.data["cp-3"]
+twc_firewall.node["cp-1"]
+twc_firewall.node["cp-2"]
+twc_firewall.node["cp-3"]
+twc_firewall_rule.node_icmp["cp-1"]
+twc_firewall_rule.node_icmp["cp-2"]
+twc_firewall_rule.node_icmp["cp-3"]
+twc_firewall_rule.node_tcp["cp-1"]
+twc_firewall_rule.node_tcp["cp-2"]
+twc_firewall_rule.node_tcp["cp-3"]
+twc_firewall_rule.node_udp["cp-1"]
+twc_firewall_rule.node_udp["cp-2"]
+twc_firewall_rule.node_udp["cp-3"]
+```
+
+Apply result:
+
+```text
+Apply complete! Resources: 0 added, 0 changed, 19 destroyed.
+cozystack_profile = "off"
+node_ids = {}
+node_private_ips = {}
+profile_resources.public_ipv4s = 0
+```
+
+Post-scale zero drift:
+
+```text
+.state-backend/cozystack-off-after-provider-gate-zero-20260717.tfplan
+COZYSTACK_OFF_AFTER_PROVIDER_GATE_ZERO_DRIFT=PASS
+```
+
+Temporary admin bootstrap/runtime access artifacts were removed from
+`ai-native-paas-system`:
+
+```text
+secret/runtime-cozystack-kubeconfig-gen10
+secret/talos-bootstrap-generation-10
+configmap/talos-bootstrap-generation-10
+job.batch/talos-bootstrap-generation-10
+```
+
 ## Local regression
 
 The Cozystack package policy golden test was updated after the reviewed
