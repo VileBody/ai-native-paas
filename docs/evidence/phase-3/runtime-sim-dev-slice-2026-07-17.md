@@ -63,3 +63,7 @@ product path:
 Create Project -> GitLab/MCP -> plan -> approval -> build -> GitOps ->
 runtime_sim_k8s -> probe -> usage/audit -> destroy
 ```
+
+The acceptance-level product chain is now recorded separately in
+`dev-product-acceptance-slice-2026-07-17.md`; live workspace VM, Harbor trust
+chain and Argo/Cozystack evidence are still pending.

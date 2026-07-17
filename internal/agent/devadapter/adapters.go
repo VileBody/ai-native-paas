@@ -174,7 +174,7 @@ func (r *Runtime) Deploy(_ context.Context, req runtimev1.DeployRequest, expecte
 	id := fmt.Sprintf("deployment-%d", len(r.ByID)+1)
 	revisionHash := sha256.Sum256([]byte(req.Artifact.Digest))
 	revision := hex.EncodeToString(revisionHash[:])[:40]
-	st := runtimev1.RuntimeStatus{DeploymentID: id, Phase: runtimev1.DeploymentReady, ActiveRelease: "release-" + id, GitOpsRevision: revision, URL: "https://app.invalid", ReadyReplicas: 1}
+	st := runtimev1.RuntimeStatus{DeploymentID: id, Phase: runtimev1.DeploymentReady, ActiveRelease: "release-" + id, GitOpsRevision: revision, URL: runtimeURL(req), ReadyReplicas: 1}
 	r.ByID[id] = st
 	r.ByKey[req.TenantID+":"+req.IdempotencyKey] = id
 	if r.TimeoutOnce {
@@ -182,6 +182,12 @@ func (r *Runtime) Deploy(_ context.Context, req runtimev1.DeployRequest, expecte
 		return application.RuntimeResult{}, &application.ProviderError{Message: "gitops response lost", Retryable: true, OperationID: "op-" + id}
 	}
 	return application.RuntimeResult{Deployment: runtimev1.DeploymentRef{DeploymentID: id, ReleaseID: st.ActiveRelease, Phase: st.Phase, GitOpsRevision: st.GitOpsRevision}, Status: &st}, nil
+}
+func runtimeURL(req runtimev1.DeployRequest) string {
+	if req.Configuration.GeneratedHostname == "" {
+		return "https://app.invalid"
+	}
+	return "https://" + req.Configuration.GeneratedHostname
 }
 func (r *Runtime) Get(_ context.Context, tenant, id string) (application.RuntimeResult, error) {
 	r.mu.Lock()

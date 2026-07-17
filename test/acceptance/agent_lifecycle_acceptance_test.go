@@ -10,9 +10,11 @@ import (
 	"github.com/keir-research/ai-native-paas/internal/agent/application"
 	"github.com/keir-research/ai-native-paas/internal/agent/memory"
 	"github.com/keir-research/ai-native-paas/internal/agent/testkit"
+	"github.com/keir-research/ai-native-paas/internal/runtime/simulator"
 	agentv1 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v1"
 	agentv2 "github.com/keir-research/ai-native-paas/pkg/contracts/agent/v2"
 	buildv1 "github.com/keir-research/ai-native-paas/pkg/contracts/build/v1"
+	commercev1 "github.com/keir-research/ai-native-paas/pkg/contracts/commerce/v1"
 	runtimev1 "github.com/keir-research/ai-native-paas/pkg/contracts/runtime/v1"
 )
 
@@ -31,7 +33,15 @@ func newLifecycleFixture(t *testing.T) *lifecycleFixture {
 	builds := testkit.NewBuilds()
 	runtime := testkit.NewRuntime()
 	attachments := testkit.NewAttachments()
-	svc := &application.Service{Store: memory.New(), Clock: clock, IDs: ids, Source: source, Builds: builds, Runtime: runtime, Attachments: attachments, Commerce: &testkit.Commerce{Allowed: true}, Operations: testkit.NewOperations(), Logs: &testkit.Logs{Lines: []string{"ready", "password=must-redact"}}, Usage: &testkit.Usage{}}
+	usage := &testkit.Usage{Preview: commercev1.InvoicePreview{
+		TenantID: "tenant-acme", PeriodID: "period-beta", Currency: "RUB", PlanVersionID: "beta-v1", PolicyVersion: "policy-v1",
+		Lines: []commercev1.InvoiceLine{
+			{ResourceType: "build", ResourceID: "build-1", Meter: commercev1.MeterBuildCPUSeconds, Kind: commercev1.UsageStandard, Quantity: 120, BillableQuantity: 120, AmountMinorUnits: 4},
+			{ResourceType: "deployment", ResourceID: "deployment-1", Meter: commercev1.MeterRuntimeUnitSeconds, Kind: commercev1.UsageStandard, Quantity: 60, BillableQuantity: 60, AmountMinorUnits: 1},
+		},
+		TotalMinorUnits: 5,
+	}}
+	svc := &application.Service{Store: memory.New(), Clock: clock, IDs: ids, Source: source, Builds: builds, Runtime: runtime, Attachments: attachments, Commerce: &testkit.Commerce{Allowed: true}, Operations: testkit.NewOperations(), Logs: &testkit.Logs{Lines: []string{"ready", "password=must-redact"}}, Usage: usage}
 	scopes := []string{}
 	for _, tool := range agentv1.ToolCatalog() {
 		scopes = append(scopes, string(agentv1.ScopeForTool(tool)))
@@ -106,7 +116,7 @@ func TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime(t 
 		Configuration: runtimev1.ReleaseConfig{
 			Region: "eu1", Isolation: runtimev1.IsolationSandboxed, Unit: "u1",
 			Processes:         map[string]runtimev1.ProcessSpec{"web": {Port: 8080, MinReplicas: 1, MaxReplicas: 2, HealthPath: "/health"}},
-			GeneratedHostname: "booking.apps.example.test", RolloutTimeoutSeconds: 300, EgressProfile: "public-default",
+			GeneratedHostname: "booking." + simulator.IngressDomain, RolloutTimeoutSeconds: 300, EgressProfile: "public-default",
 		},
 	}
 	approvalPayload, _ := json.Marshal(deployArguments)
@@ -136,6 +146,18 @@ func TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime(t 
 	if err := json.Unmarshal(statusResponse.Result.Data, &status); err != nil || status.Phase != runtimev1.DeploymentReady {
 		t.Fatalf("status=%+v err=%v", status, err)
 	}
+	if !strings.HasSuffix(status.URL, "."+simulator.IngressDomain) {
+		t.Fatalf("runtime simulator endpoint was not used: %s", status.URL)
+	}
+	record(agentv2.ToolDeploymentHTTPProbe, "http-probe", agentv1.AuditEvidence{
+		DeploymentID: status.DeploymentID, ReleaseID: status.ActiveRelease, GitOpsRevision: status.GitOpsRevision, ReadyEndpoint: status.URL,
+	})
+	usageResponse := f.invoke(t, agentv1.ToolGetUsage, application.GetUsageArguments{PeriodID: "period-beta"}, "g28-usage", "")
+	var usage commercev1.InvoicePreview
+	if err := json.Unmarshal(usageResponse.Result.Data, &usage); err != nil || usage.TenantID != "tenant-acme" || usage.PeriodID != "period-beta" || len(usage.Lines) < 2 {
+		t.Fatalf("usage=%+v err=%v", usage, err)
+	}
+	record(agentv2.ToolWorkspaceDestroy, "workspace-destroy", agentv1.AuditEvidence{WorkspaceID: "workspace-1"})
 
 	audit, err := f.svc.AuditTrail(context.Background(), "tenant-acme", "task-booking")
 	if err != nil {
@@ -194,6 +216,15 @@ func TestAgent_AuditConnectsIntentTaskCommandsCommitsPlansApprovalsAndRuntime(t 
 	if value := find(string(agentv1.ToolGetDeployment)); value.DeploymentID != status.DeploymentID || value.GitOpsRevision != status.GitOpsRevision || value.ReadyEndpoint != status.URL {
 		t.Fatalf("runtime evidence=%+v status=%+v", value, status)
 	}
+	if value := find(string(agentv2.ToolDeploymentHTTPProbe)); value.DeploymentID != status.DeploymentID || value.ReadyEndpoint != status.URL {
+		t.Fatalf("probe evidence=%+v status=%+v", value, status)
+	}
+	if value := find(string(agentv1.ToolGetUsage)); value != (agentv1.AuditEvidence{}) {
+		t.Fatalf("usage evidence should stay identifier-only for now: %+v", value)
+	}
+	if value := find(string(agentv2.ToolWorkspaceDestroy)); value.WorkspaceID != "workspace-1" {
+		t.Fatalf("destroy evidence=%+v", value)
+	}
 }
 
 func (f *lifecycleFixture) invoke(t *testing.T, tool agentv1.Tool, args any, key, grant string) agentv1.InvocationResponse {
@@ -249,7 +280,7 @@ func TestAcceptance_AgentCreatesBuildsAndDeploysProductionApplicationSafely(t *t
 		t.Fatal("write-only secret leaked")
 	}
 
-	deployArgs := application.DeployArguments{BuildID: buildView.BuildID, ApplicationID: "booking-api", EnvironmentID: "env-production", EnvironmentName: "production", ExpectedEnvironmentRevision: 1, Configuration: runtimev1.ReleaseConfig{Region: "eu1", Isolation: runtimev1.IsolationSandboxed, Unit: "u1", Processes: map[string]runtimev1.ProcessSpec{"web": {Port: 8080, MinReplicas: 1, MaxReplicas: 2, HealthPath: "/health"}}, GeneratedHostname: "booking.apps.example.test", AttachmentSnapshotRef: "snapshot-1", RolloutTimeoutSeconds: 300, EgressProfile: "public-default"}}
+	deployArgs := application.DeployArguments{BuildID: buildView.BuildID, ApplicationID: "booking-api", EnvironmentID: "env-production", EnvironmentName: "production", ExpectedEnvironmentRevision: 1, Configuration: runtimev1.ReleaseConfig{Region: "eu1", Isolation: runtimev1.IsolationSandboxed, Unit: "u1", Processes: map[string]runtimev1.ProcessSpec{"web": {Port: 8080, MinReplicas: 1, MaxReplicas: 2, HealthPath: "/health"}}, GeneratedHostname: "booking." + simulator.IngressDomain, AttachmentSnapshotRef: "snapshot-1", RolloutTimeoutSeconds: 300, EgressProfile: "public-default"}}
 	deployPayload, _ := json.Marshal(deployArgs)
 	approval := f.invoke(t, agentv1.ToolRequestApproval, application.RequestApprovalArguments{Action: agentv1.ApprovalDeployProduction, Resource: agentv1.ApprovalResource{Type: "environment", ID: "env-production"}, Payload: deployPayload, TTLSeconds: 600}, "request-production-approval", "")
 	var requestView agentv1.ApprovalRequestView
@@ -265,8 +296,12 @@ func TestAcceptance_AgentCreatesBuildsAndDeploysProductionApplicationSafely(t *t
 		t.Fatalf("deployment=%+v", deployment)
 	}
 	status := f.invoke(t, agentv1.ToolGetDeployment, application.GetDeploymentArguments{DeploymentID: deployment.Result.ID}, "deployment-status", "")
-	if status.Result.URL == "" || status.Result.State != string(runtimev1.DeploymentReady) {
+	if status.Result.URL == "" || status.Result.State != string(runtimev1.DeploymentReady) || !strings.HasSuffix(status.Result.URL, "."+simulator.IngressDomain) {
 		t.Fatalf("status=%+v", status)
+	}
+	usage := f.invoke(t, agentv1.ToolGetUsage, application.GetUsageArguments{PeriodID: "period-beta"}, "usage-preview", "")
+	if !strings.Contains(string(usage.Result.Data), string(commercev1.MeterRuntimeUnitSeconds)) || !strings.Contains(string(usage.Result.Data), string(commercev1.MeterBuildCPUSeconds)) {
+		t.Fatalf("usage preview missing build/runtime meters: %s", usage.Result.Data)
 	}
 	logs := f.invoke(t, agentv1.ToolGetLogs, application.GetLogsArguments{ApplicationID: "booking-api", Limit: 100}, "read-logs", "")
 	if strings.Contains(string(logs.Result.Data), "must-redact") {
@@ -288,7 +323,7 @@ func TestAcceptance_AgentCreatesBuildsAndDeploysProductionApplicationSafely(t *t
 			t.Fatalf("audit identity=%+v", event)
 		}
 	}
-	for _, tool := range []agentv1.Tool{agentv1.ToolCreateProject, agentv1.ToolApplyRepositoryPatch, agentv1.ToolRequestBuild, agentv1.ToolProvisionService, agentv1.ToolBindService, agentv1.ToolSetSecret, agentv1.ToolRequestApproval, agentv1.ToolDeploy, agentv1.ToolGetDeployment} {
+	for _, tool := range []agentv1.Tool{agentv1.ToolCreateProject, agentv1.ToolApplyRepositoryPatch, agentv1.ToolRequestBuild, agentv1.ToolProvisionService, agentv1.ToolBindService, agentv1.ToolSetSecret, agentv1.ToolRequestApproval, agentv1.ToolDeploy, agentv1.ToolGetDeployment, agentv1.ToolGetUsage} {
 		if !seen[tool] {
 			t.Fatalf("audit missing %s", tool)
 		}

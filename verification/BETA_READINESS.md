@@ -58,6 +58,10 @@ gates.
   process smoke proves application creation, GitOps commit under
   `cells/runtime-sim-k8s`, generated hostnames under `sim.runtime.internal`,
   status read and cross-tenant denial.
+- Acceptance coverage now exercises the cheap dev-product chain through agent
+  governance: project create, repository patch, build, exact approval,
+  `runtime_sim_k8s` hostname, deployment status, HTTP probe evidence, usage
+  preview, workspace destroy evidence and redacted audit.
 
 ## Live checkpoint
 
@@ -105,6 +109,8 @@ reconciliation and old-key rejection evidence.
 - Pass the `DEV_PRODUCT_GREEN` simulator path:
   `Create Project -> GitLab/MCP -> plan -> approval -> build -> GitOps ->
   runtime_sim_k8s -> probe -> usage/audit -> destroy`.
+  The local acceptance slice covers the agent/runtime/audit half; GitLab MCP,
+  disposable VM, Harbor trust chain and live Argo remain open.
 - Pass `COZYSTACK_LIVE_GREEN` and `PROVIDER_FULL_GREEN` in a funded
   `provider_gate_full` window; simulator evidence must not be substituted.
 - Complete GitLab, OpenBao holder, capability-provider, beta-domain/DNS, and
