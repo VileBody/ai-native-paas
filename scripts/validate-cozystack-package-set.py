@@ -44,7 +44,7 @@ def rendered_packages(raw: str) -> set[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--profile", required=True, choices=("smoke", "provider_gate"))
+    parser.add_argument("--profile", required=True, choices=("smoke", "provider_gate", "provider_gate_full"))
     parser.add_argument("--manifest", required=True, type=pathlib.Path)
     parser.add_argument(
         "--policy",
@@ -62,6 +62,7 @@ def main() -> int:
     actual = rendered_packages(args.manifest.read_text(encoding="utf-8"))
     actual -= set(policy.get("root_packages", []))
     forbidden = actual.intersection(policy["always_forbidden"])
+    forbidden |= actual.intersection(policy["profiles"][args.profile].get("forbidden_packages", []))
     missing = expected - actual
     unknown = actual - expected
     if forbidden or missing or unknown:

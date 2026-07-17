@@ -296,9 +296,8 @@ ok github.com/keir-research/ai-native-paas/test/architecture
 
 ## Remaining provider-gate work
 
-- Add an explicit `provider_gate_full` profile, or reclassify Redis/Bucket
-  high-level lifecycle as a beta/release-window gate requiring tenant and
-  monitoring dependencies.
+- Re-run the explicit `provider_gate_full` profile during a funded release-window
+  to validate tenant-scoped Redis/Bucket high-level lifecycle and backup/restore.
 - Add executable tests that reject stale kept Cozystack `Package` CRs after
   profile trim.
 - Convert the live storage/provider smoke manifests into repeatable scripts

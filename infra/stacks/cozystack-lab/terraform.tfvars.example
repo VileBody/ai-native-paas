@@ -1,15 +1,36 @@
-project_id                     = 1234567
-lab_enabled                    = false
-cost_guard_acknowledgement     = ""
-management_cidrs = [
-  "203.0.113.10/32",
-]
+project_id                 = 1234567
+cozystack_profile          = "off"
+transition_from_profile    = "off"
+lab_enabled                = false
+cost_guard_acknowledgement = ""
+runtime_vpc_id             = ""
+runtime_router_id          = ""
+runtime_gateway_ip         = "192.168.74.4"
+runtime_edge_private_ip    = ""
+runtime_ingress_ip         = ""
+node_bootstrap_ssh_key_ids = []
+
+# One-shot private bootstrap phase only. Keep false for node creation and set
+# false again as soon as encrypted evidence was uploaded and verified.
+bootstrap_runner_enabled      = false
+bootstrap_runner_ssh_key_ids  = []
+bootstrap_runner_preset_id    = 5943
+bootstrap_bundle_url          = ""
+bootstrap_bundle_sha256       = ""
+bootstrap_bundle_passphrase   = ""
+bootstrap_evidence_upload_url = ""
+bootstrap_bundle_generation   = 0
+talos_bootstrap_dnat_enabled  = false
+talos_bootstrap_source_cidr   = ""
+talos_disk_repair_ssh_enabled     = false
+talos_disk_repair_ssh_source_cidr = ""
 
 # The default installer is the digest-pinned Cozystack v1.5 Talos build.
 # Override only when deliberately upgrading the release lock.
-# Set lab_enabled=true only for a scheduled live gate and destroy the stack
-# after evidence and recovery artifacts have been retained.
-# The runbook supplies the separate exact cost acknowledgement required by the
-# resource precondition.
+# `off` is the default and plans zero provider actions against an empty state.
+# A non-zero profile requires lab_enabled=true, the reviewed outputs from the
+# network-foundation state, an exact acknowledgement and transition_from_profile="off".
+# Use provider_gate_full only for short release-window managed Redis/Bucket and
+# backup/restore evidence; return through off immediately after collecting it.
 
 # Supply state_passphrase through TF_VAR_state_passphrase.

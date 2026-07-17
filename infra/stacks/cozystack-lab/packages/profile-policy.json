@@ -26,6 +26,10 @@
         "cozystack.reloader",
         "cozystack.snapshot-controller",
         "cozystack.victoria-metrics-operator"
+      ],
+      "forbidden_packages": [
+        "cozystack.monitoring-agents",
+        "cozystack.monitoring-application"
       ]
     },
     "provider_gate": {
@@ -58,7 +62,56 @@
         "cozystack.seaweedfs-application",
         "cozystack.snapshot-controller",
         "cozystack.victoria-metrics-operator"
+      ],
+      "forbidden_packages": [
+        "cozystack.monitoring-agents",
+        "cozystack.monitoring-application"
       ]
+    },
+    "provider_gate_full": {
+      "allowed_packages": [
+        "cozystack.backup-controller",
+        "cozystack.backupstrategy-controller",
+        "cozystack.bucket-application",
+        "cozystack.cert-manager",
+        "cozystack.cozy-proxy",
+        "cozystack.cozystack-basics",
+        "cozystack.cozystack-engine",
+        "cozystack.cozystack-scheduler",
+        "cozystack.etcd-application",
+        "cozystack.etcd-operator",
+        "cozystack.flux-plunger",
+        "cozystack.flux-shard-operator",
+        "cozystack.gateway-api-crds",
+        "cozystack.gateway-application",
+        "cozystack.goldpinger",
+        "cozystack.grafana-operator",
+        "cozystack.info-application",
+        "cozystack.ingress-application",
+        "cozystack.kubeovn-plunger",
+        "cozystack.kubeovn-webhook",
+        "cozystack.linstor",
+        "cozystack.linstor-scheduler",
+        "cozystack.metallb",
+        "cozystack.metrics-server",
+        "cozystack.monitoring-agents",
+        "cozystack.monitoring-application",
+        "cozystack.multus",
+        "cozystack.networking",
+        "cozystack.objectstorage-controller",
+        "cozystack.postgres-application",
+        "cozystack.postgres-operator",
+        "cozystack.prometheus-operator-crds",
+        "cozystack.redis-application",
+        "cozystack.redis-operator",
+        "cozystack.reloader",
+        "cozystack.seaweedfs-application",
+        "cozystack.snapshot-controller",
+        "cozystack.tenant-application",
+        "cozystack.velero",
+        "cozystack.victoria-metrics-operator"
+      ],
+      "forbidden_packages": []
     }
   },
   "always_forbidden": [
@@ -77,8 +130,6 @@
     "cozystack.mariadb-operator",
     "cozystack.mongodb-application",
     "cozystack.mongodb-operator",
-    "cozystack.monitoring-application",
-    "cozystack.monitoring-agents",
     "cozystack.nats-application",
     "cozystack.openbao-application",
     "cozystack.opensearch-application",

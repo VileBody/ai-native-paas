@@ -228,6 +228,7 @@ func TestArchitecture_CozystackLabIsPinnedAndSizedForThreeNodes(t *testing.T) {
 	}
 	for _, profileValue := range []string{
 		"preset_id         = 4803",
+		"provider_gate_full = {",
 		"configurator_id   = 31",
 		"cpu               = 8",
 		"ram_mb            = 24576",
@@ -237,9 +238,10 @@ func TestArchitecture_CozystackLabIsPinnedAndSizedForThreeNodes(t *testing.T) {
 		"network_mbps      = 1000",
 		`mode = "no_nat"`,
 		`cluster_endpoint   = "https://${var.runtime_edge_private_ip}:6443"`,
+		"CREATE-3X-8VCPU-24GIB-COZYSTACK-PROVIDER-GATE-FULL",
 		`"net.ipv6.conf.all.disable_ipv6"`,
 	} {
-		if !strings.Contains(main, profileValue) {
+		if !strings.Contains(main, profileValue) && !strings.Contains(variables, profileValue) {
 			t.Errorf("Cozystack profile sizing/gate missing %q", profileValue)
 		}
 	}
@@ -306,7 +308,7 @@ func TestArchitecture_TalosBootstrapUsesDisposablePrivateRunner(t *testing.T) {
 func TestArchitecture_CozystackPackagePolicyIsGoldenAndFailClosed(t *testing.T) {
 	raw := readRepositoryFile(t, "infra", "stacks", "cozystack-lab", "packages", "profile-policy.json")
 	sum := fmt.Sprintf("%x", sha256.Sum256([]byte(raw)))
-	if sum != "5a9b12d9f887b5eb1b64f3335beb30ab7b2b9f790044a227cba2922fe57716bf" {
+	if sum != "0cdf942a83217cc2bdfe8e097e16e9f7726e2145ae1297287ab3847543ff46e0" {
 		t.Fatalf("Cozystack package golden changed: got sha256 %s", sum)
 	}
 
@@ -328,10 +330,17 @@ func TestArchitecture_CozystackPackagePolicyIsGoldenAndFailClosed(t *testing.T) 
 	if len(policy.RootPackages) != 1 || policy.RootPackages[0] != "cozystack.cozystack-platform" {
 		t.Fatal("Cozystack package policy must explicitly approve the root platform Package")
 	}
-	if len(policy.Profiles["smoke"].AllowedPackages) != 18 || len(policy.Profiles["provider_gate"].AllowedPackages) != 28 {
-		t.Fatalf("unexpected profile package counts: smoke=%d provider_gate=%d", len(policy.Profiles["smoke"].AllowedPackages), len(policy.Profiles["provider_gate"].AllowedPackages))
+	if len(policy.Profiles["smoke"].AllowedPackages) != 18 ||
+		len(policy.Profiles["provider_gate"].AllowedPackages) != 28 ||
+		len(policy.Profiles["provider_gate_full"].AllowedPackages) != 40 {
+		t.Fatalf(
+			"unexpected profile package counts: smoke=%d provider_gate=%d provider_gate_full=%d",
+			len(policy.Profiles["smoke"].AllowedPackages),
+			len(policy.Profiles["provider_gate"].AllowedPackages),
+			len(policy.Profiles["provider_gate_full"].AllowedPackages),
+		)
 	}
-	for _, profile := range []string{"smoke", "provider_gate"} {
+	for _, profile := range []string{"smoke", "provider_gate", "provider_gate_full"} {
 		allowed := map[string]bool{}
 		for _, name := range policy.Profiles[profile].AllowedPackages {
 			allowed[name] = true
@@ -344,7 +353,7 @@ func TestArchitecture_CozystackPackagePolicyIsGoldenAndFailClosed(t *testing.T) 
 	}
 
 	validator := readRepositoryFile(t, "scripts", "validate-cozystack-package-set.py")
-	for _, required := range []string{"missing = expected - actual", "unknown = actual - expected", "forbidden = actual.intersection", "return 1"} {
+	for _, required := range []string{"provider_gate_full", "missing = expected - actual", "unknown = actual - expected", "forbidden = actual.intersection", "forbidden_packages", "return 1"} {
 		if !strings.Contains(validator, required) {
 			t.Errorf("Cozystack package validator is not fail-closed: missing %q", required)
 		}
@@ -386,12 +395,30 @@ func TestArchitecture_CozystackPackageValidatorExecutesAgainstGolden(t *testing.
 		t.Fatalf("golden package set rejected: %v\n%s", err, output)
 	}
 
+	if err := os.WriteFile(manifest, []byte(render(policy.Profiles["provider_gate_full"].AllowedPackages)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	command = exec.Command("python3", validator, "--profile", "provider_gate_full", "--manifest", manifest)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("full provider gate package set rejected: %v\n%s", err, output)
+	}
+
+	withProfileForbidden := append(append([]string(nil), policy.Profiles["provider_gate"].AllowedPackages...), "cozystack.monitoring-application")
+	if err := os.WriteFile(manifest, []byte(render(withProfileForbidden)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	command = exec.Command("python3", validator, "--profile", "provider_gate", "--manifest", manifest)
+	output, err := command.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "cozystack.monitoring-application") {
+		t.Fatalf("profile-specific forbidden package was not rejected: err=%v output=%s", err, output)
+	}
+
 	withUnknown := append(append([]string(nil), policy.Profiles["smoke"].AllowedPackages...), "cozystack.unreviewed-heavy-package")
 	if err := os.WriteFile(manifest, []byte(render(withUnknown)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	command = exec.Command("python3", validator, "--profile", "smoke", "--manifest", manifest)
-	output, err := command.CombinedOutput()
+	output, err = command.CombinedOutput()
 	if err == nil || !strings.Contains(string(output), "cozystack.unreviewed-heavy-package") {
 		t.Fatalf("unknown package was not rejected: err=%v output=%s", err, output)
 	}

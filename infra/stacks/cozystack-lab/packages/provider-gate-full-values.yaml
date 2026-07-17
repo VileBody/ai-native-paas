@@ -1,0 +1,60 @@
+# Cozystack v1.5.0 full provider gate. This is a short-lived release-window
+# profile for validating tenant-scoped managed Redis/Bucket and backup/restore.
+# It still excludes KubeVirt, nested Kubernetes, GPU and heavyweight data stacks.
+bundles:
+  system:
+    enabled: true
+    variant: isp-full
+  iaas:
+    enabled: true
+  paas:
+    enabled: true
+  naas:
+    enabled: false
+  enabledPackages: []
+  disabledPackages:
+    - cozystack.capi-operator
+    - cozystack.capi-provider-bootstrap-kubeadm
+    - cozystack.capi-provider-core
+    - cozystack.capi-provider-cp-kamaji
+    - cozystack.capi-provider-infra-kubevirt
+    - cozystack.clickhouse-application
+    - cozystack.clickhouse-operator
+    - cozystack.foundationdb-application
+    - cozystack.foundationdb-operator
+    - cozystack.gpu-operator
+    - cozystack.hami
+    - cozystack.harbor-application
+    - cozystack.kafka-application
+    - cozystack.kafka-operator
+    - cozystack.kamaji
+    - cozystack.kubernetes-application
+    - cozystack.kubevirt
+    - cozystack.kubevirt-cdi
+    - cozystack.mariadb-application
+    - cozystack.mariadb-operator
+    - cozystack.mongodb-application
+    - cozystack.mongodb-operator
+    - cozystack.nats-application
+    - cozystack.openbao-application
+    - cozystack.opensearch-application
+    - cozystack.opensearch-operator
+    - cozystack.qdrant-application
+    - cozystack.rabbitmq-application
+    - cozystack.rabbitmq-operator
+    - cozystack.virtualprivatecloud-application
+    - cozystack.vm-default-images
+    - cozystack.vm-disk-application
+    - cozystack.vm-instance-application
+    - cozystack.vertical-pod-autoscaler
+
+publishing:
+  host: cozystack.internal
+  exposedServices: []
+  proxyProtocol: false
+  certificates:
+    issuerName: letsencrypt-stage
+
+authentication:
+  oidc:
+    enabled: false
