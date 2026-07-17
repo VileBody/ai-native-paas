@@ -14,9 +14,11 @@ import (
 	"syscall"
 	"time"
 
+	agentapp "github.com/keir-research/ai-native-paas/internal/agent/application"
 	"github.com/keir-research/ai-native-paas/internal/agent/enrollment"
 	enrollmenthttp "github.com/keir-research/ai-native-paas/internal/agent/enrollment/httpapi"
 	enrollmentpostgres "github.com/keir-research/ai-native-paas/internal/agent/enrollment/postgres"
+	agentpostgres "github.com/keir-research/ai-native-paas/internal/agent/postgres"
 	agentsupport "github.com/keir-research/ai-native-paas/internal/agent/support"
 	"github.com/keir-research/ai-native-paas/internal/identity/httpauth"
 	"github.com/keir-research/ai-native-paas/internal/identity/oidcverify"
@@ -47,12 +49,14 @@ func main() {
 	}
 	if _, err := platformprofile.Validate(string(profile), "project-api",
 		platformprofile.Prod("source-postgres-store"),
+		platformprofile.Prod("agent-postgres-store"),
 		platformprofile.Prod("agent-enrollment-postgres-store"),
 		platformprofile.Prod("gitlab-api"),
 		platformprofile.Prod("oidc-jwks-verifier"),
 		platformprofile.Prod("postgres-membership-resolver"),
 		platformprofile.Prod("workspace-postgres-intent-store"),
 		platformprofile.Prod("infrastructure-postgres-exact-plan-gate"),
+		platformprofile.Prod("project-mcp-agent-task-evidence-recorder"),
 		platformprofile.Prod("versioned-beta-rate-card"),
 		platformprofile.Prod("governed-workspace-git-mutations"),
 		platformprofile.Prod("exact-source-change-approval"),
@@ -80,6 +84,13 @@ func main() {
 	}
 	infrastructureStore := &infrapostgres.Store{DB: db}
 	if err := postgresbootstrap.WithMigrationLock(bootstrapCtx, db, "infrastructure", infrastructureStore.Migrate); err != nil {
+		log.Fatal(err)
+	}
+	agentStore, err := agentpostgres.NewStore(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := postgresbootstrap.WithMigrationLock(bootstrapCtx, db, "agent", agentStore.Migrate); err != nil {
 		log.Fatal(err)
 	}
 	enrollmentStore, err := enrollmentpostgres.New(db)
@@ -113,6 +124,7 @@ func main() {
 	source := &sourceapp.Service{Store: sourceStore, Provider: gitLab, Clock: sourcesupport.RealClock{}, IDs: &sourcesupport.IDs{}}
 	clock := agentsupport.Clock{}
 	runtimeIDs := &agentsupport.IDs{}
+	agentAuditService := &agentapp.Service{Store: agentStore, Clock: clock, IDs: runtimeIDs}
 	enrollmentService := &enrollment.Service{
 		Store: enrollmentStore, Clock: clock, IDs: enrollmentIDs{inner: runtimeIDs},
 		Secrets: enrollment.CryptoSecrets{}, Signer: enrollment.HMACSigner{Key: append([]byte(nil), signingKey...)},
@@ -141,6 +153,7 @@ func main() {
 	mcpHandler := projectmcp.Handler{
 		Enrollment: enrollmentService, Projects: source, Workspaces: workspaceService,
 		Infrastructure: infrastructureService, SourceChanges: workspaceService, MergeRequests: source,
+		Audit: agentAuditService,
 		Dependencies: projectmcp.DependencyGates{
 			WorkspaceNAT:  dependencyUnavailable("WORKSPACE_NAT_READY"),
 			RuntimeCell:   dependencyUnavailable("RUNTIME_CELL_READY"),

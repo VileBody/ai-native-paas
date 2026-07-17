@@ -85,6 +85,31 @@ func TestProductionExecutionAPIsPersistAndVerifyIdentity(t *testing.T) {
 	}
 }
 
+func TestProjectAPIMCPWritesAgentTaskEvidence(t *testing.T) {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve repository root")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, "cmd", "project-api", "main.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(raw)
+	for _, required := range []string{
+		"agentpostgres.NewStore(",
+		"postgresbootstrap.WithMigrationLock(bootstrapCtx, db, \"agent\", agentStore.Migrate)",
+		"platformprofile.Prod(\"agent-postgres-store\")",
+		"platformprofile.Prod(\"project-mcp-agent-task-evidence-recorder\")",
+		"agentAuditService := &agentapp.Service{Store: agentStore",
+		"Audit: agentAuditService",
+	} {
+		if !strings.Contains(source, required) {
+			t.Errorf("project-api does not wire Project MCP task evidence component %q", required)
+		}
+	}
+}
+
 func TestProductionKernelRequiresJetStreamOutboxPublisher(t *testing.T) {
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {

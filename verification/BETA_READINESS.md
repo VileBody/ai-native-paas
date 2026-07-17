@@ -62,6 +62,9 @@ gates.
   governance: project create, repository patch, build, exact approval,
   `runtime_sim_k8s` hostname, deployment status, HTTP probe evidence, usage
   preview, workspace destroy evidence and redacted audit.
+- Production `project-api` now injects an agent PostgreSQL-backed task evidence
+  recorder into Project MCP v2; successful workspace/infra/repository tools are
+  no longer unaudited in the production composition root.
 
 ## Live checkpoint
 

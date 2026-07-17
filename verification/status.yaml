@@ -28,4 +28,4 @@ statuses:
     evidence: "No runtime node has floating IPv4, Talos 50000 is not publicly exposed, provider firewalls default DROP, and tracked secret sentinel passes; the main Timeweb S3 credential was rendered in operator output and requires coordinated rotation before cross-surface sentinel and workspace compromise/isolation gates"
   OPS_GREEN:
     state: PENDING
-    evidence: "State-service scoped HTTP credentials were rotated after expiry, network-foundation=live and cozystack-lab=smoke zero-drift plans pass, earlier NATS/OpenBao backup evidence is retained, and Cozystack smoke evidence is recorded; Cozystack backups, live restore and full chaos gates remain incomplete"
+    evidence: "State-service scoped HTTP credentials were rotated after expiry, network-foundation=live and cozystack-lab=smoke zero-drift plans pass, earlier NATS/OpenBao backup evidence is retained, Cozystack smoke evidence is recorded, and Project MCP production tools now persist task evidence through agent PostgreSQL; Cozystack backups, live restore and full chaos gates remain incomplete"
