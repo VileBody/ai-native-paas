@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
-"""Enable Timeweb S3 versioning and materialize ignored backend config safely."""
+"""Enable and verify versioning for the platform state bucket.
+
+The active platform state path is the HTTP backend.  This helper intentionally
+does not materialize a long-lived S3 credentials file or S3 backend configs.
+"""
 
 import argparse
-import json
-import os
 from pathlib import Path
-import stat
 import subprocess
 
 import boto3
 from botocore.config import Config
+from timeweb_s3_credentials import read_s3_pair
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = ROOT / "infra" / "bootstrap" / "timeweb-state"
-BACKENDS = ROOT / "infra" / "backend"
-LOCAL = ROOT / ".state-backend"
-STACKS = ("admin", "network-foundation", "cozystack-lab", "workspace-images")
-
-
 def output_values():
     completed = subprocess.run(
         ["tofu", f"-chdir={BOOTSTRAP}", "output", "-json"],
@@ -34,16 +31,19 @@ def main():
     parser.add_argument("--skip-versioning", action="store_true")
     args = parser.parse_args()
     values = output_values()
-    required = {"bucket_name", "endpoint", "access_key", "secret_key"}
+    required = {"bucket_name", "endpoint"}
     if missing := required - values.keys():
         raise SystemExit("bootstrap outputs missing: " + ", ".join(sorted(missing)))
 
     if not args.skip_versioning:
+        access_key, secret_key = read_s3_pair(
+            "STATE_S3_ACCESS_KEY_FILE", "STATE_S3_SECRET_KEY_FILE"
+        )
         client = boto3.client(
             "s3",
             endpoint_url=values["endpoint"],
-            aws_access_key_id=values["access_key"],
-            aws_secret_access_key=values["secret_key"],
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
             region_name="ru-1",
             config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
         )
@@ -55,25 +55,8 @@ def main():
         if status != "Enabled":
             raise SystemExit(f"Timeweb S3 versioning is {status!r}, expected 'Enabled'")
 
-    LOCAL.mkdir(mode=0o700, parents=True, exist_ok=True)
-    os.chmod(LOCAL, stat.S_IRWXU)
-    credentials = LOCAL / "credentials.env"
-    credentials.write_text(
-        "export AWS_ACCESS_KEY_ID=" + json.dumps(values["access_key"]) + "\n"
-        "export AWS_SECRET_ACCESS_KEY=" + json.dumps(values["secret_key"]) + "\n"
-        "export AWS_REGION=\"ru-1\"\n"
-        "export AWS_ENDPOINT_URL_S3=" + json.dumps(values["endpoint"]) + "\n"
-    )
-    os.chmod(credentials, stat.S_IRUSR | stat.S_IWUSR)
-
-    for stack in STACKS:
-        template = (BACKENDS / f"{stack}.s3.tfbackend.example").read_text()
-        destination = LOCAL / f"{stack}.s3.tfbackend"
-        destination.write_text(template.replace("TIMEWEB_GENERATED_BUCKET_NAME", values["bucket_name"]))
-        os.chmod(destination, stat.S_IRUSR | stat.S_IWUSR)
-
     versioning = "left unchanged" if args.skip_versioning else "enabled"
-    print(f"Timeweb state backend configured: versioning {versioning}; ignored credentials and backend files written")
+    print(f"Timeweb state bucket verified: versioning {versioning}; no credentials were materialized")
 
 
 if __name__ == "__main__":

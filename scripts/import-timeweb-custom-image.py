@@ -22,6 +22,7 @@ from pathlib import Path
 import boto3
 import certifi
 from botocore.config import Config
+from timeweb_s3_credentials import read_s3_pair
 
 ROOT = Path(__file__).resolve().parents[1]
 STACK = ROOT / "infra" / "stacks" / "workspace-images"
@@ -179,17 +180,18 @@ def main():
     required = {
         "image_staging_bucket_name",
         "image_staging_endpoint",
-        "image_staging_access_key",
-        "image_staging_secret_key",
     }
     if missing := required - values.keys():
         raise SystemExit("workspace-images outputs missing: " + ", ".join(sorted(missing)))
 
+    access_key, secret_key = read_s3_pair(
+        "IMAGE_STAGING_S3_ACCESS_KEY_FILE", "IMAGE_STAGING_S3_SECRET_KEY_FILE"
+    )
     client = boto3.client(
         "s3",
         endpoint_url=values["image_staging_endpoint"],
-        aws_access_key_id=values["image_staging_access_key"],
-        aws_secret_access_key=values["image_staging_secret_key"],
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
         region_name="ru-1",
         config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
     )

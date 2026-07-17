@@ -7,6 +7,7 @@ import subprocess
 
 import boto3
 from botocore.config import Config
+from timeweb_s3_credentials import read_s3_pair
 
 ROOT = Path(__file__).resolve().parents[1]
 ADMIN = ROOT / "infra" / "stacks" / "admin"
@@ -24,17 +25,18 @@ def main():
     required = {
         "workspace_log_bucket_name",
         "workspace_log_s3_endpoint",
-        "workspace_log_s3_access_key",
-        "workspace_log_s3_secret_key",
     }
     if missing := required - values.keys():
         raise SystemExit("workspace log outputs missing: " + ", ".join(sorted(missing)))
 
+    access_key, secret_key = read_s3_pair(
+        "WORKSPACE_LOG_S3_ACCESS_KEY_FILE", "WORKSPACE_LOG_S3_SECRET_KEY_FILE"
+    )
     client = boto3.client(
         "s3",
         endpoint_url=values["workspace_log_s3_endpoint"],
-        aws_access_key_id=values["workspace_log_s3_access_key"],
-        aws_secret_access_key=values["workspace_log_s3_secret_key"],
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
         region_name="ru-1",
         config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
     )

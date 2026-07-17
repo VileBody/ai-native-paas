@@ -5,34 +5,39 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 kubeconfig="${KUBECONFIG:-${repo_root}/infra/timeweb/ai-native-paas-test.kubeconfig}"
 namespace="ai-native-paas-system"
 secret="workspace-manager-secrets"
+temporary_dir="$(mktemp -d -t workspace-manager-secrets.XXXXXX)"
+trap 'rm -rf "${temporary_dir}"' EXIT
 
 : "${TWC_TOKEN:?TWC_TOKEN is required}"
-: "${TF_HTTP_USERNAME:?TF_HTTP_USERNAME is required for encrypted remote state}"
-: "${TF_HTTP_PASSWORD:?TF_HTTP_PASSWORD is required for encrypted remote state}"
-: "${TF_VAR_state_passphrase:?TF_VAR_state_passphrase is required for encrypted OpenTofu outputs}"
+: "${WORKSPACE_LOG_S3_ACCESS_KEY_FILE:?WORKSPACE_LOG_S3_ACCESS_KEY_FILE is required}"
+: "${WORKSPACE_LOG_S3_SECRET_KEY_FILE:?WORKSPACE_LOG_S3_SECRET_KEY_FILE is required}"
 
-log_access_key="$(tofu -chdir="${repo_root}/infra/stacks/admin" output -raw workspace_log_s3_access_key)"
-log_secret_key="$(tofu -chdir="${repo_root}/infra/stacks/admin" output -raw workspace_log_s3_secret_key)"
-if [[ -z "${log_access_key}" || -z "${log_secret_key}" ]]; then
-  echo "workspace log S3 credentials are unavailable" >&2
-  exit 1
-fi
+for source in "${WORKSPACE_LOG_S3_ACCESS_KEY_FILE}" "${WORKSPACE_LOG_S3_SECRET_KEY_FILE}"; do
+  if [[ ! -f "${source}" || -L "${source}" || ! -s "${source}" ]]; then
+    echo "workspace-log S3 credential files must be nonempty regular files" >&2
+    exit 1
+  fi
+done
+tr -d '\r\n' <"${WORKSPACE_LOG_S3_ACCESS_KEY_FILE}" >"${temporary_dir}/log-s3-access-key"
+tr -d '\r\n' <"${WORKSPACE_LOG_S3_SECRET_KEY_FILE}" >"${temporary_dir}/log-s3-secret-key"
+printf '%s' "${TWC_TOKEN}" >"${temporary_dir}/timeweb-token"
+chmod 600 "${temporary_dir}/timeweb-token" "${temporary_dir}/log-s3-access-key" "${temporary_dir}/log-s3-secret-key"
 
 encryption_key="$(KUBECONFIG="${kubeconfig}" kubectl -n "${namespace}" get secret "${secret}" -o jsonpath='{.data.WORKSPACE_LOG_ENCRYPTION_KEY}' 2>/dev/null || true)"
-if [[ -z "${encryption_key}" ]]; then
-  encryption_key="$(openssl rand 32 | base64 | tr -d '\r\n')"
+if [[ -n "${encryption_key}" ]]; then
+  printf '%s' "${encryption_key}" | base64 -D >"${temporary_dir}/log-encryption-key"
+else
+  openssl rand 32 >"${temporary_dir}/log-encryption-key"
 fi
+chmod 600 "${temporary_dir}/log-encryption-key"
 
-manifest="$(jq -nc \
-  --arg namespace "${namespace}" \
-  --arg token "$(printf '%s' "${TWC_TOKEN}" | base64 | tr -d '\r\n')" \
-  --arg access "$(printf '%s' "${log_access_key}" | base64 | tr -d '\r\n')" \
-  --arg secret_key "$(printf '%s' "${log_secret_key}" | base64 | tr -d '\r\n')" \
-  --arg encryption "${encryption_key}" \
-  '{apiVersion:"v1",kind:"Secret",metadata:{name:"workspace-manager-secrets",namespace:$namespace,labels:{"app.kubernetes.io/name":"workspace-manager"}},type:"Opaque",data:{TIMEWEB_TOKEN:$token,WORKSPACE_LOG_S3_ACCESS_KEY:$access,WORKSPACE_LOG_S3_SECRET_KEY:$secret_key,WORKSPACE_LOG_ENCRYPTION_KEY:$encryption}}')"
-
-printf '%s' "${manifest}" \
+KUBECONFIG="${kubeconfig}" kubectl -n "${namespace}" create secret generic "${secret}" \
+  --from-file=TIMEWEB_TOKEN="${temporary_dir}/timeweb-token" \
+  --from-file=WORKSPACE_LOG_S3_ACCESS_KEY="${temporary_dir}/log-s3-access-key" \
+  --from-file=WORKSPACE_LOG_S3_SECRET_KEY="${temporary_dir}/log-s3-secret-key" \
+  --from-file=WORKSPACE_LOG_ENCRYPTION_KEY="${temporary_dir}/log-encryption-key" \
+  --dry-run=client -o yaml \
   | KUBECONFIG="${kubeconfig}" kubectl apply --server-side --field-manager=ai-native-paas-secret-sync -f - >/dev/null
 
-unset manifest log_access_key log_secret_key encryption_key
+unset encryption_key
 printf 'workspace-manager Timeweb and encrypted-log credentials synchronized\n'

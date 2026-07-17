@@ -10,6 +10,8 @@ trap 'rm -rf "${temporary_dir}"' EXIT
 : "${TF_HTTP_USERNAME:?TF_HTTP_USERNAME is required for encrypted remote state}"
 : "${TF_HTTP_PASSWORD:?TF_HTTP_PASSWORD is required for encrypted remote state}"
 : "${TF_VAR_state_passphrase:?TF_VAR_state_passphrase is required for encrypted OpenTofu outputs}"
+: "${HARBOR_BLOB_S3_ACCESS_KEY_FILE:?HARBOR_BLOB_S3_ACCESS_KEY_FILE is required}"
+: "${HARBOR_BLOB_S3_SECRET_KEY_FILE:?HARBOR_BLOB_S3_SECRET_KEY_FILE is required}"
 
 kubectl --kubeconfig "${kubeconfig}" apply -f "${repo_root}/deploy/admin/harbor/namespace.yaml" >/dev/null
 
@@ -59,8 +61,16 @@ apply_secret() {
 }
 
 output_file harbor_database_password "${temporary_dir}/database-password"
-output_file harbor_blob_s3_access_key "${temporary_dir}/s3-access-key"
-output_file harbor_blob_s3_secret_key "${temporary_dir}/s3-secret-key"
+for source in "${HARBOR_BLOB_S3_ACCESS_KEY_FILE}" "${HARBOR_BLOB_S3_SECRET_KEY_FILE}"; do
+  if [[ ! -f "${source}" || -L "${source}" || ! -s "${source}" ]]; then
+    echo "Harbor S3 credential files must be nonempty regular files" >&2
+    exit 1
+  fi
+done
+tr -d '\r\n' <"${HARBOR_BLOB_S3_ACCESS_KEY_FILE}" >"${temporary_dir}/s3-access-key"
+tr -d '\r\n' <"${HARBOR_BLOB_S3_SECRET_KEY_FILE}" >"${temporary_dir}/s3-secret-key"
+test -s "${temporary_dir}/s3-access-key"
+test -s "${temporary_dir}/s3-secret-key"
 
 preserve_or_generate harbor-admin HARBOR_ADMIN_PASSWORD 30
 preserve_or_generate_exact harbor-system-key secretKey

@@ -42,3 +42,16 @@ The role requires `audience=openbao`. The manifest therefore replaces the
 default ServiceAccount projection with a 15-minute `openbao`-audience projected
 token at the standard path and names that volume for the OpenBao Agent Injector.
 Do not restore `automountServiceAccountToken: true` or add a second token mount.
+
+Workspace logs use a dedicated Timeweb S3 user restricted to the workspace-log
+bucket. Before applying the workload, synchronize it from private `0600` files
+outside the repository:
+
+```bash
+export WORKSPACE_LOG_S3_ACCESS_KEY_FILE="$HOME/.config/ai-native-paas/timeweb-s3/workspace-logs.access-key"
+export WORKSPACE_LOG_S3_SECRET_KEY_FILE="$HOME/.config/ai-native-paas/timeweb-s3/workspace-logs.secret-key"
+./scripts/sync-workspace-manager-secrets.sh
+```
+
+The script deliberately has no fallback to `tofu output`; the Timeweb main S3
+credential must never be installed in a workload.

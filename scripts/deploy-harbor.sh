@@ -43,5 +43,10 @@ helm upgrade --install ai-native-paas-harbor "${archive}" \
   --wait \
   --timeout 10m
 
+# A Kubernetes Secret update does not restart consumers by itself.  The
+# registry is the only Harbor component that holds the S3 storage credentials.
+kubectl --kubeconfig "${kubeconfig}" -n "${namespace}" rollout restart deployment/ai-native-paas-harbor-registry >/dev/null
+kubectl --kubeconfig "${kubeconfig}" -n "${namespace}" rollout status deployment/ai-native-paas-harbor-registry --timeout=300s >/dev/null
+
 kubectl --kubeconfig "${kubeconfig}" -n "${namespace}" get pods -l app.kubernetes.io/instance=ai-native-paas-harbor
 printf 'Internal Harbor development profile is deployed; public ingress remains disabled\n'

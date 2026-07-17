@@ -74,16 +74,6 @@ output "workspace_log_s3_endpoint" {
   value = "https://s3.twcstorage.ru"
 }
 
-output "workspace_log_s3_access_key" {
-  value     = twc_s3_bucket.workspace_logs.access_key
-  sensitive = true
-}
-
-output "workspace_log_s3_secret_key" {
-  value     = twc_s3_bucket.workspace_logs.secret_key
-  sensitive = true
-}
-
 output "harbor_database_name" {
   value = twc_database_instance.harbor.name
 }
@@ -103,14 +93,4 @@ output "harbor_blob_bucket_name" {
 
 output "harbor_blob_s3_endpoint" {
   value = "https://s3.twcstorage.ru"
-}
-
-output "harbor_blob_s3_access_key" {
-  value     = twc_s3_bucket.harbor_blobs.access_key
-  sensitive = true
-}
-
-output "harbor_blob_s3_secret_key" {
-  value     = twc_s3_bucket.harbor_blobs.secret_key
-  sensitive = true
 }

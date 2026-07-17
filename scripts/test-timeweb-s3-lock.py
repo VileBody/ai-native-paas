@@ -10,6 +10,7 @@ import uuid
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from timeweb_s3_credentials import read_s3_pair
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = ROOT / "infra" / "bootstrap" / "timeweb-state"
@@ -27,11 +28,14 @@ def outputs():
 
 def main():
     values = outputs()
+    access_key, secret_key = read_s3_pair(
+        "STATE_S3_ACCESS_KEY_FILE", "STATE_S3_SECRET_KEY_FILE"
+    )
     client = boto3.client(
         "s3",
         endpoint_url=values["endpoint"],
-        aws_access_key_id=values["access_key"],
-        aws_secret_access_key=values["secret_key"],
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
         region_name="ru-1",
         config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
     )

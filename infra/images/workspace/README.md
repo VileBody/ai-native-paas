@@ -41,3 +41,8 @@ artifact with `scripts/import-timeweb-custom-image.py`, records the returned
 Timeweb image ID and raw digest in `infra/stacks/workspace-images/images.lock.json`,
 and applies that stack. Until both values are locked, production workspace
 creation remains fail-closed.
+
+The image-staging bucket has a dedicated Timeweb S3 user. Set
+`IMAGE_STAGING_S3_ACCESS_KEY_FILE` and `IMAGE_STAGING_S3_SECRET_KEY_FILE` to
+private files outside the repository before import or Talos-bootstrap artifact
+transport; the scripts reject a fallback to Terraform output.

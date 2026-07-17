@@ -81,6 +81,45 @@ func TestArchitecture_WorkspaceLogsUseDedicatedProtectedAdminBucket(t *testing.T
 	}
 }
 
+func TestArchitecture_TimewebMainS3CredentialCannotBeAnOpenTofuOutputOrRuntimeFallback(t *testing.T) {
+	for _, file := range [][]string{
+		{"infra", "bootstrap", "timeweb-state", "outputs.tf"},
+		{"infra", "stacks", "admin", "outputs.tf"},
+		{"infra", "stacks", "workspace-images", "outputs.tf"},
+	} {
+		body := readRepositoryFile(t, file...)
+		for _, forbidden := range []string{`output "access_key"`, `output "secret_key"`, `_s3_access_key"`, `_s3_secret_key"`} {
+			if strings.Contains(body, forbidden) {
+				t.Fatalf("%s exposes Timeweb S3 credential material through OpenTofu output %q", strings.Join(file, "/"), forbidden)
+			}
+		}
+	}
+
+	for _, file := range []string{
+		"scripts/sync-harbor-bootstrap-secrets.sh",
+		"scripts/sync-workspace-manager-secrets.sh",
+		"scripts/import-timeweb-custom-image.py",
+		"scripts/stage-talos-bootstrap-artifacts.py",
+		"scripts/upload-talos-bootstrap-job-evidence.py",
+		"scripts/fetch-talos-bootstrap-evidence.py",
+	} {
+		body := readRepositoryFile(t, strings.Split(file, "/")...)
+		if strings.Contains(body, "tofu -chdir") && strings.Contains(body, "s3_access_key") {
+			t.Fatalf("%s can fall back to a Terraform S3 credential output", file)
+		}
+		if !strings.Contains(body, "S3_ACCESS_KEY_FILE") {
+			t.Fatalf("%s does not require a file-backed dedicated S3 credential", file)
+		}
+	}
+
+	stateSync := readRepositoryFile(t, "scripts", "sync-state-service-s3-credentials.sh")
+	for _, required := range []string{"STATE_S3_ACCESS_KEY_FILE", "STATE_S3_SECRET_KEY_FILE", "rollout restart deployment/state-service"} {
+		if !strings.Contains(stateSync, required) {
+			t.Errorf("state S3 credential rotation lacks %q", required)
+		}
+	}
+}
+
 func TestArchitecture_PostgresIntegrationDatabaseIsIsolated(t *testing.T) {
 	admin := readRepositoryFile(t, "infra", "stacks", "admin", "main.tf")
 	runner := readRepositoryFile(t, "scripts", "run-postgres-gates-via-admin-cluster.sh")
