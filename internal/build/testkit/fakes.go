@@ -147,11 +147,14 @@ func (r *Registry) Resolve(context.Context, string, string) (application.Publish
 	r.ResolveCalls++
 	return r.Published, r.ResolveErr
 }
-func (r *Registry) StoreAttachment(_ context.Context, _ string, _ string, mediaType string, raw []byte) (string, error) {
+func (r *Registry) StoreAttachment(_ context.Context, _ string, subject application.PublishedArtifact, mediaType string, raw []byte) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.AttachmentErr != nil {
 		return "", r.AttachmentErr
+	}
+	if subject.Repository == "" || !buildv1.ValidDigest(subject.Digest) || subject.MediaType == "" {
+		return "", domain.NewError(domain.CodeInvalidArgument, "attachment subject is invalid")
 	}
 	if r.Attachments == nil {
 		r.Attachments = map[string][]byte{}

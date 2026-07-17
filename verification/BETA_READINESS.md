@@ -95,6 +95,11 @@ gates.
   `workspace-agent verified-build` validates exact Git HEAD, a clean source
   tree, immutable Dockerfile bases, the separate verified UID boundary and the
   rootless BuildKit metadata digest path.
+- The verified-build registry port now binds every SBOM, signature and
+  provenance document to an immutable artifact subject. A Harbor-compatible
+  HTTPS OCI Distribution adapter resolves exact digests and writes OCI 1.1
+  referrers; it remains unconfigured in production until a project-scoped
+  robot lease, OpenBao signing material and live workspace receipt are ready.
 - Capability gateway admission now has an executable provider-neutral core:
   project-scoped binding admission, per-project rate-limit integration,
   fail-closed provider lease dependency handling, public output without master

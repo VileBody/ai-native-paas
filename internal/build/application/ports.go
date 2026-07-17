@@ -152,7 +152,12 @@ type PublishedArtifact struct {
 type Registry interface {
 	Publish(context.Context, string, string, BuildOutput) (PublishedArtifact, error)
 	Resolve(context.Context, string, string) (PublishedArtifact, error)
-	StoreAttachment(context.Context, string, string, string, []byte) (string, error)
+	// StoreAttachment persists a trust document as an OCI referrer of an
+	// immutable subject.  The subject is deliberately part of this port: a
+	// digest-only document stored "somewhere in the repository" cannot prove
+	// that its SBOM, signature or provenance belongs to the artifact we are
+	// about to release.
+	StoreAttachment(context.Context, string, PublishedArtifact, string, []byte) (string, error)
 }
 type SBOMResult struct {
 	Digest    string

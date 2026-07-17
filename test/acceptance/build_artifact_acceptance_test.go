@@ -118,7 +118,8 @@ func TestAcceptance_SourceRevisionBecomesReleasableArtifact(t *testing.T) {
 	if err := verifier.Verify(context.Background(), artifact.Repository, *artifact.Signature); err != nil {
 		t.Fatalf("signature verification: %v", err)
 	}
-	if mediaType, ok := localRegistry.AttachmentMediaType(artifact.Repository, artifact.SBOMDigest); !ok || mediaType != sbom.MediaType {
+	subject := application.PublishedArtifact{Repository: artifact.Repository, Digest: artifact.Digest, MediaType: artifact.MediaType}
+	if mediaType, ok := localRegistry.AttachmentMediaType(subject, artifact.SBOMDigest); !ok || mediaType != sbom.MediaType {
 		t.Fatalf("SBOM attachment missing: media=%q ok=%v", mediaType, ok)
 	}
 	decision, err := service.EvaluateArtifact(context.Background(), "tenant-a", artifact.ID)

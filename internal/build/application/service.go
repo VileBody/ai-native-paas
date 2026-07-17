@@ -427,7 +427,7 @@ func (s *Service) RunBuild(ctx context.Context, tenantID, actorID, buildID strin
 	if err != nil {
 		return s.fail(ctx, actorID, build, artifact, err)
 	}
-	storedSBOM, err := s.Registry.StoreAttachment(ctx, build.TenantID, published.Repository, sbom.MediaType, sbom.Document)
+	storedSBOM, err := s.Registry.StoreAttachment(ctx, build.TenantID, published, sbom.MediaType, sbom.Document)
 	if err != nil {
 		return s.fail(ctx, actorID, build, artifact, err)
 	}
@@ -464,7 +464,7 @@ func (s *Service) RunBuild(ctx context.Context, tenantID, actorID, buildID strin
 	if err != nil {
 		return s.fail(ctx, actorID, build, artifact, domain.Wrap(domain.CodePlatformFailure, "encode signature attachment", err))
 	}
-	signatureAttachment, err := s.Registry.StoreAttachment(ctx, build.TenantID, artifact.Repository, "application/vnd.dev.cosign.simplesigning.v1+json", signatureDocument)
+	signatureAttachment, err := s.Registry.StoreAttachment(ctx, build.TenantID, publishedArtifact(*artifact), "application/vnd.dev.cosign.simplesigning.v1+json", signatureDocument)
 	if err != nil {
 		return s.fail(ctx, actorID, build, artifact, err)
 	}

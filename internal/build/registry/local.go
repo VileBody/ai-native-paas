@@ -86,16 +86,16 @@ func (l *Local) Resolve(ctx context.Context, tenant, reference string) (applicat
 	}
 	return value, nil
 }
-func (l *Local) StoreAttachment(ctx context.Context, tenant, repository, mediaType string, raw []byte) (string, error) {
+func (l *Local) StoreAttachment(ctx context.Context, tenant string, subject application.PublishedArtifact, mediaType string, raw []byte) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	if !owned(tenant, repository) {
+	if !owned(tenant, subject.Repository) || !buildv1.ValidDigest(subject.Digest) || strings.TrimSpace(subject.MediaType) == "" || strings.TrimSpace(mediaType) == "" || len(raw) == 0 {
 		return "", domain.NewError(domain.CodeConflict, "attachment repository outside tenant scope")
 	}
 	sum := sha256.Sum256(raw)
 	digest := "sha256:" + hex.EncodeToString(sum[:])
-	dir := filepath.Join(l.Root, "attachments", repositoryKey(repository))
+	dir := filepath.Join(l.Root, "attachments", repositoryKey(subject.Repository), strings.TrimPrefix(subject.Digest, "sha256:"))
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
@@ -104,16 +104,17 @@ func (l *Local) StoreAttachment(ctx context.Context, tenant, repository, mediaTy
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.attachments[repository] == nil {
-		l.attachments[repository] = map[string]string{}
+	subjectKey := subject.Repository + "@" + subject.Digest
+	if l.attachments[subjectKey] == nil {
+		l.attachments[subjectKey] = map[string]string{}
 	}
-	l.attachments[repository][digest] = mediaType
+	l.attachments[subjectKey][digest] = mediaType
 	return digest, nil
 }
-func (l *Local) AttachmentMediaType(repository, digest string) (string, bool) {
+func (l *Local) AttachmentMediaType(subject application.PublishedArtifact, digest string) (string, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	v, ok := l.attachments[repository][digest]
+	v, ok := l.attachments[subject.Repository+"@"+subject.Digest][digest]
 	return v, ok
 }
 func (l *Local) artifactPath(repository, digest string) string {

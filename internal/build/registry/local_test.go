@@ -61,18 +61,19 @@ func TestRegistryAdapter_DeniesCrossTenantRepository(t *testing.T) {
 func TestRegistryAdapter_StoresSBOMAndSignatureReferences(t *testing.T) {
 	r := registry.NewLocal(t.TempDir())
 	repo := "registry.test/tenants/t1/apps/p1"
-	d1, err := r.StoreAttachment(context.Background(), "t1", repo, "application/spdx+json", []byte("sbom"))
+	subject := application.PublishedArtifact{Repository: repo, Digest: rawDigest([]byte("artifact")), MediaType: "application/vnd.oci.image.manifest.v1+json"}
+	d1, err := r.StoreAttachment(context.Background(), "t1", subject, "application/spdx+json", []byte("sbom"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	d2, err := r.StoreAttachment(context.Background(), "t1", repo, "application/vnd.dev.cosign.simplesigning.v1+json", []byte("sig"))
+	d2, err := r.StoreAttachment(context.Background(), "t1", subject, "application/vnd.dev.cosign.simplesigning.v1+json", []byte("sig"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m, ok := r.AttachmentMediaType(repo, d1); !ok || m != "application/spdx+json" {
+	if m, ok := r.AttachmentMediaType(subject, d1); !ok || m != "application/spdx+json" {
 		t.Fatal(m, ok)
 	}
-	if _, ok := r.AttachmentMediaType(repo, d2); !ok {
+	if _, ok := r.AttachmentMediaType(subject, d2); !ok {
 		t.Fatal("signature attachment missing")
 	}
 }
@@ -115,8 +116,8 @@ func (r *lostResponseRegistry) Resolve(ctx context.Context, tenantID, reference 
 	r.resolveCalls++
 	return r.inner.Resolve(ctx, tenantID, reference)
 }
-func (r *lostResponseRegistry) StoreAttachment(ctx context.Context, tenantID, repository, mediaType string, raw []byte) (string, error) {
-	return r.inner.StoreAttachment(ctx, tenantID, repository, mediaType, raw)
+func (r *lostResponseRegistry) StoreAttachment(ctx context.Context, tenantID string, subject application.PublishedArtifact, mediaType string, raw []byte) (string, error) {
+	return r.inner.StoreAttachment(ctx, tenantID, subject, mediaType, raw)
 }
 
 func TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery(t *testing.T) {

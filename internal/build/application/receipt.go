@@ -132,7 +132,7 @@ func (s *Service) IngestVerifiedBuildReceipt(ctx context.Context, cmd IngestVeri
 	if err != nil {
 		return s.failReceipt(ctx, cmd.ActorID, build, artifact, err)
 	}
-	storedSBOM, err := s.Registry.StoreAttachment(ctx, build.TenantID, published.Repository, sbom.MediaType, sbom.Document)
+	storedSBOM, err := s.Registry.StoreAttachment(ctx, build.TenantID, published, sbom.MediaType, sbom.Document)
 	if err != nil {
 		return s.failReceipt(ctx, cmd.ActorID, build, artifact, err)
 	}
@@ -169,7 +169,7 @@ func (s *Service) IngestVerifiedBuildReceipt(ctx context.Context, cmd IngestVeri
 	if err != nil {
 		return s.failReceipt(ctx, cmd.ActorID, build, artifact, domain.Wrap(domain.CodePlatformFailure, "encode signature attachment", err))
 	}
-	signatureAttachment, err := s.Registry.StoreAttachment(ctx, build.TenantID, artifact.Repository, "application/vnd.dev.cosign.simplesigning.v1+json", signatureDocument)
+	signatureAttachment, err := s.Registry.StoreAttachment(ctx, build.TenantID, publishedArtifact(*artifact), "application/vnd.dev.cosign.simplesigning.v1+json", signatureDocument)
 	if err != nil {
 		return s.failReceipt(ctx, cmd.ActorID, build, artifact, err)
 	}
@@ -198,7 +198,7 @@ func (s *Service) IngestVerifiedBuildReceipt(ctx context.Context, cmd IngestVeri
 	if verifiedProvenance.Digest != provenance.Digest || verifiedProvenance.MediaType != provenance.MediaType {
 		return s.failReceipt(ctx, cmd.ActorID, build, artifact, domain.NewError(domain.CodePlatformFailure, "provenance verifier returned a mismatched attachment"))
 	}
-	provenanceAttachment, err := s.Registry.StoreAttachment(ctx, build.TenantID, artifact.Repository, provenance.MediaType, provenance.Document)
+	provenanceAttachment, err := s.Registry.StoreAttachment(ctx, build.TenantID, publishedArtifact(*artifact), provenance.MediaType, provenance.Document)
 	if err != nil {
 		return s.failReceipt(ctx, cmd.ActorID, build, artifact, err)
 	}
@@ -298,6 +298,10 @@ func receiptResult(build domain.Build, artifact *domain.Artifact) IngestVerified
 		}
 	}
 	return result
+}
+
+func publishedArtifact(artifact domain.Artifact) PublishedArtifact {
+	return PublishedArtifact{Repository: artifact.Repository, Digest: artifact.Digest, MediaType: artifact.MediaType}
 }
 
 func (s *Service) failReceipt(ctx context.Context, actorID string, build domain.Build, artifact *domain.Artifact, cause error) (IngestVerifiedBuildReceiptResult, error) {
