@@ -123,7 +123,7 @@ func main() {
 	}
 	var internalServer *http.Server
 	if profile == platformprofile.Production {
-		internalServer, err = servicemtls.NewServer(servicemtls.ServerConfigFromEnv("agent-api,workspace-manager,attachments-api", "commerce:read commerce:write"), baseHandler)
+		internalServer, err = servicemtls.NewServer(servicemtls.ServerConfigFromEnv("workspace-manager", "commerce.workspace_budget:write"), baseHandler)
 		if err != nil {
 			log.Fatal(err)
 		}

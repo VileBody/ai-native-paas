@@ -1,0 +1,10 @@
+{
+  "schema": "ai-native-paas.io/admin-images-lock/v1",
+  "commerce_api": {
+    "git_revision": "79306d35687552655bb089f9e3e9f1a6cdb9bd44",
+    "github_actions_run": 29951253771,
+    "image": "ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-commerce-api@sha256:c32de6b62883dab70ad3b8ab3ebeb5c38ecdadd2e81f8cd153d6ff240fee4644",
+    "provenance": "mode=max",
+    "sbom": true
+  }
+}

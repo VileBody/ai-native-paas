@@ -1,0 +1,219 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: commerce-api
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: commerce-api
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: commerce-api
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: commerce-api
+    ai-native-paas.io/owner: control-plane
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: commerce-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: commerce-api
+        ai-native-paas.io/owner: control-plane
+    spec:
+      serviceAccountName: commerce-api
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: craas-ai-native-paas-registry
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: ai-native-paas.io/pool
+                    operator: In
+                    values: [system]
+      tolerations:
+        - key: ai-native-paas.io/system
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      containers:
+        - name: commerce-api
+          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-commerce-api@sha256:c32de6b62883dab70ad3b8ab3ebeb5c38ecdadd2e81f8cd153d6ff240fee4644
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: human-http
+              containerPort: 8084
+            - name: service-mtls
+              containerPort: 8443
+          env:
+            - name: PLATFORM_PROFILE
+              value: production
+            - name: COMMERCE_API_ADDR
+              value: :8084
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-postgres
+                  key: DATABASE_URL
+            - name: OIDC_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: commerce-api-settings
+                  key: OIDC_ISSUER
+            - name: OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: commerce-api-settings
+                  key: OIDC_CLIENT_ID
+            - name: INTERNAL_MTLS_ADDR
+              value: :8443
+            - name: INTERNAL_MTLS_SERVER_CERT_FILE
+              value: /var/run/secrets/commerce-mtls/tls.crt
+            - name: INTERNAL_MTLS_SERVER_KEY_FILE
+              value: /var/run/secrets/commerce-mtls/tls.key
+            - name: INTERNAL_MTLS_CLIENT_CA_FILE
+              value: /var/run/secrets/commerce-mtls/ca.crt
+            - name: INTERNAL_MTLS_TRUST_DOMAIN
+              value: admin.platform.test
+            - name: INTERNAL_MTLS_ALLOWED_CLIENTS
+              value: workspace-manager
+            - name: INTERNAL_MTLS_SCOPES
+              value: commerce.workspace_budget:write
+          volumeMounts:
+            - name: commerce-mtls
+              mountPath: /var/run/secrets/commerce-mtls
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: human-http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: human-http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: commerce-mtls
+          secret:
+            secretName: commerce-api-mtls
+            defaultMode: 0440
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              - key: ca.crt
+                path: ca.crt
+      terminationGracePeriodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: commerce-api
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: commerce-api
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: commerce-api
+  ports:
+    - name: human-http
+      port: 8084
+      targetPort: human-http
+    - name: service-mtls
+      port: 8443
+      targetPort: service-mtls
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: commerce-api
+  namespace: ai-native-paas-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: commerce-api
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: workspace-manager
+      ports:
+        - protocol: TCP
+          port: 8443
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8084
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 192.168.73.6/32
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443

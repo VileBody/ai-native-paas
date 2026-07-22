@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'cmd/commerce-api/**'
+      - 'cmd/commerce-seed/**'
       - 'internal/commerce/**'
       - 'internal/identity/**'
       - 'internal/platformprofile/**'
@@ -32,7 +33,7 @@ jobs:
       - run: make fmt-check
       - run: go vet ./cmd/commerce-api ./internal/commerce/... ./internal/identity/...
       - run: go test -race -count=1 ./internal/commerce/... ./internal/identity/...
-      - run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath ./cmd/commerce-api
+      - run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath ./cmd/commerce-api ./cmd/commerce-seed
 
   image:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'

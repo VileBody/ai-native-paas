@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: commerce-controlled-beta-seed-
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: commerce-seed
+    ai-native-paas.io/owner: control-plane
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: commerce-seed
+        ai-native-paas.io/owner: control-plane
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: craas-ai-native-paas-registry
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: seed
+          image: REPLACE_WITH_COMMERCE_IMAGE_DIGEST
+          imagePullPolicy: IfNotPresent
+          command: [/commerce-seed]
+          env:
+            - name: PLATFORM_PROFILE
+              value: production
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-postgres
+                  key: DATABASE_URL
+            - name: COMMERCE_SEED_TENANT_ID
+              value: REPLACE_WITH_TENANT_ID
+            - name: COMMERCE_SEED_SUBSCRIPTION_ID
+              value: REPLACE_WITH_SUBSCRIPTION_ID
+            - name: COMMERCE_SEED_BILLING_PERIOD_ID
+              value: REPLACE_WITH_BILLING_PERIOD_ID
+            - name: COMMERCE_SEED_WORKSPACE_SECONDS
+              value: "86400"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
