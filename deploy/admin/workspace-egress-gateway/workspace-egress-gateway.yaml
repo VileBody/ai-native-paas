@@ -17,6 +17,7 @@ metadata:
 data:
   allowed-hosts: >-
     workspace-manager.72-56-246-80.sslip.io,
+    harbor.harbor-system.svc,
     gitlab.com,registry.gitlab.com,
     ai-native-paas-registry.registry.twcstorage.ru,
     api.timeweb.cloud,s3.twcstorage.ru,
@@ -26,6 +27,8 @@ data:
     registry.npmjs.org,pypi.org,files.pythonhosted.org,
     auth.docker.io,registry-1.docker.io,production.cloudflare.docker.com
   control-plane-targets: workspace-manager.72-56-246-80.sslip.io:32443
+  internal-service-targets: harbor.harbor-system.svc:443
+  internal-service-cidrs: 10.96.0.0/12
   denied-cidrs: >-
     10.0.0.0/8,100.64.0.0/10,169.254.0.0/16,172.16.0.0/12,
     192.168.0.0/16,192.168.73.0/24,192.168.74.0/24,192.168.75.0/24
@@ -122,6 +125,16 @@ spec:
                 configMapKeyRef:
                   name: workspace-egress-policy
                   key: control-plane-targets
+            - name: WORKSPACE_EGRESS_INTERNAL_SERVICE_TARGETS
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-egress-policy
+                  key: internal-service-targets
+            - name: WORKSPACE_EGRESS_INTERNAL_SERVICE_CIDRS
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-egress-policy
+                  key: internal-service-cidrs
           volumeMounts:
             - name: tls
               mountPath: /var/run/secrets/workspace-egress
@@ -212,6 +225,15 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: harbor-system
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8443
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0

@@ -40,8 +40,19 @@ func main() {
 		}
 		denied = append(denied, prefix)
 	}
+	internalServiceCIDRs := []netip.Prefix{}
+	for _, raw := range csv("WORKSPACE_EGRESS_INTERNAL_SERVICE_CIDRS") {
+		prefix, parseErr := netip.ParsePrefix(raw)
+		if parseErr != nil {
+			logger.Error("invalid workspace egress internal service CIDR")
+			os.Exit(1)
+		}
+		internalServiceCIDRs = append(internalServiceCIDRs, prefix)
+	}
 	gateway := egressgateway.Gateway{
-		AllowedHosts: allowed, ControlPlaneTargets: csv("WORKSPACE_EGRESS_CONTROL_PLANE_TARGETS"), DeniedCIDRs: denied, TrustDomain: required("WORKSPACE_TRUST_DOMAIN"), Resolver: net.DefaultResolver, DialContext: egressgateway.DefaultDialContext,
+		AllowedHosts: allowed, ControlPlaneTargets: csv("WORKSPACE_EGRESS_CONTROL_PLANE_TARGETS"),
+		InternalServiceTargets: csv("WORKSPACE_EGRESS_INTERNAL_SERVICE_TARGETS"), InternalServiceCIDRs: internalServiceCIDRs,
+		DeniedCIDRs: denied, TrustDomain: required("WORKSPACE_TRUST_DOMAIN"), Resolver: net.DefaultResolver, DialContext: egressgateway.DefaultDialContext,
 		Log: func(message string, values ...any) { logger.Info(message, values...) },
 	}
 	if err := gateway.Validate(); err != nil {

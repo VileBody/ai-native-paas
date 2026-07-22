@@ -19,6 +19,12 @@ type resolverFake struct {
 	err       error
 }
 
+type resolverByHost map[string][]netip.Addr
+
+func (r resolverByHost) LookupNetIP(_ context.Context, _, host string) ([]netip.Addr, error) {
+	return append([]netip.Addr(nil), r[host]...), nil
+}
+
 func (r resolverFake) LookupNetIP(context.Context, string, string) ([]netip.Addr, error) {
 	return append([]netip.Addr(nil), r.addresses...), r.err
 }
@@ -146,6 +152,59 @@ func TestGateway_AllowsOnlyExactNonStandardControlPlaneTarget(t *testing.T) {
 	}
 }
 
+func TestGateway_AllowsOnlyExactInternalServiceInsideServiceCIDR(t *testing.T) {
+	resolver := resolverByHost{
+		"harbor.harbor-system.svc": {netip.MustParseAddr("10.101.111.195")},
+		"evil.harbor-system.svc":   {netip.MustParseAddr("10.101.111.196")},
+		"public.example.com":       {netip.MustParseAddr("192.168.73.6")},
+	}
+	base := Gateway{
+		AllowedHosts:           []string{"harbor.harbor-system.svc", "evil.harbor-system.svc", "public.example.com"},
+		InternalServiceTargets: []string{"harbor.harbor-system.svc:443"},
+		InternalServiceCIDRs:   []netip.Prefix{netip.MustParsePrefix("10.96.0.0/12")},
+		DeniedCIDRs:            DefaultDeniedCIDRs(), TrustDomain: "workspace.platform.example.com", Resolver: resolver,
+	}
+
+	upstreamClient, upstreamServer := net.Pipe()
+	defer upstreamServer.Close()
+	allowed := base
+	allowed.DialContext = func(_ context.Context, _, address string) (net.Conn, error) {
+		if address != "10.101.111.195:443" {
+			t.Fatalf("unexpected internal address %q", address)
+		}
+		return upstreamClient, nil
+	}
+	client, server := net.Pipe()
+	request := httptest.NewRequest(http.MethodConnect, "https://egress.invalid", nil)
+	request.Host = "harbor.harbor-system.svc:443"
+	request.TLS = workspaceTLSState(t)
+	done := make(chan struct{})
+	go func() { allowed.ServeHTTP(newHijackWriter(server), request); close(done) }()
+	response, err := http.ReadResponse(bufio.NewReader(client), request)
+	if err != nil || response.StatusCode != http.StatusOK {
+		t.Fatalf("exact internal service response=%#v err=%v", response, err)
+	}
+	_ = client.Close()
+	_ = upstreamServer.Close()
+	<-done
+
+	for _, target := range []string{"evil.harbor-system.svc:443", "public.example.com:443", "harbor.harbor-system.svc:8443"} {
+		denied := base
+		denied.DialContext = func(context.Context, string, string) (net.Conn, error) {
+			t.Fatalf("denied internal target %q reached dialer", target)
+			return nil, io.EOF
+		}
+		request := httptest.NewRequest(http.MethodConnect, "https://egress.invalid", nil)
+		request.Host = target
+		request.TLS = workspaceTLSState(t)
+		response := httptest.NewRecorder()
+		denied.ServeHTTP(response, request)
+		if response.Code != http.StatusForbidden {
+			t.Fatalf("target=%q status=%d", target, response.Code)
+		}
+	}
+}
+
 type hijackWriter struct {
 	connection net.Conn
 	buffer     *bufio.ReadWriter
@@ -182,6 +241,21 @@ func TestGateway_RejectsInvalidControlPlaneTargets(t *testing.T) {
 		}
 		if err := gateway.Validate(); err == nil {
 			t.Fatalf("invalid control-plane target accepted: %q", target)
+		}
+	}
+}
+
+func TestGateway_RejectsInvalidInternalServiceBoundaries(t *testing.T) {
+	for _, gateway := range []Gateway{
+		{AllowedHosts: []string{"harbor.example.com"}, InternalServiceTargets: []string{"harbor.example.com:443"}},
+		{AllowedHosts: []string{"harbor.example.com"}, InternalServiceTargets: []string{"harbor.example.com:8443"}, InternalServiceCIDRs: []netip.Prefix{netip.MustParsePrefix("10.96.0.0/12")}},
+		{AllowedHosts: []string{"harbor.example.com"}, InternalServiceTargets: []string{"harbor.example.com:443"}, InternalServiceCIDRs: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")}},
+	} {
+		gateway.TrustDomain = "workspace.platform.example.com"
+		gateway.Resolver = resolverFake{}
+		gateway.DialContext = DefaultDialContext
+		if err := gateway.Validate(); err == nil {
+			t.Fatal("invalid internal service boundary accepted")
 		}
 	}
 }

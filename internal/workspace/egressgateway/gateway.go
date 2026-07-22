@@ -21,13 +21,15 @@ type Resolver interface {
 }
 
 type Gateway struct {
-	AllowedHosts        []string
-	ControlPlaneTargets []string
-	DeniedCIDRs         []netip.Prefix
-	TrustDomain         string
-	Resolver            Resolver
-	DialContext         func(context.Context, string, string) (net.Conn, error)
-	Log                 func(string, ...any)
+	AllowedHosts           []string
+	ControlPlaneTargets    []string
+	InternalServiceTargets []string
+	InternalServiceCIDRs   []netip.Prefix
+	DeniedCIDRs            []netip.Prefix
+	TrustDomain            string
+	Resolver               Resolver
+	DialContext            func(context.Context, string, string) (net.Conn, error)
+	Log                    func(string, ...any)
 }
 
 func (g Gateway) Validate() error {
@@ -48,6 +50,20 @@ func (g Gateway) Validate() error {
 		if err != nil || parsedPort < 1 || parsedPort > 65535 {
 			return errors.New("workspace control-plane target is invalid")
 		}
+	}
+	for _, target := range g.InternalServiceTargets {
+		host, port, err := net.SplitHostPort(strings.TrimSpace(target))
+		if err != nil || net.ParseIP(host) != nil || !validHostPattern(host) || !g.allowed(host) || port != "443" {
+			return errors.New("workspace internal service target is invalid")
+		}
+	}
+	for _, prefix := range g.InternalServiceCIDRs {
+		if !prefix.IsValid() || !prefix.Addr().IsPrivate() {
+			return errors.New("workspace internal service CIDR is invalid")
+		}
+	}
+	if len(g.InternalServiceTargets) > 0 && len(g.InternalServiceCIDRs) == 0 {
+		return errors.New("workspace internal service CIDR is required")
 	}
 	for _, prefix := range g.DeniedCIDRs {
 		if !prefix.IsValid() {
@@ -83,7 +99,8 @@ func (g Gateway) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		return
 	}
 	addresses, err := g.Resolver.LookupNetIP(request.Context(), "ip", host)
-	if err != nil || len(addresses) == 0 || g.hasDeniedAddress(addresses) {
+	internalService := g.internalServiceTargetAllowed(host, port)
+	if err != nil || len(addresses) == 0 || internalService && !g.hasAllowedInternalAddress(addresses) || !internalService && g.hasDeniedAddress(addresses) {
 		http.Error(response, "target resolution denied", http.StatusForbidden)
 		return
 	}
@@ -113,6 +130,40 @@ func (g Gateway) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		g.Log("workspace egress tunnel established", "identity", identity, "target_host", host)
 	}
 	go bridge(downstream, upstream)
+}
+
+func (g Gateway) internalServiceTargetAllowed(host, port string) bool {
+	target := net.JoinHostPort(strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), ".")), port)
+	for _, raw := range g.InternalServiceTargets {
+		candidateHost, candidatePort, err := net.SplitHostPort(strings.TrimSpace(raw))
+		if err != nil {
+			continue
+		}
+		candidate := net.JoinHostPort(strings.ToLower(strings.TrimSuffix(strings.TrimSpace(candidateHost), ".")), candidatePort)
+		if target == candidate {
+			return true
+		}
+	}
+	return false
+}
+
+func (g Gateway) hasAllowedInternalAddress(addresses []netip.Addr) bool {
+	for _, address := range addresses {
+		if !address.IsValid() || !address.IsPrivate() || address.IsLoopback() || address.IsLinkLocalUnicast() || address.IsLinkLocalMulticast() || address.IsMulticast() || address.IsUnspecified() {
+			return false
+		}
+		allowed := false
+		for _, prefix := range g.InternalServiceCIDRs {
+			if prefix.Contains(address) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return false
+		}
+	}
+	return true
 }
 
 func (g Gateway) controlPlaneTargetAllowed(host, port string) bool {
