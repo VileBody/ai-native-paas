@@ -103,8 +103,9 @@ gates.
 - The pinned workspace VM workflow now produces a compact 40 GiB QCOW2, SPDX
   SBOM and keyless Sigstore bundles. Run `29952874181` passed, and the
   downloaded image and manifest both passed checksum and exact-workflow
-  identity verification. Timeweb import and boot remain pending until the
-  exposed provider credentials are rotated.
+  identity verification. The image was imported into Timeweb as custom image
+  `803212b3-aa74-4c13-9bdf-77b864216994`; private-VPC boot, enrollment and
+  disposable destruction remain pending.
 - The verified-build registry port now binds every SBOM, signature and
   provenance document to an immutable artifact subject. A Harbor-compatible
   HTTPS OCI Distribution adapter resolves exact digests and writes OCI 1.1
@@ -168,6 +169,13 @@ credential incident is closed as a blocker; the remaining security gates are
 the cross-surface sentinel, live service-certificate deployment and workspace
 compromise/isolation suite.
 
+Later development diagnostics exposed the active Timeweb provider token and
+the scoped workspace-log and image-staging S3 pairs. They do not block
+development-only live gates, but they are an explicit release blocker tracked
+in [PRE_BETA_CREDENTIAL_ROTATION.md](PRE_BETA_CREDENTIAL_ROTATION.md). No beta
+window or tenant workload may start until every pending row is rotated, its
+consumers are reconciled and the previous credential is proven rejected.
+
 ## Still required
 
 - Keep the tested CoreDNS reconcile step in every future bootstrap; generation
@@ -178,10 +186,10 @@ compromise/isolation suite.
   `Create Project -> GitLab/MCP -> plan -> approval -> build -> GitOps ->
   runtime_sim_k8s -> probe -> usage/audit -> destroy`.
   The local acceptance slice covers the agent/runtime/audit half, Project MCP
-  now queues the governed build command, and the signed workspace image has the
-  verified rootless BuildKit Dockerfile boundary; GitLab repository bootstrap,
-  Timeweb image import/disposable VM, Harbor receipt ingestion/trust chain and
-  live Argo remain open.
+  now queues the governed build command, and the imported signed workspace
+  image has the verified rootless BuildKit Dockerfile boundary; GitLab
+  repository bootstrap, disposable VM boot, Harbor receipt ingestion/trust
+  chain and live Argo remain open.
 - Replace the remaining legacy Agent source/project façade stub through an
   additive v2 compatibility command carrying workspace plan, commit receipt
   and attestation context. The old v1 source signatures are intentionally not

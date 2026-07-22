@@ -161,8 +161,9 @@ func newProvider(t *testing.T, handler http.Handler) (*Provider, *httptest.Serve
 	provider, err := New(Config{
 		BaseURL: server.URL + "/api/v1", Token: testToken, ProjectID: 2545534, ConfiguratorID: 123,
 		AvailabilityZone: "msk-1", BandwidthMbps: 100, SystemDiskMiB: 40960,
-		ImageIDs: map[string]string{testDigest: "image-uuid-1"}, EgressGatewayCIDRs: []string{"192.168.75.4/32"},
-		EgressGatewayPort: 8443, DNSResolverCIDRs: []string{"192.168.75.1/32"}, HTTPClient: server.Client(),
+		ImageIDs: map[string]string{testDigest: "image-uuid-1"}, ControlPlaneCIDRs: []string{"192.168.75.5/32"}, ControlPlanePort: 9443,
+		EgressGatewayCIDRs: []string{"192.168.75.4/32"},
+		EgressGatewayPort:  8443, DNSResolverCIDRs: []string{"192.168.75.1/32"}, HTTPClient: server.Client(),
 		RenderCloudInit: func(context.Context, workspace.ProviderCreateRequest) (string, error) {
 			return "#cloud-config\nwrite_files: []\n", nil
 		},
@@ -203,15 +204,18 @@ func TestTimewebWorkspace_CreateFindDestroyIsPrivateFailClosedAndRecoverable(t *
 	if network["id"] != "vpc-workspace" || network["floating_ip"] != nil || payload["is_root_password_required"] != false || payload["project_id"] != float64(2545534) && payload["project_id"] != int64(2545534) {
 		t.Fatalf("server payload can expose workspace: %#v", payload)
 	}
-	if len(rules) != 3 {
-		t.Fatalf("want gateway TCP plus resolver TCP/UDP rules, got %#v", rules)
+	if len(rules) != 4 {
+		t.Fatalf("want control-plane TCP, gateway TCP and resolver TCP/UDP rules, got %#v", rules)
 	}
 	for _, rule := range rules {
-		if rule["direction"] != "egress" || rule["cidr"] != "192.168.75.4/32" && rule["cidr"] != "192.168.75.1/32" {
+		if rule["direction"] != "egress" || rule["cidr"] != "192.168.75.5/32" && rule["cidr"] != "192.168.75.4/32" && rule["cidr"] != "192.168.75.1/32" {
 			t.Fatalf("firewall rule opens an unapproved path: %#v", rule)
 		}
 		if rule["cidr"] == "192.168.75.4/32" && rule["port"] != "8443" {
 			t.Fatalf("gateway firewall opens more than the proxy port: %#v", rule)
+		}
+		if rule["cidr"] == "192.168.75.5/32" && rule["port"] != "9443" {
+			t.Fatalf("control-plane firewall opens more than the manager port: %#v", rule)
 		}
 	}
 	api.mu.Lock()
@@ -224,7 +228,7 @@ func TestTimewebWorkspace_CreateFindDestroyIsPrivateFailClosedAndRecoverable(t *
 	api.mu.Lock()
 	ruleCountAfterReconcile := len(api.rules)
 	api.mu.Unlock()
-	if ruleCountAfterReconcile != 3 {
+	if ruleCountAfterReconcile != 4 {
 		t.Fatalf("firewall drift was not removed, rules=%d", ruleCountAfterReconcile)
 	}
 	evidence, err := provider.Destroy(context.Background(), found)

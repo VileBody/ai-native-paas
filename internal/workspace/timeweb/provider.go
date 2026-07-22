@@ -37,6 +37,8 @@ type Config struct {
 	BandwidthMbps      int64
 	SystemDiskMiB      int64
 	ImageIDs           map[string]string
+	ControlPlaneCIDRs  []string
+	ControlPlanePort   int
 	EgressGatewayCIDRs []string
 	EgressGatewayPort  int
 	DNSResolverCIDRs   []string
@@ -53,6 +55,8 @@ type Provider struct {
 	bandwidthMbps      int64
 	systemDiskMiB      int64
 	imageIDs           map[string]string
+	controlPlaneCIDRs  []string
+	controlPlanePort   int
 	egressGatewayCIDRs []string
 	egressGatewayPort  int
 	dnsResolverCIDRs   []string
@@ -72,7 +76,7 @@ func New(config Config) (*Provider, error) {
 	if parsed.Scheme != "https" && !isLoopbackHost(parsed.Hostname()) {
 		return nil, errors.New("Timeweb API requires HTTPS")
 	}
-	if strings.TrimSpace(config.Token) == "" || config.ProjectID <= 0 || config.ConfiguratorID <= 0 || strings.TrimSpace(config.AvailabilityZone) == "" || config.BandwidthMbps < 1 || config.SystemDiskMiB < 10240 || len(config.ImageIDs) == 0 || len(config.EgressGatewayCIDRs) == 0 || config.EgressGatewayPort < 1 || config.EgressGatewayPort > 65535 || len(config.DNSResolverCIDRs) == 0 || config.RenderCloudInit == nil {
+	if strings.TrimSpace(config.Token) == "" || config.ProjectID <= 0 || config.ConfiguratorID <= 0 || strings.TrimSpace(config.AvailabilityZone) == "" || config.BandwidthMbps < 1 || config.SystemDiskMiB < 10240 || len(config.ImageIDs) == 0 || len(config.ControlPlaneCIDRs) == 0 || config.ControlPlanePort < 1 || config.ControlPlanePort > 65535 || len(config.EgressGatewayCIDRs) == 0 || config.EgressGatewayPort < 1 || config.EgressGatewayPort > 65535 || len(config.DNSResolverCIDRs) == 0 || config.RenderCloudInit == nil {
 		return nil, errors.New("Timeweb workspace provider configuration is incomplete")
 	}
 	for digest, imageID := range config.ImageIDs {
@@ -80,8 +84,8 @@ func New(config Config) (*Provider, error) {
 			return nil, errors.New("Timeweb workspace image mapping is invalid")
 		}
 	}
-	if !singleHostCIDRs(config.EgressGatewayCIDRs) || !singleHostCIDRs(config.DNSResolverCIDRs) {
-		return nil, errors.New("Timeweb workspace gateway and resolver policies require explicit host CIDRs")
+	if !singleHostCIDRs(config.ControlPlaneCIDRs) || !singleHostCIDRs(config.EgressGatewayCIDRs) || !singleHostCIDRs(config.DNSResolverCIDRs) {
+		return nil, errors.New("Timeweb workspace control-plane, gateway and resolver policies require explicit host CIDRs")
 	}
 	client := config.HTTPClient
 	if client == nil {
@@ -90,7 +94,8 @@ func New(config Config) (*Provider, error) {
 	return &Provider{
 		baseURL: parsed, token: config.Token, projectID: config.ProjectID, configuratorID: config.ConfiguratorID,
 		availabilityZone: config.AvailabilityZone, bandwidthMbps: config.BandwidthMbps, systemDiskMiB: config.SystemDiskMiB,
-		imageIDs: cloneMap(config.ImageIDs), egressGatewayCIDRs: sortedCopy(config.EgressGatewayCIDRs), egressGatewayPort: config.EgressGatewayPort,
+		imageIDs: cloneMap(config.ImageIDs), controlPlaneCIDRs: sortedCopy(config.ControlPlaneCIDRs), controlPlanePort: config.ControlPlanePort,
+		egressGatewayCIDRs: sortedCopy(config.EgressGatewayCIDRs), egressGatewayPort: config.EgressGatewayPort,
 		dnsResolverCIDRs: sortedCopy(config.DNSResolverCIDRs), client: client, renderCloudInit: config.RenderCloudInit,
 	}, nil
 }
@@ -381,6 +386,10 @@ type rulesEnvelope struct {
 
 func (p *Provider) reconcileFirewallRules(ctx context.Context, groupID string) error {
 	desired := make(map[string]firewallRule)
+	for _, cidr := range p.controlPlaneCIDRs {
+		rule := firewallRule{Direction: "egress", Protocol: "tcp", CIDR: cidr, Port: strconv.Itoa(p.controlPlanePort)}
+		desired[firewallRuleKey(rule)] = rule
+	}
 	for _, cidr := range p.egressGatewayCIDRs {
 		rule := firewallRule{Direction: "egress", Protocol: "tcp", CIDR: cidr, Port: strconv.Itoa(p.egressGatewayPort)}
 		desired[firewallRuleKey(rule)] = rule
@@ -417,7 +426,9 @@ func (p *Provider) reconcileFirewallRules(ctx context.Context, groupID string) e
 	for _, key := range keys {
 		rule := desired[key]
 		description := "Workspace DNS resolver"
-		if rule.Port != "53" {
+		if rule.Port == strconv.Itoa(p.controlPlanePort) {
+			description = "Workspace manager mTLS control plane"
+		} else if rule.Port != "53" {
 			description = "Governed mTLS egress gateway"
 		}
 		if err := p.createFirewallRule(ctx, groupID, rule.Protocol, rule.CIDR, rule.Port, description); err != nil {

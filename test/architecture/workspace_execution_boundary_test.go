@@ -40,7 +40,7 @@ func TestArchitecture_WorkspaceEgressHasNoDirectInternetFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := string(providerRaw)
-	for _, required := range []string{"EgressGatewayPort", "strconv.Itoa(p.egressGatewayPort)", `Port: "53"`} {
+	for _, required := range []string{"ControlPlanePort", "strconv.Itoa(p.controlPlanePort)", "EgressGatewayPort", "strconv.Itoa(p.egressGatewayPort)", `Port: "53"`} {
 		if !strings.Contains(provider, required) {
 			t.Fatalf("workspace firewall is missing %q", required)
 		}

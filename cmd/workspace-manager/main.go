@@ -71,6 +71,8 @@ type config struct {
 	LogS3SecretKeyFile      string
 	LogEncryptionKeyFile    string
 	ControlPlaneURL         string
+	ControlPlanePort        int
+	ControlPlaneCIDRs       []string
 	EgressGatewayURL        string
 	EgressGatewayPort       int
 	AllowedEgressHosts      []string
@@ -197,8 +199,9 @@ func main() {
 		BaseURL: settings.TimewebAPIURL, Token: string(timewebToken), ProjectID: settings.TimewebProjectID,
 		ConfiguratorID: settings.TimewebConfiguratorID, AvailabilityZone: settings.TimewebZone,
 		BandwidthMbps: settings.TimewebBandwidthMbps, SystemDiskMiB: settings.TimewebSystemDiskMiB,
-		ImageIDs: settings.WorkspaceImages, EgressGatewayCIDRs: settings.EgressGatewayCIDRs,
-		EgressGatewayPort: settings.EgressGatewayPort, DNSResolverCIDRs: settings.DNSResolverCIDRs, RenderCloudInit: renderer.Render,
+		ImageIDs: settings.WorkspaceImages, ControlPlaneCIDRs: settings.ControlPlaneCIDRs, ControlPlanePort: settings.ControlPlanePort,
+		EgressGatewayCIDRs: settings.EgressGatewayCIDRs,
+		EgressGatewayPort:  settings.EgressGatewayPort, DNSResolverCIDRs: settings.DNSResolverCIDRs, RenderCloudInit: renderer.Render,
 	})
 	if err != nil {
 		logger.Error("initialize Timeweb workspace provider", "error", err)
@@ -312,6 +315,7 @@ func loadConfig() (config, error) {
 		TimewebAPIURL:          env("TIMEWEB_API_URL", "https://api.timeweb.cloud/api/v1"), TimewebTokenFile: required("TIMEWEB_TOKEN_FILE"),
 		TimewebZone: env("TIMEWEB_AVAILABILITY_ZONE", "msk-1"), WorkspaceVPCID: required("WORKSPACE_VPC_ID"),
 		ControlPlaneURL: required("WORKSPACE_AGENT_PUBLIC_URL"), AllowedEgressHosts: csv("WORKSPACE_ALLOWED_EGRESS_HOSTS"),
+		ControlPlaneCIDRs:  csv("WORKSPACE_CONTROL_PLANE_CIDRS"),
 		EgressGatewayURL:   required("WORKSPACE_EGRESS_GATEWAY_URL"),
 		EgressGatewayCIDRs: csv("WORKSPACE_EGRESS_GATEWAY_CIDRS"), DNSResolverCIDRs: csv("WORKSPACE_DNS_RESOLVER_CIDRS"),
 		DeniedCIDRs:   csv("WORKSPACE_DENIED_CIDRS"),
@@ -341,6 +345,13 @@ func loadConfig() (config, error) {
 	if settings.TimewebSystemDiskMiB, err = integer("TIMEWEB_WORKSPACE_SYSTEM_DISK_MIB", 40960); err != nil || settings.TimewebSystemDiskMiB < 10240 {
 		return config{}, errors.New("TIMEWEB_WORKSPACE_SYSTEM_DISK_MIB is invalid")
 	}
+	controlPlaneURL, controlPlaneErr := url.Parse(settings.ControlPlaneURL)
+	if controlPlaneErr != nil || controlPlaneURL.Scheme != "https" || controlPlaneURL.Hostname() == "" || controlPlaneURL.Port() == "" {
+		return config{}, errors.New("WORKSPACE_AGENT_PUBLIC_URL must be an HTTPS URL with an explicit port")
+	}
+	if settings.ControlPlanePort, err = strconv.Atoi(controlPlaneURL.Port()); err != nil || settings.ControlPlanePort < 1 || settings.ControlPlanePort > 65535 {
+		return config{}, errors.New("WORKSPACE_AGENT_PUBLIC_URL port is invalid")
+	}
 	gatewayURL, gatewayErr := url.Parse(settings.EgressGatewayURL)
 	if gatewayErr != nil || gatewayURL.Scheme != "https" || gatewayURL.Hostname() == "" || gatewayURL.Port() == "" {
 		return config{}, errors.New("WORKSPACE_EGRESS_GATEWAY_URL must be an HTTPS URL with an explicit port")
@@ -369,8 +380,9 @@ func loadConfig() (config, error) {
 		}
 	}
 	for name, values := range map[string][]string{
-		"WORKSPACE_ALLOWED_EGRESS_HOSTS": settings.AllowedEgressHosts, "WORKSPACE_EGRESS_GATEWAY_CIDRS": settings.EgressGatewayCIDRs,
-		"WORKSPACE_DNS_RESOLVER_CIDRS": settings.DNSResolverCIDRs, "WORKSPACE_DENIED_CIDRS": settings.DeniedCIDRs,
+		"WORKSPACE_ALLOWED_EGRESS_HOSTS": settings.AllowedEgressHosts, "WORKSPACE_CONTROL_PLANE_CIDRS": settings.ControlPlaneCIDRs,
+		"WORKSPACE_EGRESS_GATEWAY_CIDRS": settings.EgressGatewayCIDRs,
+		"WORKSPACE_DNS_RESOLVER_CIDRS":   settings.DNSResolverCIDRs, "WORKSPACE_DENIED_CIDRS": settings.DeniedCIDRs,
 	} {
 		if len(values) == 0 {
 			return config{}, fmt.Errorf("%s is required", name)

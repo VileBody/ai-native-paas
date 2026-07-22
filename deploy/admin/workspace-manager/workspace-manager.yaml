@@ -153,6 +153,11 @@ spec:
                 configMapKeyRef:
                   name: workspace-manager-release
                   key: WORKSPACE_AGENT_PUBLIC_URL
+            - name: WORKSPACE_CONTROL_PLANE_CIDRS
+              valueFrom:
+                configMapKeyRef:
+                  name: workspace-manager-release
+                  key: WORKSPACE_CONTROL_PLANE_CIDRS
             - name: WORKSPACE_ALLOWED_EGRESS_HOSTS
               valueFrom:
                 configMapKeyRef:
