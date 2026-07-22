@@ -51,6 +51,24 @@ bao write auth/kubernetes/role/workspace-manager \
   token_max_ttl=30m
 ```
 
+## Temporary live-edge server certificates
+
+The client-only `workspace-agent` role above must never issue a server
+certificate. During a disposable workspace live window, a named solo-dev
+operator may create the separate server-only `workspace-service` role and
+synchronize 24-hour manager/gateway certificates with:
+
+```sh
+./scripts/sync-openbao-workspace-edge-tls.sh
+```
+
+The script reads the named operator password from macOS Keychain, uses a local
+OpenBao port-forward, writes only the two Kubernetes TLS Secrets, revokes its
+temporary token and removes all plaintext temporary files. The reviewed dev
+names are under `*.72-56-246-80.sslip.io`; beta replaces them with the supplied
+domain and automated renewal. The broad solo-dev operator remains unacceptable
+for a beta release window.
+
 The OpenBao Agent Injector must render the Kubernetes-authenticated workload
 token to `/run/openbao/token` with mode `0400`. The manager rereads that file
 for every issuance/revocation, so token rotation does not require a restart.

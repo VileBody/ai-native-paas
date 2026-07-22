@@ -79,7 +79,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: manager
-          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-workspace-manager@sha256:8de3938abbe3a6bb31bf4cba60e0e36e8ba3ddb64a6c40f1828148bf59ee8312
+          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-workspace-manager@sha256:1bb80fcad3796b49d1f96907ef3d99104f18e7f82f9478424eb987edf8158e7f
           imagePullPolicy: IfNotPresent
           ports:
             - name: agent-mtls

@@ -16,7 +16,7 @@ metadata:
     app.kubernetes.io/name: workspace-egress-gateway
 data:
   allowed-hosts: >-
-    workspace-manager.85-193-87-39.sslip.io,
+    workspace-manager.72-56-246-80.sslip.io,
     gitlab.com,registry.gitlab.com,
     ai-native-paas-registry.registry.twcstorage.ru,
     api.timeweb.cloud,s3.twcstorage.ru,
@@ -25,7 +25,7 @@ data:
     proxy.golang.org,sum.golang.org,storage.googleapis.com,
     registry.npmjs.org,pypi.org,files.pythonhosted.org,
     auth.docker.io,registry-1.docker.io,production.cloudflare.docker.com
-  control-plane-targets: workspace-manager.85-193-87-39.sslip.io:32443
+  control-plane-targets: workspace-manager.72-56-246-80.sslip.io:32443
   denied-cidrs: >-
     10.0.0.0/8,100.64.0.0/10,169.254.0.0/16,172.16.0.0/12,
     192.168.0.0/16,192.168.73.0/24,192.168.74.0/24,192.168.75.0/24
@@ -89,7 +89,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: gateway
-          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-workspace-egress-gateway@sha256:950e8823de28656bf8112bcfe5905242443c858b82b307693501189ed9996609
+          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-workspace-egress-gateway@sha256:e072a460454f9df0369e83a0699dacf5d4ec91ecf4ae981090aad1ca913761dc
           imagePullPolicy: IfNotPresent
           ports:
             - name: mtls-connect

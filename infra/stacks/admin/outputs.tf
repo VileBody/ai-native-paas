@@ -26,8 +26,8 @@ output "legacy_edge_public_ip" {
 output "workspace_live_edge" {
   description = "Temporary public mTLS endpoints, or null while the live workspace gate is disabled."
   value = var.workspace_live_edge_enabled ? {
-    manager = "workspace-manager.85-193-87-39.sslip.io:32443"
-    egress  = "workspace-egress.85-193-87-39.sslip.io:32444"
+    manager = "workspace-manager.${replace(twc_floating_ip.admin_egress.ip, ".", "-")}.sslip.io:32443"
+    egress  = "workspace-egress.${replace(twc_floating_ip.admin_egress.ip, ".", "-")}.sslip.io:32444"
   } : null
 }
 
