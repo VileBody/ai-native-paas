@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: workspace-manager-live-edge
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: workspace-manager
+    ai-native-paas.io/scope: temporary-live-gate
+spec:
+  type: NodePort
+  externalTrafficPolicy: Cluster
+  selector:
+    app.kubernetes.io/name: workspace-manager
+  ports:
+    - name: agent-mtls
+      protocol: TCP
+      port: 8443
+      targetPort: agent-mtls
+      nodePort: 32443
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workspace-egress-live-edge
+  namespace: ai-native-paas-system
+  labels:
+    app.kubernetes.io/name: workspace-egress-gateway
+    ai-native-paas.io/scope: temporary-live-gate
+spec:
+  type: NodePort
+  externalTrafficPolicy: Cluster
+  selector:
+    app.kubernetes.io/name: workspace-egress-gateway
+  ports:
+    - name: mtls-connect
+      protocol: TCP
+      port: 8443
+      targetPort: mtls-connect
+      nodePort: 32444

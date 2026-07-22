@@ -41,7 +41,7 @@ func main() {
 		denied = append(denied, prefix)
 	}
 	gateway := egressgateway.Gateway{
-		AllowedHosts: allowed, DeniedCIDRs: denied, TrustDomain: required("WORKSPACE_TRUST_DOMAIN"), Resolver: net.DefaultResolver, DialContext: egressgateway.DefaultDialContext,
+		AllowedHosts: allowed, ControlPlaneTargets: csv("WORKSPACE_EGRESS_CONTROL_PLANE_TARGETS"), DeniedCIDRs: denied, TrustDomain: required("WORKSPACE_TRUST_DOMAIN"), Resolver: net.DefaultResolver, DialContext: egressgateway.DefaultDialContext,
 		Log: func(message string, values ...any) { logger.Info(message, values...) },
 	}
 	if err := gateway.Validate(); err != nil {

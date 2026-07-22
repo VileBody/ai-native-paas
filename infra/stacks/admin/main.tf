@@ -63,6 +63,33 @@ resource "twc_router_dnat_rule" "legacy_https" {
   local_port  = "31443"
 }
 
+# Temporary, cost-free live gate listeners on the existing admin router IPv4.
+# They are raw TCP all the way to the workspace mTLS services; the retained
+# legacy HTTP(S) listeners above remain untouched. Disable outside live gates.
+resource "twc_router_dnat_rule" "workspace_manager_mtls" {
+  count = var.workspace_live_edge_enabled ? 1 : 0
+
+  router_id = twc_router.admin.id
+  protocol  = "tcp"
+
+  public_ip   = twc_floating_ip.admin_egress.ip
+  public_port = "32443"
+  local_ip    = var.legacy_edge_private_ip
+  local_port  = "32443"
+}
+
+resource "twc_router_dnat_rule" "workspace_egress_mtls" {
+  count = var.workspace_live_edge_enabled ? 1 : 0
+
+  router_id = twc_router.admin.id
+  protocol  = "tcp"
+
+  public_ip   = twc_floating_ip.admin_egress.ip
+  public_port = "32444"
+  local_ip    = var.legacy_edge_private_ip
+  local_port  = "32444"
+}
+
 resource "twc_k8s_cluster" "platform" {
   name              = "ai-native-paas-test"
   description       = "Admin control plane. PaaS tenant workloads are forbidden. ADR 0006 quarantines operator legacy apps."

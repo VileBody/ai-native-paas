@@ -23,6 +23,14 @@ output "legacy_edge_public_ip" {
   value       = twc_floating_ip.admin_egress.ip
 }
 
+output "workspace_live_edge" {
+  description = "Temporary public mTLS endpoints, or null while the live workspace gate is disabled."
+  value = var.workspace_live_edge_enabled ? {
+    manager = "workspace-manager.85-193-87-39.sslip.io:32443"
+    egress  = "workspace-egress.85-193-87-39.sslip.io:32444"
+  } : null
+}
+
 output "ci_node_group_id" {
   value = twc_k8s_node_group.ci.id
 }

@@ -25,6 +25,12 @@ variable "legacy_edge_private_ip" {
   }
 }
 
+variable "workspace_live_edge_enabled" {
+  description = "Expose the two temporary workspace mTLS listeners through the existing admin router IPv4 during live workspace gates."
+  type        = bool
+  default     = false
+}
+
 variable "location" {
   description = "Timeweb Cloud location. ru-3 is Moscow."
   type        = string

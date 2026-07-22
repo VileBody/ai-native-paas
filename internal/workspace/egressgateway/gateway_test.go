@@ -99,6 +99,53 @@ func TestGateway_UsesResolvedPublicIPAndBridgesTunnel(t *testing.T) {
 	<-done
 }
 
+func TestGateway_AllowsOnlyExactNonStandardControlPlaneTarget(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		target string
+		status int
+	}{
+		{name: "exact control plane", target: "workspace-manager.example.com:32443", status: http.StatusOK},
+		{name: "adjacent port", target: "workspace-manager.example.com:32444", status: http.StatusForbidden},
+		{name: "other host", target: "packages.example.com:32443", status: http.StatusForbidden},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			gateway := Gateway{
+				AllowedHosts: []string{"workspace-manager.example.com", "packages.example.com"}, ControlPlaneTargets: []string{"workspace-manager.example.com:32443"},
+				DeniedCIDRs: DefaultDeniedCIDRs(), TrustDomain: "workspace.platform.example.com", Resolver: resolverFake{addresses: []netip.Addr{netip.MustParseAddr("8.8.8.8")}},
+			}
+			request := httptest.NewRequest(http.MethodConnect, "https://egress.invalid", nil)
+			request.Host = test.target
+			request.TLS = workspaceTLSState(t)
+			if test.status != http.StatusOK {
+				gateway.DialContext = func(context.Context, string, string) (net.Conn, error) {
+					t.Fatal("denied target reached dialer")
+					return nil, io.EOF
+				}
+				response := httptest.NewRecorder()
+				gateway.ServeHTTP(response, request)
+				if response.Code != test.status {
+					t.Fatalf("status=%d", response.Code)
+				}
+				return
+			}
+			upstreamClient, upstreamServer := net.Pipe()
+			defer upstreamServer.Close()
+			gateway.DialContext = func(context.Context, string, string) (net.Conn, error) { return upstreamClient, nil }
+			client, server := net.Pipe()
+			done := make(chan struct{})
+			go func() { gateway.ServeHTTP(newHijackWriter(server), request); close(done) }()
+			response, err := http.ReadResponse(bufio.NewReader(client), request)
+			if err != nil || response.StatusCode != test.status {
+				t.Fatalf("status=%v err=%v", response, err)
+			}
+			_ = client.Close()
+			_ = upstreamServer.Close()
+			<-done
+		})
+	}
+}
+
 type hijackWriter struct {
 	connection net.Conn
 	buffer     *bufio.ReadWriter
@@ -123,6 +170,18 @@ func TestGateway_ValidatesAllowlistPatterns(t *testing.T) {
 		gateway := Gateway{AllowedHosts: []string{invalid}, TrustDomain: "workspace.platform.example.com", Resolver: resolverFake{}, DialContext: DefaultDialContext}
 		if err := gateway.Validate(); err == nil {
 			t.Fatalf("invalid host pattern accepted: %q", invalid)
+		}
+	}
+}
+
+func TestGateway_RejectsInvalidControlPlaneTargets(t *testing.T) {
+	for _, target := range []string{"", "workspace-manager.example.com", "127.0.0.1:32443", "unlisted.example.com:32443", "workspace-manager.example.com:0"} {
+		gateway := Gateway{
+			AllowedHosts: []string{"workspace-manager.example.com"}, ControlPlaneTargets: []string{target},
+			TrustDomain: "workspace.platform.example.com", Resolver: resolverFake{}, DialContext: DefaultDialContext,
+		}
+		if err := gateway.Validate(); err == nil {
+			t.Fatalf("invalid control-plane target accepted: %q", target)
 		}
 	}
 }

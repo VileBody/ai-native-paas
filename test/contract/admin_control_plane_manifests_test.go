@@ -103,3 +103,13 @@ func TestAdminWorkspaceManager_ImageLockMatchesManifest(t *testing.T) {
 		t.Fatalf("workspace manager image evidence is inconsistent: %#v", lock.Manager)
 	}
 }
+
+func TestWorkspaceLiveEdgeUsesOnlyReviewedNodePorts(t *testing.T) {
+	raw := readManifest(t, "deploy/admin/workspace-edge/nodeports.yaml")
+	requireAll(t, raw,
+		"name: workspace-manager-live-edge", "nodePort: 32443",
+		"name: workspace-egress-live-edge", "nodePort: 32444",
+		"ai-native-paas.io/scope: temporary-live-gate",
+	)
+	forbidAll(t, raw, "type: LoadBalancer")
+}

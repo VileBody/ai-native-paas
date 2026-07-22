@@ -21,12 +21,13 @@ type Resolver interface {
 }
 
 type Gateway struct {
-	AllowedHosts []string
-	DeniedCIDRs  []netip.Prefix
-	TrustDomain  string
-	Resolver     Resolver
-	DialContext  func(context.Context, string, string) (net.Conn, error)
-	Log          func(string, ...any)
+	AllowedHosts        []string
+	ControlPlaneTargets []string
+	DeniedCIDRs         []netip.Prefix
+	TrustDomain         string
+	Resolver            Resolver
+	DialContext         func(context.Context, string, string) (net.Conn, error)
+	Log                 func(string, ...any)
 }
 
 func (g Gateway) Validate() error {
@@ -36,6 +37,16 @@ func (g Gateway) Validate() error {
 	for _, pattern := range g.AllowedHosts {
 		if !validHostPattern(pattern) {
 			return errors.New("workspace egress allowlist is invalid")
+		}
+	}
+	for _, target := range g.ControlPlaneTargets {
+		host, port, err := net.SplitHostPort(strings.TrimSpace(target))
+		if err != nil || net.ParseIP(host) != nil || !validHostPattern(host) || !g.allowed(host) {
+			return errors.New("workspace control-plane target is invalid")
+		}
+		parsedPort, err := net.LookupPort("tcp", port)
+		if err != nil || parsedPort < 1 || parsedPort > 65535 {
+			return errors.New("workspace control-plane target is invalid")
 		}
 	}
 	for _, prefix := range g.DeniedCIDRs {
@@ -62,12 +73,12 @@ func (g Gateway) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		return
 	}
 	host, port, err := net.SplitHostPort(request.Host)
-	if err != nil || port != "443" {
+	if err != nil {
 		http.Error(response, "target denied", http.StatusForbidden)
 		return
 	}
 	host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
-	if net.ParseIP(host) != nil || !g.allowed(host) {
+	if net.ParseIP(host) != nil || !g.allowed(host) || port != "443" && !g.controlPlaneTargetAllowed(host, port) {
 		http.Error(response, "target denied", http.StatusForbidden)
 		return
 	}
@@ -102,6 +113,21 @@ func (g Gateway) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		g.Log("workspace egress tunnel established", "identity", identity, "target_host", host)
 	}
 	go bridge(downstream, upstream)
+}
+
+func (g Gateway) controlPlaneTargetAllowed(host, port string) bool {
+	target := net.JoinHostPort(strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), ".")), port)
+	for _, raw := range g.ControlPlaneTargets {
+		candidateHost, candidatePort, err := net.SplitHostPort(strings.TrimSpace(raw))
+		if err != nil {
+			continue
+		}
+		candidate := net.JoinHostPort(strings.ToLower(strings.TrimSuffix(strings.TrimSpace(candidateHost), ".")), candidatePort)
+		if target == candidate {
+			return true
+		}
+	}
+	return false
 }
 
 func (g Gateway) allowed(host string) bool {
