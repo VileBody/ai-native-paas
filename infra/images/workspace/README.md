@@ -3,8 +3,9 @@
 The image is built from an exact Debian cloud artifact and an immutable Debian
 snapshot. Every externally downloaded tool is versioned and checksum-pinned in
 `images.lock.json`; the workspace-agent binary is built from the triggering Git
-SHA. The result is a raw disk compressed with xz plus a manifest, SBOM and
-keyless Sigstore bundle.
+SHA. The result is a compact QCOW2 disk plus a manifest, SBOM and keyless
+Sigstore bundle. QCOW2 is imported directly because Timeweb supports it and a
+sparse 40 GiB RAW stream would waste staging bandwidth and temporary storage.
 
 The runtime image has no SSH service or login user. A hardened supervisor owns
 the durable journal and identity files. Ordinary commands and rootless
@@ -36,9 +37,9 @@ Build on Linux with libguestfs/qemu installed:
 ```
 
 The build does not import the image or change Timeweb state. After CI has
-produced and signed an artifact, an operator imports the exact compressed
+produced and signed an artifact, an operator imports the exact signed QCOW2
 artifact with `scripts/import-timeweb-custom-image.py`, records the returned
-Timeweb image ID and raw digest in `infra/stacks/workspace-images/images.lock.json`,
+Timeweb image ID and artifact digest in `infra/stacks/workspace-images/images.lock.json`,
 and applies that stack. Until both values are locked, production workspace
 creation remains fail-closed.
 

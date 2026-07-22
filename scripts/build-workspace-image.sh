@@ -161,24 +161,21 @@ rm-f /etc/resolv.conf
 sync
 GUESTFISH
 
-raw="$output_directory/ai-native-paas-workspace.raw"
-compressed="$raw.xz"
-qemu-img convert -f qcow2 -O raw "$image" "$raw"
-raw_sha256="$(sha256sum "$raw" | awk '{print $1}')"
-raw_size="$(stat -c '%s' "$raw")"
-xz --threads=0 --compress --force --keep --check=sha256 -9 "$raw"
-compressed_sha256="$(sha256sum "$compressed" | awk '{print $1}')"
-rm -f "$raw"
+artifact="$output_directory/ai-native-paas-workspace.qcow2"
+qemu-img convert -f qcow2 -O qcow2 -c "$image" "$artifact"
+qemu-img check -f qcow2 "$artifact"
+image_sha256="$(sha256sum "$artifact" | awk '{print $1}')"
+image_size="$(stat -c '%s' "$artifact")"
+virtual_size="$(qemu-img info --output=json "$artifact" | jq -er '.["virtual-size"]')"
 virt-copy-out -a "$image" /usr/share/ai-native-paas/sbom.spdx.json "$output_directory"
 revision="$(git rev-parse HEAD)"
 jq -n \
   --arg schema 'ai-native-paas.io/workspace-image-result/v1' \
   --arg revision "$revision" \
-  --arg raw_sha256 "$raw_sha256" \
-  --arg compressed_sha256 "$compressed_sha256" \
-  --argjson raw_size "$raw_size" \
-  --argjson compressed_size "$(stat -c '%s' "$compressed")" \
-  '{schema:$schema,git_revision:$revision,raw_sha256:$raw_sha256,compressed_sha256:$compressed_sha256,raw_size_bytes:$raw_size,compressed_size_bytes:$compressed_size}' \
+  --arg image_sha256 "$image_sha256" \
+  --argjson image_size "$image_size" \
+  --argjson virtual_size "$virtual_size" \
+  '{schema:$schema,git_revision:$revision,format:"qcow2",image_sha256:$image_sha256,image_size_bytes:$image_size,virtual_size_bytes:$virtual_size}' \
   > "$output_directory/manifest.json"
-sha256sum "$compressed" "$output_directory/manifest.json" > "$output_directory/SHA256SUMS"
-printf 'workspace image raw sha256:%s compressed sha256:%s\n' "$raw_sha256" "$compressed_sha256"
+sha256sum "$artifact" "$output_directory/manifest.json" > "$output_directory/SHA256SUMS"
+printf 'workspace image qcow2 sha256:%s virtual-size:%s\n' "$image_sha256" "$virtual_size"

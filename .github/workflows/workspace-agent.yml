@@ -96,7 +96,7 @@ jobs:
         env:
           COSIGN_YES: 'true'
         run: |
-          dist/workspace-image/cosign sign-blob --bundle dist/workspace-image/ai-native-paas-workspace.raw.xz.sigstore.json dist/workspace-image/ai-native-paas-workspace.raw.xz
+          dist/workspace-image/cosign sign-blob --bundle dist/workspace-image/ai-native-paas-workspace.qcow2.sigstore.json dist/workspace-image/ai-native-paas-workspace.qcow2
           dist/workspace-image/cosign sign-blob --bundle dist/workspace-image/manifest.sigstore.json dist/workspace-image/manifest.json
           rm dist/workspace-image/cosign
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

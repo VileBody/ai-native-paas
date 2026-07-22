@@ -80,6 +80,33 @@ func TestArchitecture_WorkspaceSupervisorAndTaskUseSeparateUnixIdentities(t *tes
 	}
 }
 
+func TestArchitecture_WorkspaceImageUsesCompactSignedQCOW2(t *testing.T) {
+	root := repositoryRoot(t)
+	imageBuild := readArchitectureFile(t, filepath.Join(root, "scripts", "build-workspace-image.sh"))
+	workflow := readArchitectureFile(t, filepath.Join(root, ".github", "workflows", "workspace-agent.yml"))
+	importer := readArchitectureFile(t, filepath.Join(root, "scripts", "import-timeweb-custom-image.py"))
+	for _, required := range []string{
+		`qemu-img convert -f qcow2 -O qcow2 -c`,
+		`qemu-img check -f qcow2`,
+		`ai-native-paas-workspace.qcow2`,
+	} {
+		if !strings.Contains(imageBuild, required) {
+			t.Errorf("workspace image build lacks compact QCOW2 invariant %q", required)
+		}
+	}
+	if strings.Contains(imageBuild, `-O raw`) || strings.Contains(imageBuild, `xz --threads`) {
+		t.Error("workspace image build still expands the sparse disk into a staged RAW stream")
+	}
+	if !strings.Contains(workflow, `ai-native-paas-workspace.qcow2.sigstore.json`) || !strings.Contains(workflow, `ai-native-paas-workspace.qcow2`) {
+		t.Error("workspace QCOW2 artifact is not signed in CI")
+	}
+	for _, required := range []string{`choices=("raw.xz", "qcow2")`, `upload_direct(`, `qcow2 staging key must end with .qcow2`} {
+		if !strings.Contains(importer, required) {
+			t.Errorf("workspace image importer lacks QCOW2 control %q", required)
+		}
+	}
+}
+
 func readArchitectureFile(t *testing.T, path string) string {
 	t.Helper()
 	raw, err := os.ReadFile(path)

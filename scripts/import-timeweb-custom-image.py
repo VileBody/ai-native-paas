@@ -158,11 +158,71 @@ def upload_raw(client, bucket, key, source, expected_compressed_sha, source_file
     return manifest
 
 
+def upload_direct(client, bucket, key, source, expected_sha, source_file, image_format):
+    if not source_file or not source_file.is_file():
+        raise RuntimeError(f"{image_format} import requires --source-file")
+    digest = hashlib.sha256()
+    upload = client.create_multipart_upload(
+        Bucket=bucket,
+        Key=key,
+        ContentType="application/octet-stream",
+        Metadata={"source-sha256": expected_sha, "image-format": image_format},
+    )
+    upload_id = upload["UploadId"]
+    parts = []
+    size = 0
+    try:
+        with source_file.open("rb") as image:
+            while chunk := image.read(PART_SIZE):
+                digest.update(chunk)
+                size += len(chunk)
+                number = len(parts) + 1
+                response = client.upload_part(
+                    Bucket=bucket,
+                    Key=key,
+                    UploadId=upload_id,
+                    PartNumber=number,
+                    Body=chunk,
+                )
+                parts.append({"ETag": response["ETag"], "PartNumber": number})
+                print(f"uploaded {image_format} part {number} ({size // (1024 * 1024)} MiB)", flush=True)
+        actual_sha = digest.hexdigest()
+        if actual_sha != expected_sha:
+            raise RuntimeError(f"image sha256 mismatch: expected {expected_sha}, got {actual_sha}")
+        if not parts:
+            raise RuntimeError("image is empty")
+        client.complete_multipart_upload(
+            Bucket=bucket,
+            Key=key,
+            UploadId=upload_id,
+            MultipartUpload={"Parts": parts},
+        )
+    except BaseException:
+        client.abort_multipart_upload(Bucket=bucket, Key=key, UploadId=upload_id)
+        raise
+
+    manifest = {
+        "source": source,
+        "format": image_format,
+        "image_sha256": digest.hexdigest(),
+        "image_size": size,
+    }
+    client.put_object(
+        Bucket=bucket,
+        Key=key + ".json",
+        Body=(json.dumps(manifest, sort_keys=True) + "\n").encode(),
+        ContentType="application/json",
+    )
+    print(f"staged {image_format} image: {size // (1024 * 1024)} MiB, sha256:{digest.hexdigest()}", flush=True)
+    return manifest
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", required=True)
     parser.add_argument("--source-file", type=Path)
     parser.add_argument("--compressed-sha256", required=True)
+    parser.add_argument("--image-format", choices=("raw.xz", "qcow2"), default="raw.xz")
     parser.add_argument("--name", required=True)
     parser.add_argument("--key", required=True)
     parser.add_argument("--description", default="Pinned AI-native PaaS custom image")
@@ -203,9 +263,22 @@ def main():
         size = client.head_object(Bucket=bucket, Key=args.key)["ContentLength"]
         if size != manifest["raw_size"]:
             raise RuntimeError(f"staged object size mismatch: expected {manifest['raw_size']}, got {size}")
-        if manifest["compressed_sha256"] != args.compressed_sha256:
-            raise RuntimeError("staged object compressed sha256 does not match the requested source")
+        manifest_sha = manifest.get("compressed_sha256", manifest.get("image_sha256"))
+        if manifest_sha != args.compressed_sha256:
+            raise RuntimeError("staged object sha256 does not match the requested source")
         print(f"reusing verified staged raw image: {size // (1024 * 1024)} MiB", flush=True)
+    elif args.image_format == "qcow2":
+        if not args.key.endswith(".qcow2"):
+            raise RuntimeError("qcow2 staging key must end with .qcow2")
+        manifest = upload_direct(
+            client,
+            bucket,
+            args.key,
+            args.source,
+            args.compressed_sha256,
+            args.source_file,
+            args.image_format,
+        )
     else:
         manifest = upload_raw(
             client,
