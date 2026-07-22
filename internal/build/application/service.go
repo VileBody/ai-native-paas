@@ -342,7 +342,7 @@ func (s *Service) RunBuild(ctx context.Context, tenantID, actorID, buildID strin
 		// not start a duplicate pipeline.
 		return build, artifact, nil
 	}
-	if s.Fetcher == nil || s.Registry == nil || s.SBOM == nil || s.Scanner == nil || s.Signer == nil || s.Verifier == nil || s.Logs == nil {
+	if s.Fetcher == nil || s.Registry == nil || s.SBOM == nil || s.Scanner == nil || s.Signer == nil || s.Verifier == nil || s.Provenance == nil || s.ProvenanceVerifier == nil || s.Logs == nil {
 		return build, artifact, domain.NewError(domain.CodeUnavailable, "build pipeline is not configured")
 	}
 	if build.BuildSpec == nil && s.Detector == nil {
@@ -474,6 +474,32 @@ func (s *Service) RunBuild(ctx context.Context, tenantID, actorID, buildID strin
 	signature.AttachmentDigest = signatureAttachment
 	artifactExpected := artifact.Version
 	if err := artifact.AttachSignature(signature, s.Clock.Now()); err != nil {
+		return s.fail(ctx, actorID, build, artifact, err)
+	}
+	finishedAt := s.Clock.Now()
+	provenance, err := s.Provenance.Attest(ctx, ProvenanceMaterials{
+		BuildID: build.ID, Repository: artifact.Repository, SourceSHA: build.Source.CommitSHA,
+		BuildSpecDigest: provenanceBuildSpecDigest(build), BuilderDigest: build.BuilderDigest, OutputDigest: artifact.Digest,
+		StartedAt: build.StartedAt, FinishedAt: finishedAt,
+	})
+	if err != nil {
+		return s.fail(ctx, actorID, build, artifact, err)
+	}
+	verifiedProvenance, err := s.ProvenanceVerifier.Verify(ctx, provenance.Document)
+	if err != nil {
+		return s.fail(ctx, actorID, build, artifact, domain.Wrap(domain.CodePlatformFailure, "platform provenance failed verification", err))
+	}
+	if verifiedProvenance.Digest != provenance.Digest || verifiedProvenance.MediaType != provenance.MediaType {
+		return s.fail(ctx, actorID, build, artifact, domain.NewError(domain.CodePlatformFailure, "provenance verifier returned a mismatched attachment"))
+	}
+	provenanceAttachment, err := s.Registry.StoreAttachment(ctx, build.TenantID, publishedArtifact(*artifact), provenance.MediaType, provenance.Document)
+	if err != nil {
+		return s.fail(ctx, actorID, build, artifact, err)
+	}
+	if provenanceAttachment != provenance.Digest {
+		return s.fail(ctx, actorID, build, artifact, domain.NewError(domain.CodePlatformFailure, "registry changed provenance digest"))
+	}
+	if err := artifact.AttachProvenance(provenanceAttachment, provenance.MediaType, s.Clock.Now()); err != nil {
 		return s.fail(ctx, actorID, build, artifact, err)
 	}
 	if err := artifact.MarkReleasable(s.Clock.Now()); err != nil {
@@ -748,6 +774,20 @@ func (s *Service) repository(build domain.Build) string {
 		base = "registry.local/tenants"
 	}
 	return fmt.Sprintf("%s/%s/apps/%s", base, build.TenantID, build.Source.ProjectID)
+}
+func provenanceBuildSpecDigest(build domain.Build) string {
+	if buildv1.ValidDigest(build.BuildSpecDigest) {
+		return build.BuildSpecDigest
+	}
+	return "sha256:" + hashJSON(struct {
+		RequestContract      string             `json:"request_contract"`
+		Config               domain.BuildConfig `json:"config"`
+		AutoDetectionAllowed bool               `json:"auto_detection_allowed"`
+	}{
+		RequestContract:      build.RequestContract,
+		Config:               build.Config,
+		AutoDetectionAllowed: build.AutoDetectionAllowed,
+	})
 }
 func hashJSON(v any) string {
 	raw, _ := json.Marshal(v)

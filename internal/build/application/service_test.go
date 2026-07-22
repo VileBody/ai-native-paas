@@ -36,11 +36,31 @@ func setup(t *testing.T) (*application.Service, *testkit.Builder, *testkit.Regis
 	builder := &testkit.Builder{Output: application.BuildOutput{ManifestDigest: dg("a"), MediaType: "application/vnd.oci.image.manifest.v1+json"}}
 	registry := &testkit.Registry{Published: application.PublishedArtifact{Repository: "registry.test/tenants/t1/apps/p1", Digest: dg("a"), MediaType: "application/vnd.oci.image.manifest.v1+json"}}
 	logStore := logs.New()
-	service := &application.Service{Store: memory.New(), Fetcher: &testkit.Fetcher{Snapshot: application.SourceSnapshot{Path: path}}, Detector: &testkit.Detector{Detection: application.Detection{Runtime: "go", Backend: application.BackendBuildpacks, BuildpackID: "paketo/go"}}, Buildpacks: builder, Registry: registry, SBOM: testkit.SBOM{Result: application.SBOMResult{Digest: rawDigest([]byte("sbom")), MediaType: "application/spdx+json", Document: []byte("sbom")}}, Scanner: testkit.Scanner{Result: domain.ScanResult{Scanner: "test", PolicyVersion: "v1", Passed: true, FindingsDigest: dg("c"), ScannedAt: clock.Now()}}, Signer: testkit.Signer{Record: domain.SignatureRecord{Issuer: "platform", Algorithm: "ed25519", Digest: dg("a"), Signature: "signature", SignedAt: clock.Now()}}, Verifier: &testkit.Verifier{}, Logs: logStore, Clock: clock, IDs: &testkit.IDs{}, RepositoryBase: "registry.test/tenants"}
+	provenanceAttestor, provenanceVerifier := testkit.ProvenanceFakes([]byte("provenance"))
+	service := &application.Service{Store: memory.New(), Fetcher: &testkit.Fetcher{Snapshot: application.SourceSnapshot{Path: path}}, Detector: &testkit.Detector{Detection: application.Detection{Runtime: "go", Backend: application.BackendBuildpacks, BuildpackID: "paketo/go"}}, Buildpacks: builder, Registry: registry, SBOM: testkit.SBOM{Result: application.SBOMResult{Digest: rawDigest([]byte("sbom")), MediaType: "application/spdx+json", Document: []byte("sbom")}}, Scanner: testkit.Scanner{Result: domain.ScanResult{Scanner: "test", PolicyVersion: "v1", Passed: true, FindingsDigest: dg("c"), ScannedAt: clock.Now()}}, Signer: testkit.Signer{Record: domain.SignatureRecord{Issuer: "platform", Algorithm: "ed25519", Digest: dg("a"), Signature: "signature", SignedAt: clock.Now()}}, Verifier: &testkit.Verifier{}, Provenance: provenanceAttestor, ProvenanceVerifier: provenanceVerifier, Logs: logStore, Clock: clock, IDs: &testkit.IDs{}, RepositoryBase: "registry.test/tenants"}
 	return service, builder, registry, logStore, clock
 }
 func command(key string) application.RequestBuildCommand {
 	return application.RequestBuildCommand{TenantID: "t1", ActorID: "u1", CorrelationID: "cor-1", IdempotencyKey: key, Source: sourcev1.SourceRevision{ProjectID: "p1", RepositoryID: "r1", Branch: "main", CommitSHA: strings.Repeat("d", 40)}, Config: domain.BuildConfig{}, BuilderDigest: dg("e"), RunImageDigest: dg("f"), PlatformVersion: "v1"}
+}
+
+func TestBuild_LegacyPathEmitsDerivedProvenanceSpecDigest(t *testing.T) {
+	s, _, _, _, _ := setup(t)
+	attestor := s.Provenance.(*testkit.ProvenanceAttestor)
+	requested, err := s.RequestBuild(context.Background(), command("legacy-provenance"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, artifact, err := s.RunBuild(context.Background(), "t1", "u1", requested.Build.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.State != buildv1.BuildSucceeded || artifact == nil || !buildv1.ValidDigest(artifact.ProvenanceDigest) || artifact.ProvenanceMediaType == "" {
+		t.Fatalf("build=%+v artifact=%+v", completed, artifact)
+	}
+	if len(attestor.Materials) != 1 || !buildv1.ValidDigest(attestor.Materials[0].BuildSpecDigest) {
+		t.Fatalf("provenance materials=%+v", attestor.Materials)
+	}
 }
 
 func explicitDockerfileCommand(key string) application.RequestBuildV2Command {
@@ -262,6 +282,8 @@ func TestBuildReceipt_RejectsSpoofedSpecBeforeRegistryAccess(t *testing.T) {
 
 func TestBuildReceipt_FailsClosedWithoutProvenanceAdapters(t *testing.T) {
 	s, _, registry, _, clock := setup(t)
+	s.Provenance = nil
+	s.ProvenanceVerifier = nil
 	requested, err := s.RequestBuildV2(context.Background(), explicitDockerfileCommand("receipt-no-provenance"))
 	if err != nil {
 		t.Fatal(err)

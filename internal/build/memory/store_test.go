@@ -78,6 +78,9 @@ func TestMemoryStore_SnapshotDoesNotAliasArtifactTrustOrEventPayloads(t *testing
 	}, now); err != nil {
 		t.Fatal(err)
 	}
+	if err := artifact.AttachProvenance("sha256:"+strings.Repeat("e", 64), "application/vnd.dsse.envelope.v1+json", now); err != nil {
+		t.Fatal(err)
+	}
 	if err := artifact.MarkReleasable(now); err != nil {
 		t.Fatal(err)
 	}

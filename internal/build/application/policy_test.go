@@ -32,6 +32,9 @@ func trustedArtifact(t *testing.T, store application.Store) domain.Artifact {
 	if err := artifact.AttachSignature(domain.SignatureRecord{Issuer: "platform", Algorithm: "ed25519", Digest: artifact.Digest, Signature: "sig", AttachmentDigest: "sha256:" + strings.Repeat("d", 64), SignedAt: now}, now); err != nil {
 		t.Fatal(err)
 	}
+	if err := artifact.AttachProvenance("sha256:"+strings.Repeat("e", 64), "application/vnd.dsse.envelope.v1+json", now); err != nil {
+		t.Fatal(err)
+	}
 	if err := artifact.MarkReleasable(now); err != nil {
 		t.Fatal(err)
 	}

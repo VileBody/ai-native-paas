@@ -125,6 +125,7 @@ func TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery(t *testing.T) {
 	registryWithLostResponse := &lostResponseRegistry{inner: registry.NewLocal(t.TempDir())}
 	clock := &testkit.Clock{T: time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)}
 	store := memory.New()
+	provenanceAttestor, provenanceVerifier := testkit.ProvenanceFakes([]byte("provenance"))
 	service := &application.Service{
 		Store: store, Fetcher: &testkit.Fetcher{Snapshot: application.SourceSnapshot{Path: t.TempDir()}},
 		Detector:   &testkit.Detector{Detection: application.Detection{Runtime: "go", Backend: application.BackendBuildpacks, BuildpackID: "paketo/go"}},
@@ -132,7 +133,8 @@ func TestBuild_RegistryPushResponseLostRecoversByDigestDiscovery(t *testing.T) {
 		SBOM:     testkit.SBOM{Result: application.SBOMResult{Digest: rawDigest([]byte("sbom")), MediaType: "application/spdx+json", Document: []byte("sbom")}},
 		Scanner:  testkit.Scanner{Result: domain.ScanResult{Scanner: "scanner", PolicyVersion: "v1", Passed: true, FindingsDigest: "sha256:" + strings.Repeat("d", 64), ScannedAt: clock.Now()}},
 		Signer:   testkit.Signer{Record: domain.SignatureRecord{Issuer: "platform", Algorithm: "ed25519", Digest: output.ManifestDigest, Signature: "signature", SignedAt: clock.Now()}},
-		Verifier: &testkit.Verifier{}, Logs: logs.New(), Clock: clock, IDs: &testkit.IDs{}, RepositoryBase: "registry.test/tenants",
+		Verifier: &testkit.Verifier{}, Provenance: provenanceAttestor, ProvenanceVerifier: provenanceVerifier,
+		Logs: logs.New(), Clock: clock, IDs: &testkit.IDs{}, RepositoryBase: "registry.test/tenants",
 	}
 	requested, err := service.RequestBuild(context.Background(), application.RequestBuildCommand{
 		TenantID: "t1", ActorID: "u1", CorrelationID: "correlation-1", IdempotencyKey: "request-1",

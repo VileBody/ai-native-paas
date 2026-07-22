@@ -68,8 +68,8 @@ func TestPostgres_BuildMigrationsCleanInstallAndUpgrade(t *testing.T) {
 	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM build.schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 5 {
-		t.Fatalf("migration count=%d want=5", count)
+	if count != 7 {
+		t.Fatalf("migration count=%d want=7", count)
 	}
 	for _, table := range []string{"builds", "artifacts", "scan_results", "signature_records", "log_refs", "idempotency", "outbox", "audit"} {
 		var exists bool
@@ -239,6 +239,7 @@ func TestPostgres_BuildPipelinePersistsReleasableTrustChain(t *testing.T) {
 		t.Fatal(err)
 	}
 	manifestDigest := "sha256:" + strings.Repeat("a", 64)
+	provenanceAttestor, provenanceVerifier := testkit.ProvenanceFakes([]byte("provenance"))
 	service := &application.Service{
 		Store:      store,
 		Fetcher:    &testkit.Fetcher{Snapshot: application.SourceSnapshot{Path: sourcePath}},
@@ -247,11 +248,12 @@ func TestPostgres_BuildPipelinePersistsReleasableTrustChain(t *testing.T) {
 		Registry: &testkit.Registry{Published: application.PublishedArtifact{
 			Repository: "registry.test/tenants/tenant-pg/apps/project-pg", Digest: manifestDigest, MediaType: "application/vnd.oci.image.manifest.v1+json",
 		}},
-		SBOM:     testkit.SBOM{Result: application.SBOMResult{Digest: pgRawDigest([]byte("sbom")), MediaType: "application/spdx+json", Document: []byte("sbom")}},
-		Scanner:  testkit.Scanner{Result: domain.ScanResult{Scanner: "test", PolicyVersion: "v1", Passed: true, FindingsDigest: "sha256:" + strings.Repeat("c", 64), ScannedAt: clock.Now()}},
-		Signer:   testkit.Signer{Record: domain.SignatureRecord{Issuer: "platform", Algorithm: "ed25519", Digest: manifestDigest, Signature: "signature", SignedAt: clock.Now()}},
-		Verifier: &testkit.Verifier{},
-		Logs:     logs.New(), Clock: clock, IDs: &testkit.IDs{}, RepositoryBase: "registry.test/tenants",
+		SBOM:       testkit.SBOM{Result: application.SBOMResult{Digest: pgRawDigest([]byte("sbom")), MediaType: "application/spdx+json", Document: []byte("sbom")}},
+		Scanner:    testkit.Scanner{Result: domain.ScanResult{Scanner: "test", PolicyVersion: "v1", Passed: true, FindingsDigest: "sha256:" + strings.Repeat("c", 64), ScannedAt: clock.Now()}},
+		Signer:     testkit.Signer{Record: domain.SignatureRecord{Issuer: "platform", Algorithm: "ed25519", Digest: manifestDigest, Signature: "signature", SignedAt: clock.Now()}},
+		Verifier:   &testkit.Verifier{},
+		Provenance: provenanceAttestor, ProvenanceVerifier: provenanceVerifier,
+		Logs: logs.New(), Clock: clock, IDs: &testkit.IDs{}, RepositoryBase: "registry.test/tenants",
 	}
 	requested, err := service.RequestBuild(context.Background(), application.RequestBuildCommand{
 		TenantID: "tenant-pg", ActorID: "actor-pg", CorrelationID: "correlation-pipeline", IdempotencyKey: "pipeline",
@@ -419,8 +421,12 @@ func TestBuild_TrustChainRequiredBeforeArtifactReleasable(t *testing.T) {
 	persist(func(value *domain.Artifact) error {
 		return value.AttachSignature(domain.SignatureRecord{Issuer: "platform", Algorithm: "ed25519", Digest: value.Digest, Signature: "signature", AttachmentDigest: "sha256:" + strings.Repeat("4", 64), SignedAt: build.CreatedAt.Add(3 * time.Second)}, build.CreatedAt.Add(3*time.Second))
 	})
+	assertDenied("signature without provenance")
+	persist(func(value *domain.Artifact) error {
+		return value.AttachProvenance("sha256:"+strings.Repeat("5", 64), "application/vnd.dsse.envelope.v1+json", build.CreatedAt.Add(4*time.Second))
+	})
 	assertDenied("complete records before release transition")
-	persist(func(value *domain.Artifact) error { return value.MarkReleasable(build.CreatedAt.Add(4 * time.Second)) })
+	persist(func(value *domain.Artifact) error { return value.MarkReleasable(build.CreatedAt.Add(5 * time.Second)) })
 	decision, err := service.EvaluateArtifact(ctx, build.TenantID, artifact.ID)
 	if err != nil || !decision.Allowed {
 		t.Fatalf("complete trust chain decision=%+v err=%v", decision, err)
@@ -431,6 +437,7 @@ func TestBuild_SameIdentityConcurrentRequestsExecuteOnce(t *testing.T) {
 	db, store := migratedBuildStore(t)
 	clock := &testkit.Clock{T: time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)}
 	builder := &testkit.Builder{Output: application.BuildOutput{ManifestDigest: "sha256:" + strings.Repeat("a", 64), MediaType: "application/vnd.oci.image.manifest.v1+json"}}
+	provenanceAttestor, provenanceVerifier := testkit.ProvenanceFakes([]byte("provenance"))
 	service := &application.Service{
 		Store: store, Fetcher: &testkit.Fetcher{Snapshot: application.SourceSnapshot{Path: t.TempDir()}},
 		Detector:   &testkit.Detector{Detection: application.Detection{Runtime: "go", Backend: application.BackendBuildpacks, BuildpackID: "paketo/go"}},
@@ -439,7 +446,8 @@ func TestBuild_SameIdentityConcurrentRequestsExecuteOnce(t *testing.T) {
 		SBOM:       testkit.SBOM{Result: application.SBOMResult{Digest: pgRawDigest([]byte("sbom")), MediaType: "application/spdx+json", Document: []byte("sbom")}},
 		Scanner:    testkit.Scanner{Result: domain.ScanResult{Scanner: "scanner", PolicyVersion: "v1", Passed: true, FindingsDigest: "sha256:" + strings.Repeat("c", 64), ScannedAt: clock.Now()}},
 		Signer:     testkit.Signer{Record: domain.SignatureRecord{Issuer: "platform", Algorithm: "ed25519", Digest: "sha256:" + strings.Repeat("a", 64), Signature: "signature", SignedAt: clock.Now()}},
-		Verifier:   &testkit.Verifier{}, Logs: logs.New(), Clock: clock, IDs: &testkit.IDs{}, RepositoryBase: "registry.test/tenants",
+		Verifier:   &testkit.Verifier{}, Provenance: provenanceAttestor, ProvenanceVerifier: provenanceVerifier,
+		Logs: logs.New(), Clock: clock, IDs: &testkit.IDs{}, RepositoryBase: "registry.test/tenants",
 	}
 	base := application.RequestBuildCommand{
 		TenantID: "tenant-pg", ActorID: "actor-pg", CorrelationID: "correlation-concurrent",

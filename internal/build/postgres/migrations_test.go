@@ -120,3 +120,15 @@ func TestMigrations_BuildArtifactsRequireProvenanceForRelease(t *testing.T) {
 		}
 	}
 }
+
+func TestMigrations_BuildProvenanceAllowsAtomicSignedRelease(t *testing.T) {
+	sql := buildMigration(t, "007_artifact_provenance_transition.sql")
+	for _, fragment := range []string{
+		"OLD.state = 'SCANNED' AND NEW.state IN ('SIGNED','RELEASABLE')",
+		"releasable artifact trust chain is incomplete",
+	} {
+		if !strings.Contains(sql, fragment) {
+			t.Errorf("missing provenance transition guard %q", fragment)
+		}
+	}
+}

@@ -47,7 +47,7 @@ func (p TrustPolicy) IsReleasable(ctx context.Context, ref buildv1.ArtifactRef) 
 		decision.Reasons = []string{"artifact identity mismatch"}
 		return decision, nil
 	}
-	if artifact.State != domain.ArtifactReleasable || artifact.Scan == nil || !artifact.Scan.Passed || artifact.Signature == nil || artifact.Signature.Digest != artifact.Digest || !buildv1.ValidDigest(artifact.Signature.AttachmentDigest) || !buildv1.ValidDigest(artifact.SBOMDigest) {
+	if artifact.State != domain.ArtifactReleasable || artifact.Scan == nil || !artifact.Scan.Passed || artifact.Signature == nil || artifact.Signature.Digest != artifact.Digest || !buildv1.ValidDigest(artifact.Signature.AttachmentDigest) || !buildv1.ValidDigest(artifact.SBOMDigest) || !buildv1.ValidDigest(artifact.ProvenanceDigest) || artifact.ProvenanceMediaType == "" {
 		decision.Reasons = []string{"artifact trust chain is incomplete"}
 		return decision, nil
 	}

@@ -159,7 +159,7 @@ func (a *Artifact) MarkReleasable(now time.Time) error {
 	if a.State == ArtifactReleasable {
 		return nil
 	}
-	if a.State != ArtifactSigned || a.Signature == nil || a.Signature.Digest != a.Digest || strings.TrimSpace(a.Signature.Issuer) == "" || strings.TrimSpace(a.Signature.Algorithm) == "" || strings.TrimSpace(a.Signature.Signature) == "" || !validDigest(a.Signature.AttachmentDigest) || !validDigest(a.SBOMDigest) || strings.TrimSpace(a.SBOMMediaType) == "" || a.Scan == nil || !a.Scan.Passed {
+	if a.State != ArtifactSigned || a.Signature == nil || a.Signature.Digest != a.Digest || strings.TrimSpace(a.Signature.Issuer) == "" || strings.TrimSpace(a.Signature.Algorithm) == "" || strings.TrimSpace(a.Signature.Signature) == "" || !validDigest(a.Signature.AttachmentDigest) || !validDigest(a.SBOMDigest) || strings.TrimSpace(a.SBOMMediaType) == "" || !validDigest(a.ProvenanceDigest) || strings.TrimSpace(a.ProvenanceMediaType) == "" || a.Scan == nil || !a.Scan.Passed {
 		return NewError(CodeConflict, "artifact trust chain is incomplete")
 	}
 	a.State = ArtifactReleasable

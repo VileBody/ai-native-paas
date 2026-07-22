@@ -52,6 +52,7 @@ func TestAcceptance_SourceRevisionBecomesReleasableArtifact(t *testing.T) {
 		t.Fatal(err)
 	}
 	artifactSigner.Now = clock.Now
+	provenanceAttestor, provenanceVerifier := testkit.ProvenanceFakes([]byte("provenance"))
 	service := &application.Service{
 		Store:      store,
 		Fetcher:    buildsource.Fetcher{Root: t.TempDir(), Resolver: acceptanceBuildResolver{access: buildsource.RepositoryAccess{TenantID: "tenant-a", RepositoryID: "repo-a", RemoteURL: remote}}},
@@ -65,8 +66,10 @@ func TestAcceptance_SourceRevisionBecomesReleasableArtifact(t *testing.T) {
 			PolicyVersion:  "policy-2026-07",
 			Now:            clock.Now,
 		},
-		Signer:   artifactSigner,
-		Verifier: verifier,
+		Signer:             artifactSigner,
+		Verifier:           verifier,
+		Provenance:         provenanceAttestor,
+		ProvenanceVerifier: provenanceVerifier,
 		SecretProvider: testkit.SecretProvider{BuildSecrets: []application.BuildSecret{{
 			Name: "private-module-token", Value: "build-secret-must-not-leak", AllowedPhases: []application.BuildPhase{application.PhaseBuild},
 		}}, RuntimeSecret: "runtime-secret-must-never-enter-build"},
@@ -160,6 +163,7 @@ func TestAcceptance_MonorepoSourceRootBuildsOnlySelectedComponent(t *testing.T) 
 		t.Fatal(err)
 	}
 	artifactSigner.Now = clock.Now
+	provenanceAttestor, provenanceVerifier := testkit.ProvenanceFakes([]byte("provenance"))
 	service := &application.Service{
 		Store: store,
 		Fetcher: buildsource.Fetcher{Root: t.TempDir(), Resolver: acceptanceBuildResolver{access: buildsource.RepositoryAccess{
@@ -173,13 +177,15 @@ func TestAcceptance_MonorepoSourceRootBuildsOnlySelectedComponent(t *testing.T) 
 			Provider: scanner.StaticProvider{}, MaximumAllowed: scanner.SeverityHigh,
 			PolicyVersion: "policy-2026-07", Now: clock.Now,
 		},
-		Signer:         artifactSigner,
-		Verifier:       artifactVerifier,
-		Logs:           logs.New(),
-		Clock:          clock,
-		IDs:            &testkit.IDs{},
-		SourceLimits:   application.SourceLimits{MaxBytes: 8 << 20, MaxFiles: 1000},
-		RepositoryBase: "registry.test/tenants",
+		Signer:             artifactSigner,
+		Verifier:           artifactVerifier,
+		Provenance:         provenanceAttestor,
+		ProvenanceVerifier: provenanceVerifier,
+		Logs:               logs.New(),
+		Clock:              clock,
+		IDs:                &testkit.IDs{},
+		SourceLimits:       application.SourceLimits{MaxBytes: 8 << 20, MaxFiles: 1000},
+		RepositoryBase:     "registry.test/tenants",
 	}
 	requested, err := service.RequestBuild(context.Background(), application.RequestBuildCommand{
 		TenantID: "tenant-a", ActorID: "agent-a", CorrelationID: "task-monorepo", IdempotencyKey: "monorepo-" + commit,

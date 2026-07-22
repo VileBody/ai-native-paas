@@ -234,6 +234,15 @@ func (t *tx) UpdateArtifact(v domain.Artifact, expected int64) error {
 	if v.SBOMDigest != "" && v.SBOMMediaType == "" {
 		return domain.NewError(domain.CodeConflict, "SBOM media type is required")
 	}
+	if old.ProvenanceDigest != "" && (old.ProvenanceDigest != v.ProvenanceDigest || old.ProvenanceMediaType != v.ProvenanceMediaType) {
+		return domain.NewError(domain.CodeConflict, "artifact provenance reference is immutable")
+	}
+	if (old.ProvenanceDigest != v.ProvenanceDigest || old.ProvenanceMediaType != v.ProvenanceMediaType) && old.State != domain.ArtifactSigned && !(old.State == domain.ArtifactScanned && (v.State == domain.ArtifactSigned || v.State == domain.ArtifactReleasable)) {
+		return domain.NewError(domain.CodeConflict, "provenance can only attach after signature")
+	}
+	if v.ProvenanceDigest != "" && v.ProvenanceMediaType == "" {
+		return domain.NewError(domain.CodeConflict, "provenance media type is required")
+	}
 	if old.Scan != nil && !reflect.DeepEqual(old.Scan, v.Scan) {
 		return domain.NewError(domain.CodeConflict, "scan result is immutable")
 	}
@@ -243,7 +252,7 @@ func (t *tx) UpdateArtifact(v domain.Artifact, expected int64) error {
 	if !validArtifactStateChange(old.State, v.State) {
 		return domain.NewError(domain.CodeConflict, "invalid persisted artifact transition")
 	}
-	if v.State == domain.ArtifactReleasable && (v.Scan == nil || !v.Scan.Passed || v.Scan.Scanner == "" || v.Scan.PolicyVersion == "" || v.Signature == nil || v.Signature.Issuer == "" || v.Signature.Algorithm == "" || v.Signature.Signature == "" || !buildv1.ValidDigest(v.Signature.AttachmentDigest) || !buildv1.ValidDigest(v.SBOMDigest) || v.SBOMMediaType == "") {
+	if v.State == domain.ArtifactReleasable && (v.Scan == nil || !v.Scan.Passed || v.Scan.Scanner == "" || v.Scan.PolicyVersion == "" || v.Signature == nil || v.Signature.Issuer == "" || v.Signature.Algorithm == "" || v.Signature.Signature == "" || !buildv1.ValidDigest(v.Signature.AttachmentDigest) || !buildv1.ValidDigest(v.SBOMDigest) || v.SBOMMediaType == "" || !buildv1.ValidDigest(v.ProvenanceDigest) || v.ProvenanceMediaType == "") {
 		return domain.NewError(domain.CodeConflict, "artifact trust chain is incomplete")
 	}
 	t.artifacts[v.ID] = cloneArtifact(v)

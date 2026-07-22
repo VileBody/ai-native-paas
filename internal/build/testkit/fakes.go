@@ -225,6 +225,17 @@ type ProvenanceVerifier struct {
 	mu        sync.Mutex
 }
 
+func ProvenanceFakes(document []byte) (*ProvenanceAttestor, *ProvenanceVerifier) {
+	copyDocument := append([]byte(nil), document...)
+	sum := sha256.Sum256(copyDocument)
+	result := application.ProvenanceResult{
+		Digest:    "sha256:" + hex.EncodeToString(sum[:]),
+		MediaType: "application/vnd.dsse.envelope.v1+json",
+		Document:  copyDocument,
+	}
+	return &ProvenanceAttestor{Result: result}, &ProvenanceVerifier{Result: result}
+}
+
 func (v *ProvenanceVerifier) Verify(_ context.Context, document []byte) (application.ProvenanceResult, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
