@@ -58,7 +58,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: commerce-api
-          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-commerce-api@sha256:c32de6b62883dab70ad3b8ab3ebeb5c38ecdadd2e81f8cd153d6ff240fee4644
+          image: ai-native-paas-registry.registry.twcstorage.ru/ai-native-paas-commerce-api@sha256:2b13118816d86791f3f7101ff37a3b65f8925e2438b42e21b3cf8efd4e66d23f
           imagePullPolicy: IfNotPresent
           ports:
             - name: human-http

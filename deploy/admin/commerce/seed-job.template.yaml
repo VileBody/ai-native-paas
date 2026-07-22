@@ -18,6 +18,19 @@ spec:
       restartPolicy: Never
       imagePullSecrets:
         - name: craas-ai-native-paas-registry
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: ai-native-paas.io/pool
+                    operator: In
+                    values: [system]
+      tolerations:
+        - key: ai-native-paas.io/system
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
