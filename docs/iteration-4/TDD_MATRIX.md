@@ -31,7 +31,7 @@ Missing: **0**
 | PASS | `TestGitOpsCommit_RecordsCommitSHA` | `internal/runtime/gitops/repository_test.go` |
 | PASS | `TestGitOpsCommit_DBFailureAfterPushIsRecoveredByReconciler` | `internal/runtime/application/gitops_saga_test.go` |
 | PASS | `TestGitOpsCommit_ConcurrentDeployUsesOptimisticLock` | `internal/runtime/application/gitops_saga_test.go` |
-| PASS | `TestGitOpsCommit_RevertCreatesExplicitRollbackRelease` | `internal/runtime/application/gitops_saga_test.go` |
+| PASS | `TestRuntime_RollbackCreatesAuditableGitRevision` | `internal/runtime/application/gitops_saga_test.go` |
 | PASS | `TestOperator_CreatesDeploymentServiceAndHTTPRoute` | `internal/runtime/operator/reconciler_test.go` |
 | PASS | `TestOperator_SetsOwnerReferencesOnChildren` | `internal/runtime/operator/reconciler_test.go` |
 | PASS | `TestOperator_SetsRuntimeClassGVisorForSandboxedTier` | `internal/runtime/operator/reconciler_test.go` |
@@ -61,9 +61,9 @@ Missing: **0**
 | PASS | `TestDelete_IsRecoverableBeforeFinalPurge` | `internal/runtime/operator/reconciler_test.go` |
 | PASS | `TestDelete_ArgoApplicationSetPreservesResourcesOnControllerRemoval` | `test/contract/runtime_manifests_test.go` |
 | PASS | `TestStatus_PaaSAppReadyMarksDeploymentReady` | `internal/runtime/application/status_test.go` |
-| PASS | `TestStatus_ArgoSyncedButAppNotReadyStaysDeploying` | `internal/runtime/application/status_test.go` |
+| PASS | `TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady` | `internal/runtime/application/status_test.go` |
 | PASS | `TestStatus_MissedWatchEventRecoveredByPeriodicRead` | `internal/runtime/application/status_test.go` |
-| PASS | `TestStatus_UnknownKubernetesObjectIsQuarantined` | `internal/runtime/application/status_test.go` |
+| PASS | `TestRuntime_UnknownObservedObjectIsQuarantined` | `internal/runtime/application/status_test.go` |
 | PASS | `TestArgoApplication_UsesRestrictedAppProject` | `test/contract/runtime_manifests_test.go` |
 | PASS | `TestArgoApplication_AutoSyncPruneSelfHealEnabled` | `test/contract/runtime_manifests_test.go` |
 | PASS | `TestArgoApplication_SourceIsOnlyCellGitOpsRepository` | `test/contract/runtime_manifests_test.go` |

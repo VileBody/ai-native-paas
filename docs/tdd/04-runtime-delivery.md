@@ -156,7 +156,7 @@ TestGitOpsCommit_IdempotentByReleaseID
 TestGitOpsCommit_RecordsCommitSHA
 TestGitOpsCommit_DBFailureAfterPushIsRecoveredByReconciler
 TestGitOpsCommit_ConcurrentDeployUsesOptimisticLock
-TestGitOpsCommit_RevertCreatesExplicitRollbackRelease
+TestRuntime_RollbackCreatesAuditableGitRevision
 ```
 
 ### 6. Operator reconciliation
@@ -218,9 +218,9 @@ TestDelete_ArgoApplicationSetPreservesResourcesOnControllerRemoval
 
 ```text
 TestStatus_PaaSAppReadyMarksDeploymentReady
-TestStatus_ArgoSyncedButAppNotReadyStaysDeploying
+TestRuntime_ArgoSyncedWithoutHealthyWorkloadsIsNotReady
 TestStatus_MissedWatchEventRecoveredByPeriodicRead
-TestStatus_UnknownKubernetesObjectIsQuarantined
+TestRuntime_UnknownObservedObjectIsQuarantined
 ```
 
 ## Argo contract tests
