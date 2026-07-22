@@ -25,6 +25,7 @@ import (
 const defaultBaseURL = "https://api.timeweb.cloud/api/v1"
 
 var providerIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
+var errProviderConflict = errors.New("Timeweb provider operation conflicts with current resource state")
 
 type CloudInitRenderer func(context.Context, workspace.ProviderCreateRequest) (string, error)
 
@@ -111,6 +112,7 @@ type serverJSON struct {
 	ID       opaqueID      `json:"id"`
 	Name     string        `json:"name"`
 	Comment  string        `json:"comment"`
+	Status   string        `json:"status"`
 	Disks    []diskJSON    `json:"disks"`
 	Networks []networkJSON `json:"networks"`
 }
@@ -121,7 +123,8 @@ type diskJSON struct {
 type networkJSON struct {
 	Type string `json:"type"`
 	IPs  []struct {
-		IP string `json:"ip"`
+		IP   string `json:"ip"`
+		Type string `json:"type"`
 	} `json:"ips"`
 }
 type serverEnvelope struct {
@@ -161,9 +164,12 @@ func (p *Provider) Create(ctx context.Context, request workspace.ProviderCreateR
 	if response.Server.ID.String() == "" {
 		return workspace.ProviderVM{}, errors.New("Timeweb create response has no server ID")
 	}
-	if hasPublicIP(response.Server) {
-		cause := errors.New("Timeweb unexpectedly assigned a public IP to workspace VM")
+	if hasPublicIPv4(response.Server) {
+		cause := errors.New("Timeweb unexpectedly assigned a public IPv4 to workspace VM")
 		return workspace.ProviderVM{}, errors.Join(cause, p.failClosedCleanup(context.WithoutCancel(ctx), response.Server.ID.String(), request.WorkspaceID))
+	}
+	if err := p.setNoNAT(ctx, response.Server.ID.String()); err != nil {
+		return workspace.ProviderVM{}, errors.Join(err, p.failClosedCleanup(context.WithoutCancel(ctx), response.Server.ID.String(), request.WorkspaceID))
 	}
 	group, err := p.ensureFirewall(ctx, response.Server.ID.String(), request.WorkspaceID)
 	if err != nil {
@@ -199,9 +205,12 @@ func (p *Provider) FindByCorrelation(ctx context.Context, correlationID string) 
 		return workspace.ProviderVM{}, errors.New("multiple Timeweb servers share workspace correlation identity")
 	}
 	selected := matches[0]
-	if hasPublicIP(selected.server) {
-		cause := errors.New("discovered workspace VM has a forbidden public IP")
+	if hasPublicIPv4(selected.server) {
+		cause := errors.New("discovered workspace VM has a forbidden public IPv4")
 		return workspace.ProviderVM{}, errors.Join(cause, p.failClosedCleanup(context.WithoutCancel(ctx), selected.server.ID.String(), selected.metadata.WorkspaceID))
+	}
+	if err := p.setNoNAT(ctx, selected.server.ID.String()); err != nil {
+		return workspace.ProviderVM{}, errors.Join(err, p.failClosedCleanup(context.WithoutCancel(ctx), selected.server.ID.String(), selected.metadata.WorkspaceID))
 	}
 	group, err := p.ensureFirewall(ctx, selected.server.ID.String(), selected.metadata.WorkspaceID)
 	if err != nil {
@@ -364,12 +373,59 @@ func (p *Provider) ensureFirewall(ctx context.Context, serverID, workspaceID str
 	if err := p.reconcileFirewallRules(ctx, group.ID.String()); err != nil {
 		return firewallGroup{}, err
 	}
-	linkQuery := url.Values{"resource_type": []string{"server"}}
-	if err := p.doJSON(ctx, http.MethodPost, "/firewall/groups/"+pathSegment(group.ID.String())+"/resources/"+pathSegment(serverID), linkQuery, nil, nil, http.StatusOK, http.StatusCreated, http.StatusNoContent); err != nil {
+	if err := p.linkFirewallEventually(ctx, group, serverID); err != nil {
 		return firewallGroup{}, err
 	}
 	group.Policy = "DROP"
 	return group, nil
+}
+
+func (p *Provider) linkFirewallEventually(ctx context.Context, group firewallGroup, serverID string) error {
+	// Custom images can remain in installing state for several minutes. The
+	// firewall API returns 409 until the server is linkable.
+	linkCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	query := url.Values{"resource_type": []string{"server"}}
+	for {
+		err := p.doJSON(linkCtx, http.MethodPost, "/firewall/groups/"+pathSegment(group.ID.String())+"/resources/"+pathSegment(serverID), query, nil, nil, http.StatusOK, http.StatusCreated, http.StatusNoContent)
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, errProviderConflict) {
+			return err
+		}
+		groups, discoverErr := p.resourceFirewallGroups(linkCtx, serverID)
+		if discoverErr == nil {
+			for _, linked := range groups {
+				if linked.ID.String() == group.ID.String() && linked.Policy == "DROP" {
+					return nil
+				}
+			}
+		} else if !errors.Is(discoverErr, workspace.ErrNotFound) {
+			return discoverErr
+		}
+		server, serverErr := p.getServer(linkCtx, serverID)
+		if serverErr != nil && !errors.Is(serverErr, workspace.ErrNotFound) {
+			return serverErr
+		}
+		if serverErr == nil && terminalProviderFailure(server.Status) {
+			return fmt.Errorf("Timeweb workspace server entered terminal status %q", server.Status)
+		}
+		select {
+		case <-linkCtx.Done():
+			return err
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+func terminalProviderFailure(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "blocked", "no_paid", "permanent_blocked", "removed":
+		return true
+	default:
+		return false
+	}
 }
 
 type firewallRule struct {
@@ -477,6 +533,10 @@ func (p *Provider) deleteServer(ctx context.Context, serverID string) error {
 	return p.doJSON(ctx, http.MethodDelete, "/servers/"+pathSegment(serverID), nil, nil, nil, http.StatusOK, http.StatusAccepted, http.StatusNoContent)
 }
 
+func (p *Provider) setNoNAT(ctx context.Context, serverID string) error {
+	return p.doJSON(ctx, http.MethodPatch, "/servers/"+pathSegment(serverID)+"/local-networks/nat-mode", nil, map[string]string{"nat_mode": "no_nat"}, nil, http.StatusOK, http.StatusNoContent)
+}
+
 func (p *Provider) doJSON(ctx context.Context, method, endpoint string, query url.Values, requestBody, responseBody any, expected ...int) error {
 	var body io.Reader
 	if requestBody != nil {
@@ -515,6 +575,10 @@ func (p *Provider) doJSON(ctx context.Context, method, endpoint string, query ur
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
 		return workspace.ErrNotFound
 	}
+	if response.StatusCode == http.StatusConflict && !containsInt(expected, http.StatusConflict) {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
+		return errProviderConflict
+	}
 	if !allowed {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
 		return fmt.Errorf("Timeweb API %s %s returned HTTP %d", method, endpoint, response.StatusCode)
@@ -541,7 +605,7 @@ func providerVM(server serverJSON, metadata workspaceMetadata, firewallGroupIDs 
 	sort.Strings(disks)
 	return workspace.ProviderVM{
 		VMID: server.ID.String(), DiskIDs: disks, FirewallGroupIDs: uniqueStrings(firewallGroupIDs), CorrelationID: metadata.CorrelationID, ImageDigest: metadata.ImageDigest,
-		NetworkProfile: metadata.NetworkProfile, PrivateAddressOnly: !hasPublicIP(server), DenyAllInbound: len(firewallGroupIDs) > 0, OutboundAgentReady: len(firewallGroupIDs) > 0,
+		NetworkProfile: metadata.NetworkProfile, PrivateAddressOnly: !hasPublicIPv4(server), DenyAllInbound: len(firewallGroupIDs) > 0, OutboundAgentReady: len(firewallGroupIDs) > 0,
 	}
 }
 
@@ -569,10 +633,20 @@ func decodeMetadata(comment string) (workspaceMetadata, error) {
 	return metadata, nil
 }
 
-func hasPublicIP(server serverJSON) bool {
+// Timeweb assigns a provider IPv6 address in some Moscow zones even when
+// floating IPv4 is explicitly omitted. The deny-by-default provider firewall
+// remains authoritative for that interface; a public IPv4 is never accepted.
+func hasPublicIPv4(server serverJSON) bool {
 	for _, network := range server.Networks {
-		if network.Type == "public" && len(network.IPs) > 0 {
-			return true
+		if network.Type != "public" {
+			continue
+		}
+		for _, address := range network.IPs {
+			typeName := strings.ToLower(strings.TrimSpace(address.Type))
+			parsed := net.ParseIP(strings.TrimSpace(address.IP))
+			if typeName == "ipv4" || parsed != nil && parsed.To4() != nil || typeName == "" && parsed == nil {
+				return true
+			}
 		}
 	}
 	return false

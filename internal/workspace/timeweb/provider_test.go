@@ -27,7 +27,11 @@ type apiFixture struct {
 	firewallGroupCreated bool
 	firewallGroupDeleted bool
 	firewallLinked       bool
+	linkConflicts        int
 	publicIP             bool
+	publicIPv6           bool
+	noPaid               bool
+	natModeSet           bool
 	failRuleCreation     bool
 	comment              string
 	serverPayload        map[string]any
@@ -114,7 +118,20 @@ func (f *apiFixture) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "wrong resource type", http.StatusBadRequest)
 			return
 		}
+		if f.linkConflicts > 0 {
+			f.linkConflicts--
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
 		f.firewallLinked = true
+		w.WriteHeader(http.StatusNoContent)
+	case r.Method == http.MethodPatch && r.URL.Path == "/api/v1/servers/42/local-networks/nat-mode":
+		var payload map[string]string
+		if json.NewDecoder(r.Body).Decode(&payload) != nil || payload["nat_mode"] != "no_nat" {
+			http.Error(w, "wrong NAT mode", http.StatusBadRequest)
+			return
+		}
+		f.natModeSet = true
 		w.WriteHeader(http.StatusNoContent)
 	case r.Method == http.MethodDelete && r.URL.Path == "/api/v1/servers/42":
 		f.serverDeleted = true
@@ -147,10 +164,20 @@ func (f *apiFixture) serverJSON() map[string]any {
 		networkType = "public"
 		address = "203.0.113.10"
 	}
+	addressType := "ipv4"
+	if f.publicIPv6 {
+		networkType = "public"
+		address = "2001:db8::10"
+		addressType = "ipv6"
+	}
+	status := "on"
+	if f.noPaid {
+		status = "no_paid"
+	}
 	return map[string]any{
-		"id": 42, "name": "paas-ws-workspace-1", "comment": f.comment,
+		"id": 42, "name": "paas-ws-workspace-1", "comment": f.comment, "status": status,
 		"disks":    []any{map[string]any{"id": 99}},
-		"networks": []any{map[string]any{"type": networkType, "ips": []any{map[string]any{"ip": address}}}},
+		"networks": []any{map[string]any{"type": networkType, "ips": []any{map[string]any{"ip": address, "type": addressType}}}},
 	}
 }
 
@@ -199,7 +226,11 @@ func TestTimewebWorkspace_CreateFindDestroyIsPrivateFailClosedAndRecoverable(t *
 	api.mu.Lock()
 	payload := api.serverPayload
 	rules := append([]map[string]any(nil), api.rules...)
+	natModeSet := api.natModeSet
 	api.mu.Unlock()
+	if !natModeSet {
+		t.Fatal("server-local NAT was not disabled")
+	}
 	network, _ := payload["network"].(map[string]any)
 	if network["id"] != "vpc-workspace" || network["floating_ip"] != nil || payload["is_root_password_required"] != false || payload["project_id"] != float64(2545534) && payload["project_id"] != int64(2545534) {
 		t.Fatalf("server payload can expose workspace: %#v", payload)
@@ -292,5 +323,44 @@ func TestTimewebWorkspace_PublicAddressAndPartialFirewallFailureAreCleanedUp(t *
 				t.Fatal("partially created firewall group was left behind")
 			}
 		})
+	}
+}
+
+func TestTimewebWorkspace_ProviderIPv6RemainsFirewallIsolatedWithoutFloatingIPv4(t *testing.T) {
+	api := &apiFixture{publicIPv6: true}
+	provider, _ := newProvider(t, api)
+	created, err := provider.Create(context.Background(), providerRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !created.PrivateAddressOnly || !created.DenyAllInbound || !api.natModeSet {
+		t.Fatalf("provider IPv6 bypassed the private IPv4/firewall policy: %#v", created)
+	}
+}
+
+func TestTimewebWorkspace_RetriesFirewallLinkWhileServerIsInstalling(t *testing.T) {
+	api := &apiFixture{linkConflicts: 1}
+	provider, _ := newProvider(t, api)
+	created, err := provider.Create(context.Background(), providerRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.VMID != "42" || !api.firewallLinked {
+		t.Fatalf("firewall was not linked after provider conflict: %#v", created)
+	}
+}
+
+func TestTimewebWorkspace_NoPaidFailsClosedWithoutWaitingForLinkTimeout(t *testing.T) {
+	api := &apiFixture{linkConflicts: 1, noPaid: true}
+	provider, _ := newProvider(t, api)
+	started := time.Now()
+	if _, err := provider.Create(context.Background(), providerRequest()); err == nil || !strings.Contains(err.Error(), "no_paid") {
+		t.Fatalf("terminal provider state was not surfaced: %v", err)
+	}
+	if time.Since(started) > time.Second {
+		t.Fatal("terminal provider state waited for the firewall retry window")
+	}
+	if !api.serverDeleted || !api.firewallGroupDeleted {
+		t.Fatal("terminal provider state left disposable resources behind")
 	}
 }

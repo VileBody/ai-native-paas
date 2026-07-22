@@ -38,3 +38,23 @@ provider and scoped staging/log credentials are recorded by identifier in
 but beta promotion is blocked until their final rotation and rejection proof.
 This evidence does not substitute for private-VPC boot, mTLS enrollment,
 rootless BuildKit receipt, lease revocation or VM destruction gates.
+
+## Live provider attempt
+
+The first private-VPC lifecycle attempts exposed two Timeweb-specific facts
+that are now encoded in the provider and executable tests:
+
+- omitting `network.floating_ip` correctly prevents public IPv4, while Timeweb
+  still assigns its free provider IPv6 in Moscow; the provider accepts only
+  that typed IPv6 and requires a deny-by-default firewall;
+- the server-local VPC mode must be reconciled through the NAT-mode API to
+  `no_nat`; firewall linking returns `409` while a custom-image server is still
+  installing and is therefore retried with a bounded status-aware loop.
+
+The latest attempt reached `no_paid` before the image booted because the
+Timeweb account balance cannot fund even the temporary 1 vCPU / 1 GiB / 40 GiB
+workspace VM. The provider now treats `no_paid`, `blocked`,
+`permanent_blocked`, and `removed` as terminal states and immediately performs
+fail-closed cleanup. Post-attempt API scans confirmed zero `paas-ws-live-*`
+servers and zero matching firewall groups. Therefore private boot/enrollment
+remains pending; no green live evidence is claimed.
