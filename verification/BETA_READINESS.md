@@ -100,6 +100,11 @@ gates.
   `workspace-agent verified-build` validates exact Git HEAD, a clean source
   tree, immutable Dockerfile bases, the separate verified UID boundary and the
   rootless BuildKit metadata digest path.
+- The pinned workspace VM workflow now produces a compact 40 GiB QCOW2, SPDX
+  SBOM and keyless Sigstore bundles. Run `29952874181` passed, and the
+  downloaded image and manifest both passed checksum and exact-workflow
+  identity verification. Timeweb import and boot remain pending until the
+  exposed provider credentials are rotated.
 - The verified-build registry port now binds every SBOM, signature and
   provenance document to an immutable artifact subject. A Harbor-compatible
   HTTPS OCI Distribution adapter resolves exact digests and writes OCI 1.1
@@ -173,9 +178,10 @@ compromise/isolation suite.
   `Create Project -> GitLab/MCP -> plan -> approval -> build -> GitOps ->
   runtime_sim_k8s -> probe -> usage/audit -> destroy`.
   The local acceptance slice covers the agent/runtime/audit half, Project MCP
-  now queues the governed build command, and workspace-agent has the verified
-  rootless BuildKit Dockerfile boundary; GitLab repository bootstrap,
-  disposable VM, Harbor receipt ingestion/trust chain and live Argo remain open.
+  now queues the governed build command, and the signed workspace image has the
+  verified rootless BuildKit Dockerfile boundary; GitLab repository bootstrap,
+  Timeweb image import/disposable VM, Harbor receipt ingestion/trust chain and
+  live Argo remain open.
 - Replace the remaining legacy Agent source/project façade stub through an
   additive v2 compatibility command carrying workspace plan, commit receipt
   and attestation context. The old v1 source signatures are intentionally not
