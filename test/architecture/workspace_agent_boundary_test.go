@@ -105,6 +105,14 @@ func TestArchitecture_WorkspaceImageUsesCompactSignedQCOW2(t *testing.T) {
 			t.Errorf("workspace image importer lacks QCOW2 control %q", required)
 		}
 	}
+	for _, required := range []string{`"output", "-raw", name`, `"image_staging_bucket_name"`, `"image_staging_endpoint"`} {
+		if !strings.Contains(importer, required) {
+			t.Errorf("workspace image importer lacks scoped non-secret state read %q", required)
+		}
+	}
+	if strings.Contains(importer, `"output", "-json"`) {
+		t.Error("workspace image importer may expose stale sensitive OpenTofu outputs")
+	}
 }
 
 func readArchitectureFile(t *testing.T, path string) string {

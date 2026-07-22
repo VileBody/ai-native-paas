@@ -33,14 +33,21 @@ SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 
 def stack_outputs():
-    completed = subprocess.run(
-        ["tofu", f"-chdir={STACK}", "output", "-json"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    values = json.loads(completed.stdout)
-    return {name: item["value"] for name, item in values.items()}
+    # Read only the two non-sensitive values needed by this importer.  A
+    # generic `output -json` also returns stale outputs retained in older
+    # remote-state generations; before the scoped-S3 migration those included
+    # bucket credentials.  The importer must remain safe even until an
+    # operator has applied the output-only state cleanup.
+    values = {}
+    for name in ("image_staging_bucket_name", "image_staging_endpoint"):
+        completed = subprocess.run(
+            ["tofu", f"-chdir={STACK}", "output", "-raw", name],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        values[name] = completed.stdout.strip()
+    return values
 
 
 def api_request(token, method, path, payload=None):
