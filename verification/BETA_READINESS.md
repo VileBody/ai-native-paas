@@ -1,6 +1,6 @@
 # `v0.1.0-beta.1` readiness
 
-Updated: 2026-07-17
+Updated: 2026-07-22
 
 The controlled beta is **not released yet**. The repository baseline, isolated
 PostgreSQL gates, imported IPv4 foundation, private smoke compute, Talos,
@@ -112,6 +112,15 @@ gates.
   restricted test Job were deleted after the run. This validates the internal
   storage/credential path only; it does not close the verified-build trust
   chain or release gate.
+- State-service, workspace logs, image staging and Harbor now use four
+  independent Timeweb S3 users with `Manage` access to exactly one bucket.
+  Each user passed own-bucket authorization and denial against all three
+  foreign buckets. The account-wide administrator secret was reset in the
+  Timeweb panel; its previous value was recovered only in memory from encrypted
+  state and proved rejected, while the rotated administrator and scoped state
+  credentials remained accepted. No Kubernetes Secret contains the previous
+  pair. Detailed evidence is in
+  `docs/evidence/phase-1/timeweb-s3-scoped-consumer-rotation-2026-07-22.md`.
 - Capability gateway admission now has an executable provider-neutral core:
   project-scoped binding admission, per-project rate-limit integration,
   fail-closed provider lease dependency handling, public output without master
@@ -131,8 +140,8 @@ gates.
 
 Timeweb also assigns provider IPv6 addresses to these nodes. Provider
 firewalls default to `DROP`; no IPv6 ingress rule is declared. `SECURITY_GREEN`
-still requires credential rotation, cross-surface sentinel, and workspace
-compromise/isolation evidence.
+still requires the full cross-surface sentinel, live OpenBao service-certificate
+mounts, and workspace compromise/isolation evidence.
 
 ## PostgreSQL safety incident and remediation
 
@@ -143,16 +152,16 @@ the metadata, and state reads and locks recovered. A separate managed test
 database, an explicit IaC grant, and a fail-closed in-cluster PostgreSQL gate
 runner now prevent the same class of mistake.
 
-During final operator verification, the current main S3 credential file was
-rendered in local operator output. It remains ignored by Git and the tracked
-secret sentinel is green, but the credential must be treated as compromised.
-Because Timeweb uses that credential across the state, log and staging buckets,
-its coordinated rotation and consumer reconciliation are required before any
-security/release gate can become green. Authenticated attempts against the
-documented main-user update route returned `404` for `POST`, `PATCH`, and
-`PUT`; no credential or consumer was changed. Rotation must therefore be done
-through a confirmed Timeweb route or the account panel, followed by automated
-reconciliation and old-key rejection evidence.
+During final operator verification, the then-current main S3 credential was
+rendered in local operator output and treated as compromised. The documented
+legacy main-user API route returned `404`, so four least-privilege users were
+created and every consumer was reconciled before the operator reset the
+administrator secret in the account panel. The old pair is now rejected, the
+new administrator pair is accepted, all four scoped paths pass live checks,
+and decoded cluster-wide Secret scanning found no previous credential. The S3
+credential incident is closed as a blocker; the remaining security gates are
+the cross-surface sentinel, live service-certificate deployment and workspace
+compromise/isolation suite.
 
 ## Still required
 
@@ -178,8 +187,6 @@ reconciliation and old-key rejection evidence.
 - Wire the capability gateway core to real OpenBao/provider leases, live
   OpenRouter/Apify/Bright Data calls, usage replay and provider substitution
   evidence.
-- Rotate the Timeweb main S3 secret and reconcile state-service, backend,
-  workspace-log and image-staging consumers; prove the previous secret fails.
 - Produce signed immutable release artifacts and the final restore drill.
 - Issue/mount OpenBao admin-service certificates and record a live in-cluster
   handshake against the new internal mTLS listeners.

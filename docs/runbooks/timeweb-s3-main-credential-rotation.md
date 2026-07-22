@@ -6,8 +6,10 @@ Timeweb documents its automatically created S3 main user as account-wide: it
 can access every bucket. A `twc_s3_bucket` resource may expose that same pair
 for multiple buckets, so separate buckets alone do not isolate credentials.
 The main user must not be used by a runtime consumer or stored in an OpenTofu
-output. This runbook replaces it with least-privilege S3 users before the old
-main user is blocked.
+output. This runbook replaces it with least-privilege S3 users before the
+administrator secret is reset. Timeweb retains the mandatory S3 administrator
+principal; the goal is to invalidate its old secret and remove it from every
+runtime consumer, not to delete the principal.
 
 ## Preconditions
 
@@ -73,15 +75,25 @@ only to the operator command that imports an image or moves a Talos bootstrap
 artifact. Run its existing digest/round-trip gate before treating it as
 switched.
 
-## Revoke and verify
+## Reset and verify the administrator secret
 
-Only after every applicable consumer is proved, block the Timeweb S3 main user
-in **S3 → Users**. Run a harmless authenticated request with the old
-credential against the state bucket and require rejection; discard the response
-body and never print the old pair. Record only `old-key rejected` and the
-timestamp in release evidence. Remove stale local `credentials.env` and
-legacy `.s3.tfbackend` files once no operator uses the fallback path.
+Only after every applicable consumer is proved, open the S3 administrator in
+**S3 → Users** and reset its secret. Do not try to delete the mandatory
+administrator. The legacy public API route may return `404` for migrated
+accounts, in which case the authenticated account panel is the authoritative
+rotation surface.
 
-If a new user fails, unblock the main user only long enough to restore the
-previous working consumer, then fix the new user's bucket scope. Do not widen a
-dedicated user's rights beyond its single bucket as a shortcut.
+Run a harmless authenticated request with the old credential against the state
+bucket and require rejection; discard the response body and never print the old
+pair. Also require the rotated administrator credential and every scoped
+consumer to remain accepted. Record only `old-key rejected` and the timestamp
+in release evidence. Remove stale local `credentials.env` files once no
+operator uses them; a `.s3.tfbackend` file is not a credential by itself and
+may remain as offline recovery configuration when its access/secret values are
+provided separately.
+
+If a new user fails before the administrator reset, restore the previous
+working consumer and fix the new user's bucket scope. After reset, use the
+rotated administrator only for operator recovery and never install it into a
+runtime Secret. Do not widen a dedicated user's rights beyond its single bucket
+as a shortcut.
