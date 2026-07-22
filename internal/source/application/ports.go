@@ -151,6 +151,7 @@ type GitProvider interface {
 	FindOpenMergeRequest(context.Context, int64, string, string) (ProviderMergeRequest, bool, error)
 	CreateMergeRequestNote(context.Context, int64, int64, string) (ProviderMergeRequestNote, error)
 	FindMergeRequestNoteByMarker(context.Context, int64, int64, string) (ProviderMergeRequestNote, bool, error)
+	RenameRepository(context.Context, int64, string, string) (ProviderRepository, error)
 	ArchiveRepository(context.Context, int64) (ProviderRepository, error)
 	UnarchiveRepository(context.Context, int64) (ProviderRepository, error)
 	DeleteRepository(context.Context, int64) error

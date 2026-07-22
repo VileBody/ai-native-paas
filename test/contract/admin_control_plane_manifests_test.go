@@ -78,6 +78,7 @@ func TestAdminWorkspaceManager_UsesProductionBackendsAndKubernetesOpenBaoAuth(t 
 		"OPENBAO_CA_FILE", "OPENBAO_TOKEN_FILE", "value: /vault/secrets/token",
 		"TIMEWEB_WORKSPACE_BANDWIDTH_MBPS", "value: \"1000\"",
 		"WORKSPACE_EGRESS_GATEWAY_URL", "WORKSPACE_EGRESS_GATEWAY_CIDRS",
+		"COMMERCE_API_URL", "workspace-manager-service-mtls",
 		"WORKSPACE_IMAGE_MAP_JSON", "secretName: workspace-manager-secrets",
 		"ai-native-paas.io/pool", "values: [system]", "type: ClusterIP",
 		"192.168.73.6/32", "runAsNonRoot: true", "readOnlyRootFilesystem: true", "drop: [ALL]",

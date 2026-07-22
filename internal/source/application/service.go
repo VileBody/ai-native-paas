@@ -167,24 +167,76 @@ func (s *Service) ProvisionRepository(ctx context.Context, cmd ProvisionReposito
 }
 
 func (s *Service) RenameProject(ctx context.Context, tenantID, actorID, projectID, name string) (domain.Project, error) {
-	var out domain.Project
+	if s.Store == nil || s.Provider == nil || s.Clock == nil || s.IDs == nil {
+		return domain.Project{}, domain.NewError(domain.CodeUnavailable, "source service is not configured")
+	}
+	var planned domain.Project
+	var repository domain.Repository
+	unchanged := false
 	err := s.Store.Transact(ctx, func(tx Tx) error {
 		p, ok := tx.GetProject(projectID)
 		if !ok || p.TenantID != tenantID {
 			return domain.NewError(domain.CodeNotFound, "project not found")
 		}
-		old := p.Version
+		unchanged = p.Name == strings.TrimSpace(name)
 		if err := p.Rename(name, s.Clock.Now()); err != nil {
 			return err
 		}
 		if existing, ok := tx.FindProjectBySlug(tenantID, p.Slug); ok && existing.ID != p.ID {
 			return domain.NewError(domain.CodeConflict, "project slug already exists")
 		}
-		if err := tx.UpdateProject(p, old); err != nil {
+		r, ok := tx.FindRepositoryByProject(projectID)
+		if !ok || r.TenantID != tenantID {
+			return domain.NewError(domain.CodeNotFound, "repository not found")
+		}
+		planned, repository = p, r
+		return nil
+	})
+	if err != nil {
+		return domain.Project{}, err
+	}
+	if unchanged {
+		return planned, nil
+	}
+	remote := ProviderRepository{}
+	if repository.ProviderProjectID > 0 {
+		remote, err = s.Provider.RenameRepository(ctx, repository.ProviderProjectID, planned.Name, planned.Slug)
+		if err != nil {
+			return domain.Project{}, domain.Wrap(domain.CodeExternal, "git repository rename failed", err)
+		}
+	}
+	var out domain.Project
+	err = s.Store.Transact(ctx, func(tx Tx) error {
+		current, ok := tx.GetProject(projectID)
+		if !ok || current.TenantID != tenantID || current.Version+1 != planned.Version {
+			return domain.NewError(domain.CodeConflict, "project changed during provider rename")
+		}
+		currentRepository, ok := tx.FindRepositoryByProject(projectID)
+		if !ok || currentRepository.Version != repository.Version {
+			return domain.NewError(domain.CodeConflict, "repository changed during provider rename")
+		}
+		oldProjectVersion := current.Version
+		if err := current.Rename(name, s.Clock.Now()); err != nil {
 			return err
 		}
-		out = p
-		return tx.AppendAudit(AuditRecord{ID: s.IDs.NewID("aud"), TenantID: tenantID, ActorID: actorID, Action: "source.project.rename", ResourceType: "project", ResourceID: p.ID, Data: []byte(`{}`), CreatedAt: s.Clock.Now()})
+		if err := tx.UpdateProject(current, oldProjectVersion); err != nil {
+			return err
+		}
+		if repository.ProviderProjectID > 0 {
+			oldRepositoryVersion := currentRepository.Version
+			if err := currentRepository.SyncProviderMetadata(remote.ID, remote.PathWithNamespace, remote.WebURL, remote.DefaultBranch, s.Clock.Now()); err != nil {
+				return err
+			}
+			if err := tx.UpdateRepository(currentRepository, oldRepositoryVersion); err != nil {
+				return err
+			}
+		}
+		out = current
+		payload, _ := json.Marshal(map[string]any{"repository_id": currentRepository.ID, "provider_project_id": currentRepository.ProviderProjectID, "path": currentRepository.ProviderPath})
+		if err := tx.AppendOutbox(OutboxRecord{ID: s.IDs.NewID("evt"), Topic: "source.repository_renamed.v2", AggregateID: currentRepository.ID, Payload: payload, CreatedAt: s.Clock.Now()}); err != nil {
+			return err
+		}
+		return tx.AppendAudit(AuditRecord{ID: s.IDs.NewID("aud"), TenantID: tenantID, ActorID: actorID, Action: "source.project.rename", ResourceType: "project", ResourceID: current.ID, Data: []byte(`{}`), CreatedAt: s.Clock.Now()})
 	})
 	return out, err
 }

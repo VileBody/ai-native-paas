@@ -287,6 +287,25 @@ func TestGitLab_ArchiveRestoreAndDeleteUseProjectLifecycleAPI(t *testing.T) {
 	}
 }
 
+func TestGitLab_RenameUsesStableNumericProjectIdentity(t *testing.T) {
+	var body map[string]string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/api/v4/projects/42" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		_, _ = io.WriteString(w, `{"id":42,"name":"Reservations","namespace":{"id":7},"path":"reservations","path_with_namespace":"acme/reservations","web_url":"https://git/acme/reservations","default_branch":"main"}`)
+	}))
+	defer server.Close()
+	client := gitlab.Client{BaseURL: server.URL}
+	repository, err := client.RenameRepository(context.Background(), 42, "Reservations", "reservations")
+	if err != nil || repository.ID != 42 || repository.PathWithNamespace != "acme/reservations" || body["name"] != "Reservations" || body["path"] != "reservations" {
+		t.Fatalf("repository=%+v body=%+v err=%v", repository, body, err)
+	}
+}
+
 func TestGitLab_BootstrapRepositoryUsesExactBaseAndBatchCommit(t *testing.T) {
 	var body struct {
 		Branch        string `json:"branch"`

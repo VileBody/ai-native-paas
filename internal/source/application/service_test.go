@@ -149,7 +149,7 @@ func TestRepository_ProtectionFailureDoesNotPublishReady(t *testing.T) {
 	}
 }
 func TestProjectRename_DoesNotMutateNumericProviderIdentity(t *testing.T) {
-	s, _, _, _, _ := setupService()
+	s, _, provider, _, _ := setupService()
 	r := create(t, s, "Booking", "k1")
 	ready, err := s.ProvisionRepository(context.Background(), application.ProvisionRepositoryCommand{TenantID: "t1", ActorID: "u1", RepositoryID: r.Repository.ID})
 	if err != nil {
@@ -160,8 +160,8 @@ func TestProjectRename_DoesNotMutateNumericProviderIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	after, err := s.GetRepository(context.Background(), "t1", r.Repository.ID)
-	if err != nil || after.ProviderProjectID != ready.ProviderProjectID {
-		t.Fatalf("before=%d after=%d err=%v", ready.ProviderProjectID, after.ProviderProjectID, err)
+	if err != nil || after.ProviderProjectID != ready.ProviderProjectID || after.ProviderPath != "group-10/reservations" || provider.RenameCalls != 1 {
+		t.Fatalf("before=%d after=%+v rename_calls=%d err=%v", ready.ProviderProjectID, after, provider.RenameCalls, err)
 	}
 }
 

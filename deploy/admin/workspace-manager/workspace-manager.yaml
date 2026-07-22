@@ -192,6 +192,14 @@ spec:
               value: /var/run/secrets/workspace-manager/log-s3-secret-key
             - name: WORKSPACE_LOG_ENCRYPTION_KEY_FILE
               value: /var/run/secrets/workspace-manager/log-encryption-key
+            - name: COMMERCE_API_URL
+              value: https://commerce-api.ai-native-paas-system.svc:8443
+            - name: COMMERCE_CA_FILE
+              value: /var/run/secrets/commerce-mtls/ca.crt
+            - name: COMMERCE_CLIENT_CERT_FILE
+              value: /var/run/secrets/commerce-mtls/tls.crt
+            - name: COMMERCE_CLIENT_KEY_FILE
+              value: /var/run/secrets/commerce-mtls/tls.key
           volumeMounts:
             - name: openbao-service-account-token
               mountPath: /var/run/secrets/kubernetes.io/serviceaccount
@@ -204,6 +212,9 @@ spec:
               readOnly: true
             - name: openbao-ca
               mountPath: /var/run/secrets/openbao
+              readOnly: true
+            - name: commerce-mtls
+              mountPath: /var/run/secrets/commerce-mtls
               readOnly: true
           readinessProbe:
             httpGet:
@@ -287,6 +298,17 @@ spec:
             secretName: openbao-client-ca
             defaultMode: 0444
             items:
+              - key: ca.crt
+                path: ca.crt
+        - name: commerce-mtls
+          secret:
+            secretName: workspace-manager-service-mtls
+            defaultMode: 0440
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
               - key: ca.crt
                 path: ca.crt
       terminationGracePeriodSeconds: 30

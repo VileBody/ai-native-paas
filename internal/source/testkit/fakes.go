@@ -44,7 +44,7 @@ type Provider struct {
 	CreateCalls, ProtectCalls, CredentialCalls, RevokeCalls int
 	MergeRequestCalls                                       int
 	MergeRequestNoteCalls                                   int
-	ArchiveCalls, UnarchiveCalls, DeleteCalls               int
+	RenameCalls, ArchiveCalls, UnarchiveCalls, DeleteCalls  int
 	LastMergeRequest                                        application.CreateMergeRequestRequest
 	LostResponseOnce                                        bool
 	MergeRequestLostResponseOnce                            bool
@@ -184,6 +184,20 @@ func (p *Provider) FindMergeRequestNoteByMarker(_ context.Context, projectID, me
 	defer p.mu.Unlock()
 	note, ok := p.MergeRequestNotes[noteKey(projectID, mergeRequestIID, marker)]
 	return note, ok, nil
+}
+func (p *Provider) RenameRepository(_ context.Context, projectID int64, name, projectPath string) (application.ProviderRepository, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.RenameCalls++
+	repository, ok := p.Repositories[projectID]
+	if !ok {
+		return application.ProviderRepository{}, errors.New("project not found")
+	}
+	repository.Path = projectPath
+	repository.PathWithNamespace = fmt.Sprintf("group-%d/%s", repository.NamespaceID, projectPath)
+	repository.WebURL = "https://git.example/" + projectPath
+	p.Repositories[projectID] = repository
+	return repository, nil
 }
 func (p *Provider) ArchiveRepository(_ context.Context, projectID int64) (application.ProviderRepository, error) {
 	p.mu.Lock()

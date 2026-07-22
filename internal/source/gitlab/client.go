@@ -173,7 +173,8 @@ func min(a, b int) int {
 }
 
 type projectJSON struct {
-	ID        int64 `json:"id"`
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
 	Namespace struct {
 		ID int64 `json:"id"`
 	} `json:"namespace"`
@@ -184,6 +185,27 @@ type projectJSON struct {
 	Description       string   `json:"description"`
 	Topics            []string `json:"topics"`
 	Archived          bool     `json:"archived"`
+}
+
+func (c *Client) RenameRepository(ctx context.Context, projectID int64, name, projectPath string) (application.ProviderRepository, error) {
+	name = strings.TrimSpace(name)
+	projectPath = strings.TrimSpace(projectPath)
+	if projectID <= 0 || name == "" || len(name) > 255 || projectPath == "" || len(projectPath) > 255 || strings.ContainsAny(projectPath, `/\\\x00`) || pathpkg.Clean(projectPath) != projectPath {
+		return application.ProviderRepository{}, errors.New("gitlab rename request is invalid")
+	}
+	var project projectJSON
+	err := c.do(ctx, http.MethodPut, "/projects/"+strconv.FormatInt(projectID, 10), map[string]string{"name": name, "path": projectPath}, &project)
+	if err != nil {
+		observed, observeErr := c.GetRepository(ctx, projectID)
+		if observeErr == nil && observed.ID == projectID && observed.Path == projectPath {
+			return observed, nil
+		}
+		return application.ProviderRepository{}, err
+	}
+	if project.ID != projectID || project.Path != projectPath || project.Name != name {
+		return application.ProviderRepository{}, errors.New("gitlab rename response does not match requested identity")
+	}
+	return toProvider(project), nil
 }
 
 func toProvider(p projectJSON) application.ProviderRepository {
