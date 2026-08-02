@@ -19,20 +19,12 @@ data:
       reverse_proxy clean-start-gateway.rec-sidecar.svc.cluster.local:80
     }
 
-    suffleur.teamgenius.ru {
-      tls /etc/caddy/legacy-tls/suffleur.crt /etc/caddy/legacy-tls/suffleur.key
+    voicechat.teamgenius.ru {
+      tls {
+        issuer acme {
+          disable_http_challenge
+        }
+      }
       encode zstd gzip
-      reverse_proxy pulseplus-copilot.rec-sidecar.svc.cluster.local:80
-    }
-
-    vietnam.teamgenius.ru {
-      tls /etc/caddy/legacy-tls/vietnam.crt /etc/caddy/legacy-tls/vietnam.key
-      encode zstd gzip
-      reverse_proxy vietnest.vietnam-rent.svc.cluster.local:80
-    }
-
-    klukhanova.teamgenius.ru {
-      tls /etc/caddy/legacy-tls/klukhanova.crt /etc/caddy/legacy-tls/klukhanova.key
-      encode zstd gzip
-      reverse_proxy klukhanova-static.rec-sidecar.svc.cluster.local:80
+      reverse_proxy botamin-voice.botamin-voice.svc.cluster.local:80
     }

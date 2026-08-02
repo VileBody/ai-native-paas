@@ -7,11 +7,10 @@ spec:
   description: Operator-owned legacy apps excluded from the AI-native PaaS runtime.
   sourceRepos:
     - https://github.com/VileBody/rec-sidecar-mvp.git
-    - https://github.com/VileBody/vietnam-rent-miniapp.git
   destinations:
     - namespace: rec-sidecar
       server: https://kubernetes.default.svc
-    - namespace: vietnam-rent
+    - namespace: botamin-voice
       server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
@@ -33,75 +32,41 @@ spec:
   project: legacy-quarantine
   source:
     repoURL: https://github.com/VileBody/rec-sidecar-mvp.git
-    targetRevision: 59a6e0c8fe0cfb4022988a9bc3ce5cf43b0d3102
-    path: k8s
+    targetRevision: b20a5923541205a50dcabfeb661f67ada3e9f979
+    path: k8s/minimal-rec
   destination:
     server: https://kubernetes.default.svc
     namespace: rec-sidecar
-  ignoreDifferences:
-    - group: apps
-      kind: Deployment
-      jsonPointers:
-        - /spec/template/spec/containers/0/image
-        - /spec/template/spec/imagePullSecrets
-        - /spec/template/spec/nodeSelector
-    - group: ""
-      kind: PersistentVolumeClaim
-      jsonPointers:
-        - /spec/storageClassName
-        - /spec/resources/requests/storage
-    - group: apps
-      kind: Deployment
-      name: clean-start-edge
-      jsonPointers:
-        - /spec/template/spec/containers/0/volumeMounts
-        - /spec/template/spec/volumes
-    - group: ""
-      kind: ConfigMap
-      name: clean-start-edge-caddy
-      jsonPointers:
-        - /data
   syncPolicy:
     automated:
       enabled: true
-      prune: false
+      prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
-      - RespectIgnoreDifferences=true
+      - PruneLast=true
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: vietnam-rent
+  name: botamin-voice
   namespace: legacy-argocd
   labels:
     ai-native-paas.io/scope: legacy-quarantine
 spec:
   project: legacy-quarantine
   source:
-    repoURL: https://github.com/VileBody/vietnam-rent-miniapp.git
-    targetRevision: main
-    path: k8s
+    repoURL: https://github.com/VileBody/rec-sidecar-mvp.git
+    targetRevision: b20a5923541205a50dcabfeb661f67ada3e9f979
+    path: k8s/botamin-voice
   destination:
     server: https://kubernetes.default.svc
-    namespace: vietnam-rent
-  ignoreDifferences:
-    - group: apps
-      kind: Deployment
-      jsonPointers:
-        - /spec/template/spec/imagePullSecrets
-        - /spec/template/spec/nodeSelector
-    - group: ""
-      kind: PersistentVolumeClaim
-      jsonPointers:
-        - /spec/storageClassName
-        - /spec/resources/requests/storage
+    namespace: botamin-voice
   syncPolicy:
     automated:
       enabled: true
-      prune: false
+      prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
-      - RespectIgnoreDifferences=true
+      - PruneLast=true

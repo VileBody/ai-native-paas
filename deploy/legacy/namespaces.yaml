@@ -21,9 +21,10 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: vietnam-rent
+  name: botamin-voice
   labels:
     ai-native-paas.io/scope: legacy-quarantine
-    pod-security.kubernetes.io/enforce: baseline
+    app.kubernetes.io/part-of: botamin-voice
+    pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted

@@ -33,7 +33,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [namespaces]
-    resourceNames: [rec-sidecar, vietnam-rent]
+    resourceNames: [rec-sidecar, botamin-voice]
     verbs: [get, patch, update]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -86,22 +86,25 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: legacy-argocd-application-manager
-  namespace: vietnam-rent
+  namespace: botamin-voice
   labels:
     ai-native-paas.io/scope: legacy-quarantine
 rules:
   - apiGroups: [""]
-    resources: [configmaps, services, persistentvolumeclaims]
+    resources: [configmaps, services, persistentvolumeclaims, serviceaccounts]
     verbs: [get, list, watch, create, update, patch, delete]
   - apiGroups: [apps]
-    resources: [deployments]
+    resources: [deployments, statefulsets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
     verbs: [get, list, watch, create, update, patch, delete]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: legacy-argocd-application-manager
-  namespace: vietnam-rent
+  namespace: botamin-voice
   labels:
     ai-native-paas.io/scope: legacy-quarantine
 roleRef:
